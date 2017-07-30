@@ -19,7 +19,7 @@
     "angular": "1.5.8",
     "angular-animate": "^1.6.5",
     "angular-aria": "1.5.8",
-    "angular-bootstrap": "^0.12.1",
+    "angular-bootstrap": "^2.5.0",
     "angular-bootstrap-nav-tree": "*",
     "angular-cookies": "1.5.8",
     "angular-file-upload": "~1.1.1",
@@ -125,6 +125,6 @@
     "angular-sanitize": "1.5.8",
     "angular-touch": "1.5.8",
     "fullcalendar": "~2.7.1",
-    "angular-bootstrap": "^0.12.1"
+    "angular-bootstrap": "^2.5.0"
   }
 }

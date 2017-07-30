@@ -1,0 +1,158 @@
+.bg-pink {
+  color: #fffefa;
+  background-color: #ffa7b6;
+}
+
+.bg-pink.lt,
+.bg-pink .lt {
+  background-color: #ffc0cb;
+}
+
+.bg-pink.lter,
+.bg-pink .lter {
+  background-color: #ffdae0;
+}
+
+.bg-pink.dk,
+.bg-pink .dk {
+  background-color: #ff8da1;
+}
+
+.bg-pink.dker,
+.bg-pink .dker {
+  background-color: #ff748c;
+}
+
+.bg-pink.bg,
+.bg-pink .bg {
+  background-color: #ffa7b6;
+}
+
+.bg-pink a {
+  color: #ffffff;
+}
+
+.bg-pink a:hover {
+  color: #ffffff;
+}
+
+.bg-pink a.list-group-item:hover,
+.bg-pink a.list-group-item:focus {
+  background-color: inherit;
+}
+
+.bg-pink .nav > li:hover > a,
+.bg-pink .nav > li:focus > a,
+.bg-pink .nav > li.active > a {
+  color: #ffffff;
+  background-color: #fcd417;
+}
+
+.bg-pink .nav > li > a {
+  color: #f2f2f2;
+}
+
+.bg-pink .nav > li > a:hover,
+.bg-pink .nav > li > a:focus {
+  background-color: #fcd621;
+}
+
+.bg-pink .nav .open > a {
+  background-color: #fcd417;
+}
+
+.bg-pink .caret {
+  border-top-color: #fffefa;
+  border-bottom-color: #fffefa;
+}
+
+.bg-pink.navbar .nav > li.active > a {
+  color: #ffffff;
+  background-color: #fcd417;
+}
+
+.bg-pink .open > a,
+.bg-pink .open > a:hover,
+.bg-pink .open > a:focus {
+  color: #ffffff;
+}
+
+.bg-pink .text-muted {
+  color: #ffa7b6 !important;
+}
+
+.bg-pink .text-lt {
+  color: #ffffff !important;
+}
+
+.bg-pink.auto .list-group-item,
+.bg-pink .auto .list-group-item {
+  background-color: transparent;
+  border-color: #f9d21a !important;
+}
+
+.bg-warning.auto .list-group-item:hover,
+.bg-warning .auto .list-group-item:hover,
+.bg-warning.auto .list-group-item:focus,
+.bg-warning .auto .list-group-item:focus,
+.bg-warning.auto .list-group-item:active,
+.bg-warning .auto .list-group-item:active,
+.bg-warning.auto .list-group-item.active,
+.bg-warning .auto .list-group-item.active {
+  background-color: #fcd417 !important;
+}
+
+.btn-pink {
+  color: #ffffff !important;
+  background-color: #ffa7b6;
+  border-color: #ffa7b6;
+}
+
+.btn-pink:hover,
+.btn-pink:focus,
+.btn-pink:active,
+.btn-pink.active,
+.open .dropdown-toggle.btn-pink {
+  color: #ffffff !important;
+  background-color: #ffa7b6;
+  border-color: #ffa7b6;
+}
+
+.btn-pink:active,
+.btn-pink.active,
+.open .dropdown-toggle.btn-pink {
+  background-image: none;
+}
+
+.btn-pink.disabled,
+.btn-pink[disabled],
+fieldset[disabled] .btn-pink,
+.btn-pink.disabled:hover,
+.btn-pink[disabled]:hover,
+fieldset[disabled] .btn-pink:hover,
+.btn-pink.disabled:focus,
+.btn-pink[disabled]:focus,
+fieldset[disabled] .btn-pink:focus,
+.btn-pink.disabled:active,
+.btn-pink[disabled]:active,
+fieldset[disabled] .btn-pink:active,
+.btn-pink.disabled.active,
+.btn-pink[disabled].active,
+fieldset[disabled] .btn-pink.active {
+  background-color: #ffa7b6;
+  border-color: #ffa7b6;
+}
+
+.navbar-brand img {
+	max-height:40px;
+	margin-top:5px;
+}
+
+.modal .modal-body {
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+.l-height-30{
+    line-height: 30px;
+}

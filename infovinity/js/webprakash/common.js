@@ -84,3 +84,7 @@ function getDtOptions(url, DTOptionsBuilder, $compile, $scope){
 function getModulePath(mPath){
     return MODULES + mPath.split('.').join('/' + MODULES) + '/';
 }
+
+function getRemoteURL(file){
+	return appConfig.engineUrl + file;
+}

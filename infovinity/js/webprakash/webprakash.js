@@ -121,6 +121,25 @@ angular.module('webprakash').factory('AuthService', function ($http, tokenServic
     return authService;
 });
 
+angular.module('webprakash').factory('helper', function () {
+    
+	var factory = {}; 
+	
+	factory.getModulePath = function(mPath){
+		return MODULES + mPath.split('.').join('/' + MODULES) + '/';
+	};
+
+	factory.getRemoteURL = function(mFile){
+		return appConfig.engineUrl + mFile;
+	};
+
+	factory.getLetterIcon = function(mName){
+		return getRemoteURL('img/letters/material/A.png');
+	};
+    
+    return factory;
+});
+
 angular.module('webprakash').factory('AuthInterceptor', function ($rootScope, $q, APP_EVENTS) {
     return {
         responseError: function (response) {
@@ -163,8 +182,10 @@ angular.module('webprakash').factory('dataFactory', ['$http', function($http) {
     return dataFactory;
 }]);
 
-angular.module('webprakash').run(['$rootScope', '$transitions', '$state', '$stateParams', '$translate', '$localStorage', '$window', 'AuthService', '$cookieStore', 'toaster',
-        function ($rootScope, $transitions, $state, $stateParams, $translate, $localStorage, $window, AuthService, $cookieStore, toaster) {
+angular.module('webprakash').run(['$rootScope', '$transitions', '$state', '$stateParams', '$translate', '$localStorage', '$window', 'AuthService', '$cookieStore', 'toaster', 'helper',
+        function ($rootScope, $transitions, $state, $stateParams, $translate, $localStorage, $window, AuthService, $cookieStore, toaster, helper) {
+			
+			$rootScope.helper = helper;
                        
             $rootScope.$on('app-error', function(event, mass) {
                 if (! angular.isObject(mass.data)){

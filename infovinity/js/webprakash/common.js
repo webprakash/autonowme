@@ -2,6 +2,18 @@
  * Created by Prakash Khandelwal on 3/8/2015.
  */
 
+function getModulePath(mPath){
+    return MODULES + mPath.split('.').join('/' + MODULES) + '/';
+}
+
+function getRemoteURL(file){
+	return appConfig.engineUrl + file;
+}
+
+function getLetterIcon(mName){
+	return getRemoteURL('img/letters/material/A.png');
+}
+ 
 angular.isUndefinedOrNull = function(val) {
     return angular.isUndefined(val) || val === null
 }
@@ -81,10 +93,3 @@ function getDtOptions(url, DTOptionsBuilder, $compile, $scope){
     .withBootstrap();    
 }
 
-function getModulePath(mPath){
-    return MODULES + mPath.split('.').join('/' + MODULES) + '/';
-}
-
-function getRemoteURL(file){
-	return appConfig.engineUrl + file;
-}

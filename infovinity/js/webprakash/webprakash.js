@@ -163,7 +163,7 @@ angular.module('webprakash').factory('dataFactory', ['$http', function($http) {
     return dataFactory;
 }]);
 
-angular.module('webprakash').factory('helper', function () {
+angular.module('webprakash').factory('helper', [function () {
     
 	var factory = {}; 
 	
@@ -180,7 +180,7 @@ angular.module('webprakash').factory('helper', function () {
 	};
     
     return factory;
-});
+}]);
 
 angular.module('webprakash').run(['$rootScope', '$transitions', '$state', '$stateParams', '$translate', '$localStorage', '$window', 'AuthService', '$cookieStore', 'toaster', 'helper',
         function ($rootScope, $transitions, $state, $stateParams, $translate, $localStorage, $window, AuthService, $cookieStore, toaster, helper) {

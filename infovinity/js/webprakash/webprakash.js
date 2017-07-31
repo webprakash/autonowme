@@ -1,25 +1,4 @@
-angular.module('helper', []);
-
-angular.module('helper').factory('helper', function () {
-    
-	var factory = {}; 
-	
-	factory.getModulePath = function(mPath){
-		return MODULES + mPath.split('.').join('/' + MODULES) + '/';
-	};
-
-	factory.getRemoteURL = function(mFile){
-		return appConfig.engineUrl + mFile;
-	};
-
-	factory.getLetterIcon = function(mName){
-		return getRemoteURL('img/letters/material/A.png');
-	};
-    
-    return factory;
-});
-
-angular.module('webprakash', ['angular-jwt', 'helper']);
+angular.module('webprakash', ['angular-jwt']);
 
 angular.module('webprakash').constant('APP_EVENTS', {
     sessionTimeout: 'app-session-timeout',
@@ -183,6 +162,25 @@ angular.module('webprakash').factory('dataFactory', ['$http', function($http) {
 
     return dataFactory;
 }]);
+
+angular.module('webprakash').factory('helper', function () {
+    
+	var factory = {}; 
+	
+	factory.getModulePath = function(mPath){
+		return MODULES + mPath.split('.').join('/' + MODULES) + '/';
+	};
+
+	factory.getRemoteURL = function(mFile){
+		return appConfig.engineUrl + mFile;
+	};
+
+	factory.getLetterIcon = function(mName){
+		return getRemoteURL('img/letters/material/A.png');
+	};
+    
+    return factory;
+});
 
 angular.module('webprakash').run(['$rootScope', '$transitions', '$state', '$stateParams', '$translate', '$localStorage', '$window', 'AuthService', '$cookieStore', 'toaster', 'helper',
         function ($rootScope, $transitions, $state, $stateParams, $translate, $localStorage, $window, AuthService, $cookieStore, toaster, helper) {

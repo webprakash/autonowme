@@ -2,7 +2,9 @@
  * Created by Prakash Khandelwal on 3/8/2015.
  */
 
-
+function getRemoteURL(mFile){
+	return appConfig.engineUrl + mFile;
+};
  
 angular.isUndefinedOrNull = function(val) {
     return angular.isUndefined(val) || val === null

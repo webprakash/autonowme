@@ -3,8 +3,30 @@
  */
 
 function getRemoteURL(mFile){
-	return appConfig.engineUrl + mFile;
+	return appConfig.libUrl + mFile;
 };
+
+function getAddonPath(addonKey){
+	return MODULES + addonKey.split('.').join('/' + MODULES) + '/';
+};
+
+function getAddonUrl(addonKey){
+	return appConfig.appUrl + appConfig.module.name  + '/' + getAddonPath(addonKey);
+};
+
+function getLetterIcon(mName){
+	return getRemoteURL('img/letters/material/A.png');
+};
+
+function getUploadedImgURL(mImg, size){
+	if (mImg == '' || mImg == undefined){
+        mImg = 'http://via.placeholder.com/' + size;
+        return mImg;
+    }
+    else {
+        return appConfig.dataUrl + mImg;        
+    }
+}
  
 angular.isUndefinedOrNull = function(val) {
     return angular.isUndefined(val) || val === null
@@ -63,7 +85,7 @@ Array.prototype.diff = function(a) {
 };
 
 function getDtOptions(url, DTOptionsBuilder, $compile, $scope){
-    var urlBase = appConfig.wsModuleUrl;
+    var urlBase = appConfig.wsUrl;
     return DTOptionsBuilder.newOptions()
         .withOption('ajax', {
          url: urlBase + url,

@@ -27,5 +27,6 @@
   },
   "_source": "https://github.com/tinymce/tinymce-dist.git",
   "_target": "^4.6.4",
-  "_originalSource": "tinymce-dist"
+  "_originalSource": "tinymce",
+  "_direct": true
 }

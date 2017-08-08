@@ -87,6 +87,10 @@ module.exports = {
 					
 					'angular-xeditable/dist/**',
 					
+					'angular-bootstrap-datetimepicker/src/**',
+					'angular-date-time-input/src/**',
+					'bootstrap-ui-datetime-picker/dist/**',
+					
 					'jquery.easy-pie-chart/dist/**',
 					
 					'ngBootbox/dist/**',
@@ -229,7 +233,7 @@ module.exports = {
 					'slimscroll/jquery.slimscroll.js',
 					'slimscroll/jquery.slimscroll.min.js',
 					
-					'tinymce/tinymce.js'					
+					'tinymce/**'					
                 ],
                 dest: 'infovinity/libs/jquery',
                 cwd:  'bower_components',

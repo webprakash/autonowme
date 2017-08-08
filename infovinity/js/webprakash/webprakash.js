@@ -1,4 +1,7 @@
-angular.module('webprakash', ['angular-jwt']);
+angular.module('webprakash', ['angular-jwt', 'pascalprecht.translate'], function ($translateProvider) {
+	// tell angular-translate to use your custom handler
+	$translateProvider.useMissingTranslationHandler('defaultTranslateFactory');
+});
 
 angular.module('webprakash').constant('APP_EVENTS', {
     sessionTimeout: 'app-session-timeout',
@@ -67,6 +70,16 @@ angular.module('webprakash').service('tokenService', function ($http) {
     this.destroyToken = function(){
         window.sessionStorage.removeItem("rmsToken");
     }
+});
+
+app.factory('defaultTranslateFactory', function () {
+	// has to return a function which gets a tranlation ID
+	return function (translationID) {
+		var str = translationID.split('.');
+		return str[str.length - 1].replace(/_/g, " ");
+		// return translationID;
+		// do something with dep1 and dep2
+	};
 });
 
 angular.module('webprakash').factory('AuthService', function ($http, tokenService, jwtHelper) {   
@@ -149,7 +162,8 @@ angular.module('webprakash').factory('AuthInterceptor', function ($rootScope, $q
 });
 
 angular.module('webprakash').factory('dataFactory', ['$http', function($http) {
-    var urlBase = appConfig.wsModuleUrl;
+    var urlBase = appConfig.wsUrl;
+	
     var dataFactory = {};
 
     dataFactory.getData = function (url, params) {
@@ -163,29 +177,105 @@ angular.module('webprakash').factory('dataFactory', ['$http', function($http) {
     return dataFactory;
 }]);
 
-angular.module('webprakash').factory('helper', [function () {
-    
-	var factory = {}; 
+angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFactory', function($rootScope, $http, dataFactory) {
+
+    var helper = {};
+
+    helper.getRemoteURL = function (mFile) {
+        return getRemoteURL(mFile);
+    };
+
+    helper.getAddonPath = function (mPath) {
+        return getAddonPath(mPath);
+    };
 	
-	factory.getModulePath = function(mPath){
-		return MODULES + mPath.split('.').join('/' + MODULES) + '/';
-	};
+	helper.getCurrentAddonPath = function(){
+		return appConfig.module.name  + '/' + helper.getAddonPath($rootScope.$state.$current.parent.name);
+	}
+	
+	helper.getAddonUrl = function(addonKey){
+		return getAddonUrl(addonKey);
+	}
+	
+	helper.getCurrentAddonTplUrl = function(tpl){
+		return getAddonUrl($rootScope.$state.$current.parent.name) + tpl;
+	}
+	
+	helper.getLetterIcon = function (mName) {
+        return getLetterIcon(mName);
+    };
+	
+	helper.getUploadedImgURL = function(mImg, size){		
+		return getUploadedImgURL(mImg, size);
+	}
+	
+	helper.save = function(actionUrl, obj, goTo){
+		if(angular.isUndefinedOrNull(goTo)){
+			goTo = '.list';
+		}
+		dataFactory.postData(actionUrl, obj).then(
+            function (res) {
+                helper.goPeer(goTo);
+            },
+            function (error) {
+				console.log(error);
+            }
+        );
+	}
+	
+	helper.TrueFalse = function(v){
+		if (v == 1) return true;
+        return false;
+	}
+	
+	helper.BoolToInt = function(v){
+		if (v) return 1;
+        return 0;
+	}
+	
+	helper.goPeer = function(s){
+		$rootScope.$state.go($rootScope.$state.$current.parent.name + s);
+	}
+	
+	helper.getDTActionHTML = function(deleteUrl, tblInstance, data){
+	
+		return '' +
+        
+        '<a class="btn btn-xs btn-default" ui-sref="' + $rootScope.$state.$current.parent.name + '.edit({id:' + data.id + '})">' + 
+               '<i class="fa fa-edit"></i>' +
+        '</a>' +
+        
+        '<button type="button" ng-click="' + 'helper.deleteDTObj(\'' + deleteUrl + '\',' + tblInstance + ',' + data.id + ')" class="btn btn-xs btn-default m-l-xs">' + 
+               '<i class="fa fa-times"></i>' +
+        '</button>';
+	}
+	
+	helper.deleteDTObj = function(deleteUrl, tblInstance, id){
+        var r = confirm("Are you sure, you want to delete this user ?");
+        if (r == true) {
+            var params = {'id' : id}
+            dataFactory.postData(deleteUrl, params).then(
+                function (res) {
+                    tblInstance.reloadData(function(){}, true);
+                },
+                function (error) {
+                    // $scope.status = 'Unable to load customer data: ' + error.message;
+                }
+            );
+        }
+    }
 
-	factory.getRemoteURL = function(mFile){
-		return appConfig.engineUrl + mFile;
-	};
-
-	factory.getLetterIcon = function(mName){
-		return getRemoteURL('img/letters/material/A.png');
-	};
-    
-    return factory;
+    return helper;
 }]);
 
-angular.module('webprakash').run(['$rootScope', '$transitions', '$state', '$stateParams', '$translate', '$localStorage', '$window', 'AuthService', '$cookieStore', 'toaster', 'helper',
+
+angular.module('webprakash').run(['$rootScope', '$transitions', '$state', '$stateParams', '$translate', '$localStorage', '$window', 'AuthService', '$cookieStore', 'toaster', 'helper', 
         function ($rootScope, $transitions, $state, $stateParams, $translate, $localStorage, $window, AuthService, $cookieStore, toaster, helper) {
 			
+			$rootScope.$state = $state;
+			$rootScope.$stateParams = $stateParams;
 			$rootScope.helper = helper;
+			
                        
             $rootScope.$on('app-error', function(event, mass) {
                 if (! angular.isObject(mass.data)){
@@ -296,6 +386,7 @@ angular.module('webprakash').run(['$rootScope', '$transitions', '$state', '$stat
                 $translate.use(langKey);
                 $rootScope.lang.isopen = !$rootScope.lang.isopen;
             };
+
             
             // add 'ie' classes to html
             var isIE = !!navigator.userAgent.match(/MSIE/i);
@@ -313,3 +404,155 @@ angular.module('webprakash').run(['$rootScope', '$transitions', '$state', '$stat
             $rootScope.$stateParams = $stateParams;
         }
     ]);
+	
+
+angular.module('webprakash').directive('wpDatepicker', function(){
+    return {
+		restrict: 'EA',
+		template: '<p class="input-group">' + 
+				'<input type="type" class="form-control" ui-date-format = "dd-MMM-yyyy"  uib-datepicker-popup="{{wpUibDatepickerPopup}}" ng-model="val" is-open="wpIsOpen" datepicker-options="wpDatepickerOptions" ng-required="ngRequired" />' +
+				
+				// '<input type="text" class="form-control" date-format = "dd-MMM-yyyy HH:mm" datetime-picker="dd-MMM-yyyy HH:mm" ng-model="model" is-open="wpIsOpen" save-as = "a(c)" read-as = "b(c)"/>' +
+				
+				'<span class="input-group-btn">' + 
+				'<button type="button" class="btn btn-default" ng-click="open()"><i class="glyphicon glyphicon-calendar"></i></button>' + 
+				'</span>' + 
+				'</p>',
+		scope: {
+			val: '=',
+			wpUibDatepickerPopup: '@?',
+			wpDatepickerOptions: '=?',
+			ngRequired: '=?',
+			wpIsOpen:'@?'
+		},
+		controller: function($scope){
+			
+			$scope.a = function(v){
+				console.log(v);
+			}
+			
+			$scope.b = function(v){
+				console.log(v);
+				return Date.parse($scope.model);
+			}
+		},      
+		link: function(scope, element, attrs) {
+			if (angular.isUndefinedOrNull(attrs.wpUibDatepickerPopup)){
+				scope.wpUibDatepickerPopup = 'dd-MMM-yyyy';
+			}
+						
+			scope.model = Date.parse(attrs.model);
+			
+
+							
+            scope.open = function() {
+				scope.wpIsOpen = true;
+			};					
+        }
+    };
+  });	
+	
+	
+angular.module('webprakash').directive('wpImgUploader', function(helper, Upload){
+    return {
+      restrict: 'EA',
+      template: '<div class="thumbnail m-b-sm">' +
+                '<img title = "{{size}} px" id="img_{{$id}}" ngf-min-width = "10" ngf-min-height = "10" ngf-thumbnail="tmpImg || \'c0.jpg\'">' +
+                '<span ng-show = "isLoading" class = "loading_thumb"><p>Loading...</p></span>' +
+                '</div>' +
+                '<uib-progressbar ng-show = "tmpProgress > 0 && tmpProgress < 100"  value="tmpProgress" class="progress-xxs"></uib-progressbar>' +                    
+                '<span class="btn btn-primary" ngf-select="upload($file, \'model\')" ngf-multiple="true" name="file" accept="*.jpg, *.jpeg, *.png, *.gif" ' +
+                    'ngf-min-height="100"  enctype="multipart/form-data">Select Image</span>' +
+                '<button title = "{{size}} px" type="button" ng-click = "removeImage()" class="btn btn-default m-l">X</button>' +
+                '<input type="hidden" name = "model" ng-model = "model">',
+      scope: {
+        model: "=ngModel",
+        accounts:'@',
+        title: '@',
+        size: '@'
+      },
+      controller: function($scope){
+          $scope.isLoading = false;
+      },      
+      link: function($scope, element, attrs) {
+            $scope.tmpImg = helper.getUploadedImgURL($scope.model, $scope.size);
+            $scope.tmpProgress = 0; 
+            
+            
+            element.find('img').bind("load" , function(e){                          
+                $scope.isLoading = false;
+                $scope.tmpProgress = 0;
+                
+                if(this.naturalHeight > this.naturalWidth){
+                    this.className = "vertical";
+                }
+                $scope.$apply();
+            });
+            
+            $scope.removeImage = function(){
+                $scope.model = '';
+                $scope.tmpImg = helper.getUploadedImgURL($scope.model, $scope.size);              
+            }
+
+            $scope.upload = function (file, eleName) {
+                var uploadUrl = appConfig.wsUrl + 'default/fileupload';
+
+                Upload.upload({
+                    url: uploadUrl,
+                    fields: {'eleName': eleName},
+                    file: file
+                }).progress(function (evt) {
+                    var progressPercentage = parseInt(100.0 * evt.loaded / evt.total);
+                    $scope.tmpProgress = progressPercentage;
+                    console.log('progress: ' + progressPercentage + '% ' + evt.config.file.name);
+                }).success(function (data, status, headers, config) {
+                    $scope.model = data;
+                    $scope.tmpImg = helper.getUploadedImgURL($scope.model, $scope.size); 
+                    $scope.isLoading = true;
+                }).error(function (data, status, headers, config) {
+                    console.log('error status: ' + data);
+                })
+            };
+        }
+    };
+  });
+	
+angular.module('webprakash').directive('wpDatetimepicker', function(helper){
+    return {
+		restrict: 'EA',
+     			
+				
+		template:	'<p class="input-group">' +
+				'<input type="text" class="form-control" ng-required = "{{required}}" enable-time="enableTime" enable-date="enableDate" datepicker-options = "{dateFormat: \'{{format}}\'}" datetime-picker="{{format}}" ng-model="model" is-open="isOpen"  />' +
+				'<span class="input-group-btn">' +
+				'<button type="button" class="btn btn-default" ng-click="isOpen = true"><i class="fa fa-calendar"></i></button>' +
+				'</span>' +
+				'</p>',
+
+		scope: {
+			model: "=ngModel",
+			format: '@format',
+			picker: '@picker',
+			enableTime: '=enableTime',
+			enableDate: '=enableDate',	
+			required: "@ngRequired"
+		},
+		link: function($scope, element, attrs){
+			$scope.model = new Date($scope.model);			
+		}
+			
+    };
+  });
+  
+angular.module('webprakash').directive('wp-orientable', function () {       
+    return {
+        link: function(scope, element, attrs) { 
+            element.on("load" , function(e){ 
+                if(this.naturalHeight > this.naturalWidth){
+                    this.className = "vertical";
+                }
+            });
+        }
+    }
+});
+

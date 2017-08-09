@@ -10,12 +10,21 @@ function getAddonPath(addonKey){
 	return MODULES + addonKey.split('.').join('/' + MODULES) + '/';
 };
 
+function getModuleUrl(path){
+	console.log(appConfig.appUrl + appConfig.module.name  + '/' + path);
+	return appConfig.appUrl + appConfig.module.name  + '/' + path;
+}
+
 function getAddonUrl(addonKey){
 	return appConfig.appUrl + appConfig.module.name  + '/' + getAddonPath(addonKey);
 };
 
+function getDataUrl(path){
+	return appConfig.dataUrl + path;
+};
+
 function getLetterIcon(mName){
-	return getRemoteURL('img/letters/material/A.png');
+	return getRemoteURL('img/letters/material/' + mName.substring(0,1).toUpperCase() + '.png');
 };
 
 function getUploadedImgURL(mImg, size){

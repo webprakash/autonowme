@@ -184,6 +184,14 @@ angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFact
     helper.getRemoteURL = function (mFile) {
         return getRemoteURL(mFile);
     };
+	
+	helper.getModuleUrl = function(path){
+		return getModuleUrl(path);
+	}
+	
+	helper.getDataUrl = function(path){
+		return getDataUrl(path);
+	}
 
     helper.getAddonPath = function (mPath) {
         return getAddonPath(mPath);
@@ -196,9 +204,17 @@ angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFact
 	helper.getAddonUrl = function(addonKey){
 		return getAddonUrl(addonKey);
 	}
-	
+		
 	helper.getCurrentAddonTplUrl = function(tpl){
 		return getAddonUrl($rootScope.$state.$current.parent.name) + tpl;
+	}
+		
+	helper.getProfilePic = function(userData){
+		if (userData.profile_image != ''){
+			return helper.getDataUrl(userData.profile_image);
+		}
+		
+		return getLetterIcon(userData.first_name);
 	}
 	
 	helper.getLetterIcon = function (mName) {
@@ -538,7 +554,15 @@ angular.module('webprakash').directive('wpDatetimepicker', function(helper){
 			required: "@ngRequired"
 		},
 		link: function($scope, element, attrs){
-			$scope.model = new Date($scope.model);			
+			$scope.model = new Date($scope.model);
+
+			if (angular.isUndefinedOrNull(attrs.required)){
+				$scope.required = "false";				
+				console.log('prakash');
+			}
+			else {
+				$scope.required = "true";
+			}
 		}
 			
     };
@@ -556,3 +580,23 @@ angular.module('webprakash').directive('wp-orientable', function () {
     }
 });
 
+
+angular.module('webprakash').directive('wpTrueValue', [function() {
+  return {
+    restrict: 'A',
+    require: 'ngModel',
+    link: function(scope, element, attrs, ngModel) {
+		console.log(ngModel);	
+		
+		ngModel.$formatters.push(function(value) {
+			return value == 1 ? true : false;
+		});
+  
+	
+		ngModel.$parsers.push(function(v){		
+			console.log(v);
+			return v ? scope.$eval(attrs.wpTrueValue) : scope.$eval(attrs.wpFalseValue);
+		});
+    }
+  };
+}]);

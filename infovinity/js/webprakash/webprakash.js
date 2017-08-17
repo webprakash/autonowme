@@ -476,7 +476,7 @@ angular.module('webprakash').directive('wpVideoUploader', function(helper, Uploa
       template: '<div class="thumbnail m-b-sm">' +				
 				'<video controls ngf-src="tmpImg"></video>' +
                 // '<img title = "{{size}} px" id="img_{{$id}}" ngf-min-width = "10" ngf-min-height = "10" ngf-thumbnail="tmpImg || \'c0.jpg\'">' +
-                '<span ng-show = "isLoading" class = "loading_thumb"><p>Loading...</p></span>' +
+                // '<span ng-show = "isLoading" class = "loading_thumb"><p>Loading...</p></span>' +
                 '</div>' +
                 '<uib-progressbar ng-show = "tmpProgress > 0 && tmpProgress < 100"  value="tmpProgress" class="progress-xxs"></uib-progressbar>' +                    
                 '<span class="btn btn-primary" ngf-select="upload($file, \'model\')" ngf-multiple="true" name="file" accept="*.jpg, *.jpeg, *.png, *.gif" ' +

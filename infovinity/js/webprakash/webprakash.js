@@ -616,8 +616,8 @@ angular.module('webprakash').directive('wpDatetimepicker', function(helper){
 			model: "=ngModel",
 			format: '@format',
 			picker: '@picker',
-			enableTime: '@enableTime',
-			enableDate: '@enableDate',	
+			enableTime: '=enableTime',
+			enableDate: '=enableDate',	
 			required: "@ngRequired"
 		},
 		link: function($scope, element, attrs){

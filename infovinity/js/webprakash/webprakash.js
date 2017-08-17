@@ -480,7 +480,7 @@ angular.module('webprakash').directive('wpVideoUploader', function(helper, Uploa
                 '</div>' +
                 '<uib-progressbar ng-show = "tmpProgress > 0 && tmpProgress < 100"  value="tmpProgress" class="progress-xxs"></uib-progressbar>' +                    
                 '<span class="btn btn-primary" ngf-select="upload($file, \'model\')" ngf-multiple="true" name="file" accept="*.jpg, *.jpeg, *.png, *.gif" ' +
-                    'ngf-min-height="100"  enctype="multipart/form-data">Select Image</span>' +
+                    'ngf-min-height="100"  enctype="multipart/form-data">Select Video</span>' +
                 '<button title = "{{size}} px" type="button" ng-click = "removeImage()" class="btn btn-default m-l">X</button>' +
                 '<input type="hidden" name = "model" ng-model = "model">',
       scope: {

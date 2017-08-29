@@ -608,7 +608,7 @@ angular.module('webprakash').directive('wpImgUploader', function(helper, Upload)
 angular.module('webprakash').directive('wpFileUploader', function(helper, Upload){
     return {
       restrict: 'EA',
-      template: '<a id="file_{{$id}}" href = "tmpFile" target = "_new">Download {{tmpFile}}</a>' +
+      template: '<a id="file_{{$id}}" href = "{{tmpFile}}" target = "_new">Download {{tmpFile}}</a>' +
                 '<uib-progressbar ng-show = "tmpProgress > 0 && tmpProgress < 100"  value="tmpProgress" class="progress-xxs"></uib-progressbar>' +                    
                 '<span class="btn btn-primary" ngf-select="upload($file, \'model\')" ngf-multiple="true" name="file" ' +
                     'enctype="multipart/form-data">Select File</span>' +

@@ -36,6 +36,16 @@ function getUploadedImgURL(mImg, size){
         return appConfig.dataUrl + mImg;        
     }
 }
+
+function getUploadedFileURL(mFile){
+	if (mFile == '' || mFile == undefined){
+        mFile = '';
+        return mFile;
+    }
+    else {
+        return appConfig.dataUrl + mFile;        
+    }
+}
  
 angular.isUndefinedOrNull = function(val) {
     return angular.isUndefined(val) || val === null

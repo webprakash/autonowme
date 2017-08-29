@@ -225,6 +225,10 @@ angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFact
 		return getUploadedImgURL(mImg, size);
 	}
 	
+	helper.getUploadedFileURL = function(mFile){		
+		return getUploadedFileURL(mFile);
+	}
+	
 	helper.save = function(actionUrl, obj, goTo){
 		if(angular.isUndefinedOrNull(goTo)){
 			goTo = '.list';
@@ -599,6 +603,69 @@ angular.module('webprakash').directive('wpImgUploader', function(helper, Upload)
         }
     };
   });
+  
+  
+angular.module('webprakash').directive('wpFileUploader', function(helper, Upload){
+    return {
+      restrict: 'EA',
+      template: '<a id="file_{{$id}}" href = "tmpFile" target = "_new">Download</a>' +
+                '<uib-progressbar ng-show = "tmpProgress > 0 && tmpProgress < 100"  value="tmpProgress" class="progress-xxs"></uib-progressbar>' +                    
+                '<span class="btn btn-primary" ngf-select="upload($file, \'model\')" ngf-multiple="true" name="file" ' +
+                    'enctype="multipart/form-data">Select File</span>' +
+                '<button type="button" ng-click = "removeFile()" class="btn btn-default m-l">X</button>' +
+                '<input type="hidden" name = "model" ng-model = "model">',
+      scope: {
+        model: "=ngModel",
+        accounts:'@',
+        title: '@',
+        size: '@'
+      },
+      controller: function($scope){
+          $scope.isLoading = false;
+      },      
+      link: function($scope, element, attrs) {
+            $scope.tmpFile = helper.getUploadedFileURL($scope.model);
+            $scope.tmpProgress = 0; 
+            
+            
+            element.find('file').bind("load" , function(e){                          
+                $scope.isLoading = false;
+                $scope.tmpProgress = 0;
+                
+                if(this.naturalHeight > this.naturalWidth){
+                    this.className = "vertical";
+                }
+                $scope.$apply();
+            });
+            
+            $scope.removeFile = function(){
+                $scope.model = '';
+                $scope.tmpFile = helper.getUploadedFileURL($scope.model);              
+            }
+
+            $scope.upload = function (file, eleName) {
+                var uploadUrl = appConfig.wsUrl + 'default/fileupload';
+
+                Upload.upload({
+                    url: uploadUrl,
+                    fields: {'eleName': eleName},
+                    file: file
+                }).progress(function (evt) {
+                    var progressPercentage = parseInt(100.0 * evt.loaded / evt.total);
+                    $scope.tmpProgress = progressPercentage;
+                    console.log('progress: ' + progressPercentage + '% ' + evt.config.file.name);
+                }).success(function (data, status, headers, config) {
+                    $scope.model = data;
+                    $scope.tmpImg = helper.getUploadedFileURL($scope.model, $scope.size); 
+                    $scope.isLoading = true;
+                }).error(function (data, status, headers, config) {
+                    console.log('error status: ' + data);
+                })
+            };
+        }
+    };
+  });  
+  
 	
 angular.module('webprakash').directive('wpDatetimepicker', function(helper){
     return {

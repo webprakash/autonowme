@@ -656,7 +656,7 @@ angular.module('webprakash').directive('wpFileUploader', function(helper, Upload
                     console.log('progress: ' + progressPercentage + '% ' + evt.config.file.name);
                 }).success(function (data, status, headers, config) {
                     $scope.model = data;
-                    $scope.tmpImg = helper.getUploadedFileURL($scope.model, $scope.size); 
+                    $scope.tmpFile = helper.getUploadedFileURL($scope.model); 
                     $scope.isLoading = true;
                 }).error(function (data, status, headers, config) {
                     console.log('error status: ' + data);

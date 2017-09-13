@@ -116,7 +116,8 @@
     "datatables.net-select": "^1.2.2",
     "datatables.net-select-bs": "^1.2.2",
     "angular-ui-router": "^1.0.5",
-    "bootstrap-ui-datetime-picker": "^2.6.0"
+    "bootstrap-ui-datetime-picker": "^2.6.0",
+    "highcharts-ng": "^1.1.0"
   },
   "resolutions": {
     "tinymce": "^4.6.4",

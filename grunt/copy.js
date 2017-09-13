@@ -117,7 +117,9 @@ module.exports = {
                     'videogular-buffering/buffering.min.js',
                     'videogular-overlay-play/overlay-play.min.js',
                     'videogular-poster/poster.min.js',
-                    'videogular-ima-ads/ima-ads.min.js'
+                    'videogular-ima-ads/ima-ads.min.js',
+					
+					'highcharts-ng/dist/highcharts-ng.min.js'
 					
                 ],
                 dest: 'infovinity/libs/angular',
@@ -233,7 +235,10 @@ module.exports = {
 					'slimscroll/jquery.slimscroll.js',
 					'slimscroll/jquery.slimscroll.min.js',
 					
-					'tinymce/**'					
+					'tinymce/**',					
+					
+					'highcharts/highcharts.js',
+					'highcharts/js/highstock.js'
                 ],
                 dest: 'infovinity/libs/jquery',
                 cwd:  'bower_components',

@@ -233,6 +233,7 @@ angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFact
 		if(angular.isUndefinedOrNull(goTo)){
 			goTo = '.list';
 		}
+		console.log(obj);
 		dataFactory.postData(actionUrl, obj).then(
             function (res) {
                 helper.goPeer(goTo);

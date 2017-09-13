@@ -237,8 +237,7 @@ module.exports = {
 					
 					'tinymce/**',					
 					
-					'highcharts/highcharts.js',
-					'highcharts/js/highstock.js'
+					'highcharts/**'					
                 ],
                 dest: 'infovinity/libs/jquery',
                 cwd:  'bower_components',

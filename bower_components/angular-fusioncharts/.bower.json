@@ -1,0 +1,15 @@
+{
+  "name": "angular-fusioncharts",
+  "homepage": "https://github.com/fusioncharts/angular-fusioncharts",
+  "version": "0.2.0",
+  "_release": "0.2.0",
+  "_resolution": {
+    "type": "version",
+    "tag": "v0.2.0",
+    "commit": "b04e6f1615c71c7472efd9d9110b231c4cc919a2"
+  },
+  "_source": "https://github.com/fusioncharts/angular-fusioncharts.git",
+  "_target": "^0.2.0",
+  "_originalSource": "https://github.com/fusioncharts/angular-fusioncharts.git",
+  "_direct": true
+}

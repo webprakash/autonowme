@@ -119,7 +119,9 @@ module.exports = {
                     'videogular-poster/poster.min.js',
                     'videogular-ima-ads/ima-ads.min.js',
 					
-					'highcharts-ng/dist/highcharts-ng.min.js'
+					'highcharts-ng/dist/highcharts-ng.min.js',
+					
+					'angular-fusioncharts/dist/angular-fusioncharts.min.js'
 					
                 ],
                 dest: 'infovinity/libs/angular',
@@ -237,7 +239,11 @@ module.exports = {
 					
 					'tinymce/**',					
 					
-					'highcharts/**'					
+					'highcharts/**',
+
+					'fusioncharts/**',
+
+					'fusionmaps/**'						
                 ],
                 dest: 'infovinity/libs/jquery',
                 cwd:  'bower_components',

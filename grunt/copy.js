@@ -123,10 +123,8 @@ module.exports = {
 					
 					'angular-fusioncharts/dist/angular-fusioncharts.min.js',
 					
-					'angular-simple-logger/dist/angular-simple-logger.js',
-					
-					'angular-google-maps/dist/angular-google-maps.js'
-					
+					'ngmap/build/scripts/ng-map.min.js'
+										
                 ],
                 dest: 'infovinity/libs/angular',
                 cwd:  'bower_components',
@@ -247,9 +245,8 @@ module.exports = {
 
 					'fusioncharts/**',
 
-					'fusionmaps/**',
-
-					'lodash/dist/lodash.js',				
+					'fusionmaps/**'
+								
                 ],
                 dest: 'infovinity/libs/jquery',
                 cwd:  'bower_components',

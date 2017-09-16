@@ -121,7 +121,7 @@
     "fusioncharts": "^3.12.1",
     "fusionmaps": "^3.12.1",
     "angular-fusioncharts": "https://github.com/fusioncharts/angular-fusioncharts.git#^0.2.0",
-    "angular-google-maps": "^2.4.1"
+    "ngmap": "^1.18.4"
   },
   "resolutions": {
     "tinymce": "^4.6.4",

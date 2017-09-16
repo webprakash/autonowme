@@ -121,7 +121,11 @@ module.exports = {
 					
 					'highcharts-ng/dist/highcharts-ng.min.js',
 					
-					'angular-fusioncharts/dist/angular-fusioncharts.min.js'
+					'angular-fusioncharts/dist/angular-fusioncharts.min.js',
+					
+					'angular-simple-logger/dist/angular-simple-logger.js',
+					
+					'angular-google-maps/dist/angular-google-maps.js'
 					
                 ],
                 dest: 'infovinity/libs/angular',
@@ -243,7 +247,9 @@ module.exports = {
 
 					'fusioncharts/**',
 
-					'fusionmaps/**'						
+					'fusionmaps/**',
+
+					'lodash/dist/lodash.js',				
                 ],
                 dest: 'infovinity/libs/jquery',
                 cwd:  'bower_components',

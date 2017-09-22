@@ -3,6 +3,8 @@ angular.module('webprakash', ['angular-jwt', 'pascalprecht.translate'], function
 	$translateProvider.useMissingTranslationHandler('defaultTranslateFactory');
 });
 
+$.fn.dataTable.ext.errMode = 'none';
+
 angular.module('webprakash').constant('APP_EVENTS', {
     sessionTimeout: 'app-session-timeout',
     notAuthenticated: 'app-not-authenticated',

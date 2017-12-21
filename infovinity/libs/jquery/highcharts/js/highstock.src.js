@@ -1,5 +1,5 @@
 /**
- * @license Highstock JS v5.0.14 (2017-07-28)
+ * @license Highstock JS v6.0.4 (2017-12-15)
  *
  * (c) 2009-2016 Torstein Honsi
  *
@@ -21,21 +21,21 @@
          *
          * License: www.highcharts.com/license
          */
-        /* global window */
-        var win = window,
-            doc = win.document;
+        /* global win, window */
 
-        var SVG_NS = 'http://www.w3.org/2000/svg',
-            userAgent = (win.navigator && win.navigator.userAgent) || '',
+        // glob is a temporary fix to allow our es-modules to work.
+        var glob = typeof win === 'undefined' ? window : win,
+            doc = glob.document,
+            SVG_NS = 'http://www.w3.org/2000/svg',
+            userAgent = (glob.navigator && glob.navigator.userAgent) || '',
             svg = doc && doc.createElementNS && !!doc.createElementNS(SVG_NS, 'svg').createSVGRect,
-            isMS = /(edge|msie|trident)/i.test(userAgent) && !window.opera,
-            vml = !svg,
+            isMS = /(edge|msie|trident)/i.test(userAgent) && !glob.opera,
             isFirefox = /Firefox/.test(userAgent),
-            hasBidiBug = isFirefox && parseInt(userAgent.split('Firefox/')[1], 10) < 4; // issue #38
+            hasBidiBug = isFirefox && parseInt(userAgent.split('Firefox/')[1], 10) < 4; // issue #38;
 
-        var Highcharts = win.Highcharts ? win.Highcharts.error(16, true) : {
+        var Highcharts = glob.Highcharts ? glob.Highcharts.error(16, true) : {
             product: 'Highstock',
-            version: '5.0.14',
+            version: '6.0.4',
             deg2rad: Math.PI * 2 / 360,
             doc: doc,
             hasBidiBug: hasBidiBug,
@@ -49,8 +49,7 @@
             seriesTypes: {},
             symbolSizes: {},
             svg: svg,
-            vml: vml,
-            win: win,
+            win: glob,
             marginNames: ['plotTop', 'marginRight', 'marginBottom', 'plotLeft'],
             noop: function() {
                 return undefined;
@@ -85,7 +84,7 @@
          * @namespace Highcharts
          */
 
-        var timers = [];
+        H.timers = [];
 
         var charts = H.charts,
             doc = H.doc,
@@ -165,7 +164,7 @@
                         startVal = parseFloat(start[i]);
                         ret[i] =
                             isNaN(startVal) ? // a letter instruction like M or L
-                            start[i] :
+                            end[i] :
                             now * (parseFloat(end[i] - startVal)) + startVal;
 
                     }
@@ -221,34 +220,46 @@
              */
             run: function(from, to, unit) {
                 var self = this,
+                    options = self.options,
                     timer = function(gotoEnd) {
                         return timer.stopped ? false : self.step(gotoEnd);
                     },
-                    i;
-
-                this.startTime = +new Date();
-                this.start = from;
-                this.end = to;
-                this.unit = unit;
-                this.now = this.start;
-                this.pos = 0;
-
-                timer.elem = this.elem;
-                timer.prop = this.prop;
-
-                if (timer() && timers.push(timer) === 1) {
-                    timer.timerId = setInterval(function() {
-
-                        for (i = 0; i < timers.length; i++) {
-                            if (!timers[i]()) {
-                                timers.splice(i--, 1);
+                    requestAnimationFrame =
+                    win.requestAnimationFrame ||
+                    function(step) {
+                        setTimeout(step, 13);
+                    },
+                    step = function() {
+                        for (var i = 0; i < H.timers.length; i++) {
+                            if (!H.timers[i]()) {
+                                H.timers.splice(i--, 1);
                             }
                         }
 
-                        if (!timers.length) {
-                            clearInterval(timer.timerId);
+                        if (H.timers.length) {
+                            requestAnimationFrame(step);
                         }
-                    }, 13);
+                    };
+
+                if (from === to) {
+                    delete options.curAnim[this.prop];
+                    if (options.complete && H.keys(options.curAnim).length === 0) {
+                        options.complete.call(this.elem);
+                    }
+                } else { // #7166
+                    this.startTime = +new Date();
+                    this.start = from;
+                    this.end = to;
+                    this.unit = unit;
+                    this.now = this.start;
+                    this.pos = 0;
+
+                    timer.elem = this.elem;
+                    timer.prop = this.prop;
+
+                    if (timer() && H.timers.push(timer) === 1) {
+                        requestAnimationFrame(step);
+                    }
                 }
             },
 
@@ -483,7 +494,6 @@
                 );
             };
 
-
         /**
          * Utility function to extend an object with the members of another.
          *
@@ -513,9 +523,9 @@
          * @function #merge
          * @memberOf Highcharts
          * @param {Boolean} [extend] - Whether to extend the left-side object (a) or
-                  return a whole new object.
+        		  return a whole new object.
          * @param {Object} a - The first object to extend. When only this is given, the
-                  function returns a deep copy.
+        		  function returns a deep copy.
          * @param {...Object} [n] - An object to merge into the previous one.
          * @returns {Object} - The merged object. If the first argument is true, the 
          * return is the same as the second argument.
@@ -644,15 +654,18 @@
         };
 
         /**
-         * Utility function to check if an item is of type number.
+         * Utility function to check if an item is a number and it is finite (not NaN,
+         * Infinity or -Infinity).
          *
          * @function #isNumber
          * @memberOf Highcharts
-         * @param {Object} n - The item to check.
-         * @returns {Boolean} - True if the item is a number and is not NaN.
+         * @param  {Object} n
+         *         The item to check.
+         * @return {Boolean}
+         *         True if the item is a finite number
          */
         H.isNumber = function(n) {
-            return typeof n === 'number' && !isNaN(n);
+            return typeof n === 'number' && !isNaN(n) && n < Infinity && n > -Infinity;
         };
 
         /**
@@ -983,7 +996,7 @@
                 // List all format keys. Custom formats can be added from the outside. 
                 replacements = H.extend({
 
-                        //-- Day
+                        // Day
                         // Short weekday, like 'Mon'
                         'a': shortWeekdays ?
                             shortWeekdays[day] : langWeekdays[day].substr(0, 3),
@@ -996,9 +1009,9 @@
                         'w': day,
 
                         // Week (none implemented)
-                        //'W': weekNumber(),
+                        // 'W': weekNumber(),
 
-                        //-- Month
+                        // Month
                         // Short month, like 'Jan'
                         'b': lang.shortMonths[month],
                         // Long month, like 'January'
@@ -1006,13 +1019,13 @@
                         // Two digit month number, 01 through 12
                         'm': pad(month + 1),
 
-                        //-- Year
+                        // Year
                         // Two digits year, like 09 for 2009
                         'y': fullYear.toString().substr(2, 2),
                         // Four digits year, like 2009
                         'Y': fullYear,
 
-                        //-- Time
+                        // Time
                         // Two digits hours in 24h format, 00 through 23
                         'H': pad(hours),
                         // Hours in 24h format, 0 through 23
@@ -1148,7 +1161,9 @@
 
                     // Assign deeper paths
                     for (i = 0; i < len; i++) {
-                        val = val[path[i]];
+                        if (val) {
+                            val = val[path[i]];
+                        }
                     }
 
                     // Format the replacement
@@ -1458,7 +1473,7 @@
          *        given in the lang options, or a space character.
          * @returns {String} The formatted number.
          *
-         * @sample members/highcharts-numberformat/ Custom number format
+         * @sample highcharts/members/highcharts-numberformat/ Custom number format
          */
         H.numberFormat = function(number, decimals, decimalPoint, thousandsSep) {
             number = +number || 0;
@@ -1470,13 +1485,36 @@
                 thousands,
                 ret,
                 roundedNumber,
-                exponent = number.toString().split('e');
+                exponent = number.toString().split('e'),
+                fractionDigits;
 
             if (decimals === -1) {
                 // Preserve decimals. Not huge numbers (#3793).
                 decimals = Math.min(origDec, 20);
             } else if (!H.isNumber(decimals)) {
                 decimals = 2;
+            } else if (decimals && exponent[1] && exponent[1] < 0) {
+                // Expose decimals from exponential notation (#7042)
+                fractionDigits = decimals + +exponent[1];
+                if (fractionDigits >= 0) {
+                    // remove too small part of the number while keeping the notation
+                    exponent[0] = (+exponent[0]).toExponential(fractionDigits)
+                        .split('e')[0];
+                    decimals = fractionDigits;
+                } else {
+                    // fractionDigits < 0
+                    exponent[0] = exponent[0].split('.')[0] || 0;
+
+                    if (decimals < 20) {
+                        // use number instead of exponential notation (#7405)
+                        number = (exponent[0] * Math.pow(10, exponent[1]))
+                            .toFixed(decimals);
+                    } else {
+                        // or zero
+                        number = 0;
+                    }
+                    exponent[1] = 0;
+                }
             }
 
             // Add another decimal to avoid rounding errors of float numbers. (#4573)
@@ -1514,7 +1552,7 @@
                 ret += decimalPoint + roundedNumber.slice(-decimals);
             }
 
-            if (exponent[1]) {
+            if (exponent[1] && +ret !== 0) {
                 ret += 'e' + exponent[1];
             }
 
@@ -1557,11 +1595,16 @@
                     H.getStyle(el, 'padding-bottom');
             }
 
+            if (!win.getComputedStyle) {
+                // SVG not supported, forgot to load oldie.js?
+                H.error(27, true);
+            }
+
             // Otherwise, get the computed style
             style = win.getComputedStyle(el, undefined);
             if (style) {
                 style = style.getPropertyValue(prop);
-                if (H.pick(toInt, true)) {
+                if (H.pick(toInt, prop !== 'opacity')) {
                     style = H.pInt(style);
                 }
             }
@@ -1578,7 +1621,7 @@
          * @returns {Number} - The index within the array, or -1 if not found.
          */
         H.inArray = function(item, arr) {
-            return arr.indexOf ? arr.indexOf(item) : [].indexOf.call(arr, item);
+            return (H.indexOfPolyfill || Array.prototype.indexOf).call(arr, item);
         };
 
         /**
@@ -1593,7 +1636,7 @@
          * @returns {Array} - A new, filtered array.
          */
         H.grep = function(arr, callback) {
-            return [].filter.call(arr, callback);
+            return (H.filterPolyfill || Array.prototype.filter).call(arr, callback);
         };
 
         /**
@@ -1608,9 +1651,21 @@
          *        condition.
          * @returns {Mixed} - The value of the element.
          */
-        H.find = function(arr, callback) {
-            return [].find.call(arr, callback);
-        };
+        H.find = Array.prototype.find ?
+            function(arr, callback) {
+                return arr.find(callback);
+            } :
+            // Legacy implementation. PhantomJS, IE <= 11 etc. #7223.
+            function(arr, fn) {
+                var i,
+                    length = arr.length;
+
+                for (i = 0; i < length; i++) {
+                    if (fn(arr[i], i)) {
+                        return arr[i];
+                    }
+                }
+            };
 
         /**
          * Map an array by a callback.
@@ -1635,6 +1690,38 @@
         };
 
         /**
+         * Returns an array of a given object's own properties.
+         *
+         * @function #keys
+         * @memberOf highcharts
+         * @param {Object} obj - The object of which the properties are to be returned.
+         * @returns {Array} - An array of strings that represents all the properties.
+         */
+        H.keys = function(obj) {
+            return (H.keysPolyfill || Object.keys).call(undefined, obj);
+        };
+
+        /**
+         * Reduce an array to a single value.
+         *
+         * @function #reduce
+         * @memberOf Highcharts
+         * @param {Array} arr - The array to reduce.
+         * @param {Function} fn - The callback function. Return the reduced value. 
+         *  Receives 4 arguments: Accumulated/reduced value, current value, current 
+         *  array index, and the array.
+         * @param {Mixed} initialValue - The initial value of the accumulator.
+         * @returns {Mixed} - The reduced value.
+         */
+        H.reduce = function(arr, func, initialValue) {
+            return (H.reducePolyfill || Array.prototype.reduce).call(
+                arr,
+                func,
+                initialValue
+            );
+        };
+
+        /**
          * Get the element's offset position, corrected for `overflow: auto`.
          *
          * @function #offset
@@ -1645,7 +1732,11 @@
          */
         H.offset = function(el) {
             var docElem = doc.documentElement,
-                box = el.getBoundingClientRect();
+                box = el.parentElement ? // IE11 throws Unspecified error in test suite
+                el.getBoundingClientRect() : {
+                    top: 0,
+                    left: 0
+                };
 
             return {
                 top: box.top + (win.pageYOffset || docElem.scrollTop) -
@@ -1673,12 +1764,12 @@
          */
         H.stop = function(el, prop) {
 
-            var i = timers.length;
+            var i = H.timers.length;
 
             // Remove timers related to this element (#4519)
             while (i--) {
-                if (timers[i].elem === el && (!prop || prop === timers[i].prop)) {
-                    timers[i].stopped = true; // #4667
+                if (H.timers[i].elem === el && (!prop || prop === H.timers[i].prop)) {
+                    H.timers[i].stopped = true; // #4667
                 }
             }
         };
@@ -1696,7 +1787,7 @@
          * @param {Object} [ctx] The context.
          */
         H.each = function(arr, fn, ctx) { // modern browsers
-            return Array.prototype.forEach.call(arr, fn, ctx);
+            return (H.forEachPolyfill || Array.prototype.forEach).call(arr, fn, ctx);
         };
 
         /**
@@ -1733,33 +1824,30 @@
          */
         H.addEvent = function(el, type, fn) {
 
-            var events = el.hcEvents = el.hcEvents || {};
+            var events,
+                itemEvents,
+                addEventListener = el.addEventListener || H.addEventListenerPolyfill;
 
-            function wrappedFn(e) {
-                e.target = e.srcElement || win; // #2820
-                fn.call(el, e);
+            // If events are previously set directly on the prototype, pick them up 
+            // and copy them over to the instance. Otherwise instance handlers would
+            // be set on the prototype and apply to multiple charts in the page.
+            if (
+                el.hcEvents &&
+                // IE8, window and document don't have hasOwnProperty
+                !Object.prototype.hasOwnProperty.call(el, 'hcEvents')
+            ) {
+                itemEvents = {};
+                H.objectEach(el.hcEvents, function(handlers, eventType) {
+                    itemEvents[eventType] = handlers.slice(0);
+                });
+                el.hcEvents = itemEvents;
             }
 
-            // Handle DOM events in modern browsers
-            if (el.addEventListener) {
-                el.addEventListener(type, fn, false);
+            events = el.hcEvents = el.hcEvents || {};
 
-                // Handle old IE implementation
-            } else if (el.attachEvent) {
-
-                if (!el.hcEventsIE) {
-                    el.hcEventsIE = {};
-                }
-
-                // unique function string (#6746)
-                if (!fn.hcGetKey) {
-                    fn.hcGetKey = H.uniqueKey();
-                }
-
-                // Link wrapped fn with original fn, so we can get this in removeEvent
-                el.hcEventsIE[fn.hcGetKey] = wrappedFn;
-
-                el.attachEvent('on' + type, wrappedFn);
+            // Handle DOM events
+            if (addEventListener) {
+                addEventListener.call(el, type, fn, false);
             }
 
             if (!events[type]) {
@@ -1793,11 +1881,11 @@
                 index;
 
             function removeOneEvent(type, fn) {
-                if (el.removeEventListener) {
-                    el.removeEventListener(type, fn, false);
-                } else if (el.attachEvent) {
-                    fn = el.hcEventsIE[fn.hcGetKey];
-                    el.detachEvent('on' + type, fn);
+                var removeEventListener =
+                    el.removeEventListener || H.removeEventListenerPolyfill;
+
+                if (removeEventListener) {
+                    removeEventListener.call(el, type, fn, false);
                 }
             }
 
@@ -1875,7 +1963,6 @@
             if (doc.createEvent && (el.dispatchEvent || el.fireEvent)) {
                 e = doc.createEvent('Events');
                 e.initEvent(type, true, true);
-                //e.target = el;
 
                 H.extend(e, eventArguments);
 
@@ -2100,110 +2187,6 @@
             };
         }
 
-
-        /**
-         * Compatibility section to add support for legacy IE. This can be removed if
-         * old IE support is not needed.
-         */
-        if (doc && !doc.defaultView) {
-            H.getStyle = function(el, prop) {
-                var val,
-                    alias = {
-                        width: 'clientWidth',
-                        height: 'clientHeight'
-                    }[prop];
-
-                if (el.style[prop]) {
-                    return H.pInt(el.style[prop]);
-                }
-                if (prop === 'opacity') {
-                    prop = 'filter';
-                }
-
-                // Getting the rendered width and height
-                if (alias) {
-                    el.style.zoom = 1;
-                    return Math.max(el[alias] - 2 * H.getStyle(el, 'padding'), 0);
-                }
-
-                val = el.currentStyle[prop.replace(/\-(\w)/g, function(a, b) {
-                    return b.toUpperCase();
-                })];
-                if (prop === 'filter') {
-                    val = val.replace(
-                        /alpha\(opacity=([0-9]+)\)/,
-                        function(a, b) {
-                            return b / 100;
-                        }
-                    );
-                }
-
-                return val === '' ? 1 : H.pInt(val);
-            };
-        }
-
-        if (!Array.prototype.forEach) {
-            H.each = function(arr, fn, ctx) { // legacy
-                var i = 0,
-                    len = arr.length;
-                for (; i < len; i++) {
-                    if (fn.call(ctx, arr[i], i, arr) === false) {
-                        return i;
-                    }
-                }
-            };
-        }
-
-        if (!Array.prototype.indexOf) {
-            H.inArray = function(item, arr) {
-                var len,
-                    i = 0;
-
-                if (arr) {
-                    len = arr.length;
-
-                    for (; i < len; i++) {
-                        if (arr[i] === item) {
-                            return i;
-                        }
-                    }
-                }
-
-                return -1;
-            };
-        }
-
-        if (!Array.prototype.filter) {
-            H.grep = function(elements, fn) {
-                var ret = [],
-                    i = 0,
-                    length = elements.length;
-
-                for (; i < length; i++) {
-                    if (fn(elements[i], i)) {
-                        ret.push(elements[i]);
-                    }
-                }
-
-                return ret;
-            };
-        }
-
-        if (!Array.prototype.find) {
-            H.find = function(arr, fn) {
-                var i,
-                    length = arr.length;
-
-                for (i = 0; i < length; i++) {
-                    if (fn(arr[i], i)) {
-                        return arr[i];
-                    }
-                }
-            };
-        }
-
-        //--- End compatibility section ---
-
     }(Highcharts));
     (function(H) {
         /**
@@ -2290,7 +2273,7 @@
                 } else {
 
                     // Bitmasking as input[0] is not working for legacy IE.
-                    if (input && input.charAt() === '#') {
+                    if (input && input.charAt && input.charAt() === '#') {
 
                         len = input.length;
                         input = parseInt(input.substr(1), 16);
@@ -2417,26 +2400,33 @@
             tweenTo: function(to, pos) {
                 // Check for has alpha, because rgba colors perform worse due to lack of
                 // support in WebKit.
-                var from = this,
+                var fromRgba = this.rgba,
+                    toRgba = to.rgba,
                     hasAlpha,
                     ret;
 
-                // Unsupported color, return to-color (#3920)
-                if (!to.rgba.length) {
+                // Unsupported color, return to-color (#3920, #7034)
+                if (!toRgba.length || !fromRgba || !fromRgba.length) {
                     ret = to.input || 'none';
 
                     // Interpolate
                 } else {
-                    from = from.rgba;
-                    to = to.rgba;
-                    hasAlpha = (to[3] !== 1 || from[3] !== 1);
+                    hasAlpha = (toRgba[3] !== 1 || fromRgba[3] !== 1);
                     ret = (hasAlpha ? 'rgba(' : 'rgb(') +
-                        Math.round(to[0] + (from[0] - to[0]) * (1 - pos)) + ',' +
-                        Math.round(to[1] + (from[1] - to[1]) * (1 - pos)) + ',' +
-                        Math.round(to[2] + (from[2] - to[2]) * (1 - pos)) +
-                        (hasAlpha ?
-                            (',' + (to[3] + (from[3] - to[3]) * (1 - pos))) :
-                            '') + ')';
+                        Math.round(toRgba[0] + (fromRgba[0] - toRgba[0]) * (1 - pos)) +
+                        ',' +
+                        Math.round(toRgba[1] + (fromRgba[1] - toRgba[1]) * (1 - pos)) +
+                        ',' +
+                        Math.round(toRgba[2] + (fromRgba[2] - toRgba[2]) * (1 - pos)) +
+                        (
+                            hasAlpha ?
+                            (
+                                ',' +
+                                (toRgba[3] + (fromRgba[3] - toRgba[3]) * (1 - pos))
+                            ) :
+                            ''
+                        ) +
+                        ')';
                 }
                 return ret;
             }
@@ -2532,7 +2522,7 @@
             ],
 
             /**
-             * Initialize the SVG renderer. This function only exists to make the
+             * Initialize the SVG element. This function only exists to make the
              * initiation process overridable. It should not be called directly.
              *
              * @param  {SVGRenderer} renderer
@@ -2874,9 +2864,10 @@
              * @typedef {Object} SVGAttributes An object of key-value pairs for SVG
              *   attributes. Attributes in Highcharts elements for the most parts
              *   correspond to SVG, but some are specific to Highcharts, like `zIndex`,
-             *   `rotation`, `translateX`, `translateY`, `scaleX` and `scaleY`. SVG
-             *   attributes containing a hyphen are _not_ camel-cased, they should be
-             *   quoted to preserve the hyphen.
+             *   `rotation`, `rotationOriginX`, `rotationOriginY`, `translateX`,
+             *   `translateY`, `scaleX` and `scaleY`. SVG attributes containing a hyphen
+             *   are _not_ camel-cased, they should be quoted to preserve the hyphen.
+             *   
              * @example
              * {
              *     'stroke': '#ff0000', // basic
@@ -2958,7 +2949,7 @@
                     // setter
                 } else {
 
-                    objectEach(hash, function(val, key) {
+                    objectEach(hash, function eachAttribute(val, key) {
                         skipAttr = false;
 
                         // Unless .attr is from the animator update, stop current
@@ -3061,7 +3052,7 @@
 
             /**
              * Remove a class name from the element.
-             * @param  {string} className The class name to remove.
+             * @param  {String|RegExp} className The class name to remove.
              * @return {SVGElement} Returns the SVG element for chainability.
              */
             removeClass: function(className) {
@@ -3142,7 +3133,6 @@
             crisp: function(rect, strokeWidth) {
 
                 var wrapper = this,
-                    attribs = {},
                     normalizer;
 
                 strokeWidth = strokeWidth || rect.strokeWidth || 0;
@@ -3161,14 +3151,7 @@
                 if (defined(rect.strokeWidth)) {
                     rect.strokeWidth = strokeWidth;
                 }
-
-                objectEach(rect, function(val, key) {
-                    if (wrapper[key] !== val) { // only set attribute if changed
-                        wrapper[key] = attribs[key] = val;
-                    }
-                });
-
-                return attribs;
+                return rect;
             },
 
             /**
@@ -3441,6 +3424,7 @@
                     scaleY = wrapper.scaleY,
                     inverted = wrapper.inverted,
                     rotation = wrapper.rotation,
+                    matrix = wrapper.matrix,
                     element = wrapper.element,
                     transform;
 
@@ -3456,13 +3440,22 @@
                 // #1846).
                 transform = ['translate(' + translateX + ',' + translateY + ')'];
 
+                // apply matrix
+                if (defined(matrix)) {
+                    transform.push(
+                        'matrix(' + matrix.join(',') + ')'
+                    );
+                }
+
                 // apply rotation
                 if (inverted) {
                     transform.push('rotate(90) scale(-1,1)');
                 } else if (rotation) { // text rotation
                     transform.push(
-                        'rotate(' + rotation + ' ' + (element.getAttribute('x') || 0) +
-                        ' ' + (element.getAttribute('y') || 0) + ')'
+                        'rotate(' + rotation + ' ' +
+                        pick(this.rotationOriginX, element.getAttribute('x'), 0) +
+                        ' ' +
+                        pick(this.rotationOriginY, element.getAttribute('y') || 0) + ')'
                     );
                 }
 
@@ -3531,9 +3524,10 @@
                 if (alignOptions) {
                     this.alignOptions = alignOptions;
                     this.alignByTranslate = alignByTranslate;
-                    if (!box || isString(box)) { // boxes other than renderer handle this internally
+                    if (!box || isString(box)) {
                         this.alignTo = alignTo = box || 'renderer';
-                        erase(alignedObjects, this); // prevent duplicates, like legendGroup after resize
+                        // prevent duplicates, like legendGroup after resize
+                        erase(alignedObjects, this);
                         alignedObjects.push(this);
                         box = null; // reassign it below
                     }
@@ -3624,10 +3618,12 @@
                 rad = rotation * deg2rad;
 
 
-                fontSize = element && SVGElement.prototype.getStyle.call(element, 'font-size');
+                fontSize = element &&
+                    SVGElement.prototype.getStyle.call(element, 'font-size');
 
 
-                if (textStr !== undefined) {
+                // Avoid undefined and null (#7316)
+                if (defined(textStr)) {
 
                     cacheKey = textStr.toString();
 
@@ -3662,22 +3658,28 @@
                     if (element.namespaceURI === wrapper.SVG_NS || renderer.forExport) {
                         try { // Fails in Firefox if the container has display: none.
 
-                            // When the text shadow shim is used, we need to hide the fake shadows
-                            // to get the correct bounding box (#3872)
+                            // When the text shadow shim is used, we need to hide the
+                            // fake shadows to get the correct bounding box (#3872)
                             toggleTextShadowShim = this.fakeTS && function(display) {
-                                each(element.querySelectorAll('.highcharts-text-outline'), function(tspan) {
-                                    tspan.style.display = display;
-                                });
+                                each(
+                                    element.querySelectorAll(
+                                        '.highcharts-text-outline'
+                                    ),
+                                    function(tspan) {
+                                        tspan.style.display = display;
+                                    }
+                                );
                             };
 
-                            // Workaround for #3842, Firefox reporting wrong bounding box for shadows
+                            // Workaround for #3842, Firefox reporting wrong bounding
+                            // box for shadows
                             if (toggleTextShadowShim) {
                                 toggleTextShadowShim('none');
                             }
 
                             bBox = element.getBBox ?
-                                // SVG: use extend because IE9 is not allowed to change width and height in case
-                                // of rotation (below)
+                                // SVG: use extend because IE9 is not allowed to change
+                                // width and height in case of rotation (below)
                                 extend({}, element.getBBox()) : {
 
                                     // Legacy IE in export mode
@@ -3691,8 +3693,9 @@
                             }
                         } catch (e) {}
 
-                        // If the bBox is not set, the try-catch block above failed. The other condition
-                        // is for Opera that returns a width of -Infinity on hidden elements.
+                        // If the bBox is not set, the try-catch block above failed. The
+                        // other condition is for Opera that returns a width of
+                        // -Infinity on hidden elements.
                         if (!bBox || bBox.width < 0) {
                             bBox = {
                                 width: 0,
@@ -3708,8 +3711,8 @@
 
                     }
 
-                    // True SVG elements as well as HTML elements in modern browsers using the .useHTML option
-                    // need to compensated for rotation
+                    // True SVG elements as well as HTML elements in modern browsers
+                    // using the .useHTML option need to compensated for rotation
                     if (renderer.isSVG) {
                         width = bBox.width;
                         height = bBox.height;
@@ -3732,13 +3735,15 @@
 
                         // Adjust for rotated text
                         if (rotation) {
-                            bBox.width = Math.abs(height * Math.sin(rad)) + Math.abs(width * Math.cos(rad));
-                            bBox.height = Math.abs(height * Math.cos(rad)) + Math.abs(width * Math.sin(rad));
+                            bBox.width = Math.abs(height * Math.sin(rad)) +
+                                Math.abs(width * Math.cos(rad));
+                            bBox.height = Math.abs(height * Math.cos(rad)) +
+                                Math.abs(width * Math.sin(rad));
                         }
                     }
 
-                    // Cache it. When loading a chart in a hidden iframe in Firefox and IE/Edge, the
-                    // bounding box height is 0, so don't cache it (#5620).
+                    // Cache it. When loading a chart in a hidden iframe in Firefox and
+                    // IE/Edge, the bounding box height is 0, so don't cache it (#5620).
                     if (cacheKey && bBox.height > 0) {
 
                         // Rotate (#4681)
@@ -3893,12 +3898,18 @@
                     // Look for existing references to this clipPath and remove them
                     // before destroying the element (#6196).
                     each(
-                        ownerSVGElement.querySelectorAll('[clip-path]'),
+                        // The upper case version is for Edge
+                        ownerSVGElement.querySelectorAll('[clip-path],[CLIP-PATH]'),
                         function(el) {
                             // Include the closing paranthesis in the test to rule out
                             // id's from 10 and above (#6550)
-                            if (el.getAttribute('clip-path')
-                                .indexOf(wrapper.clipPath.element.id + ')') > -1) {
+                            if (el
+                                .getAttribute('clip-path')
+                                .match(RegExp(
+                                    // Edge puts quotes inside the url, others not
+                                    '[\("]#' + wrapper.clipPath.element.id + '[\)"]'
+                                ))
+                            ) {
                                 el.removeAttribute('clip-path');
                             }
                         }
@@ -3967,6 +3978,7 @@
              */
             _defaultGetter: function(key) {
                 var ret = pick(
+                    this[key + 'Value'], // align getter
                     this[key],
                     this.element ? this.element.getAttribute(key) : null,
                     0
@@ -4003,6 +4015,7 @@
                     center: 'middle',
                     right: 'end'
                 };
+                this.alignValue = value;
                 this.element.setAttribute('text-anchor', convert[value]);
             },
             opacitySetter: function(value, key, element) {
@@ -4023,7 +4036,8 @@
 
                 titleNode.appendChild(
                     doc.createTextNode(
-                        (String(pick(value), '')).replace(/<[^>]*>/g, '') // #3276, #3895
+                        // #3276, #3895
+                        (String(pick(value), '')).replace(/<[^>]*>/g, '')
                     )
                 );
             },
@@ -4046,7 +4060,8 @@
                 }
             },
             visibilitySetter: function(value, key, element) {
-                // IE9-11 doesn't handle visibilty:inherit well, so we remove the attribute instead (#2881, #3909)
+                // IE9-11 doesn't handle visibilty:inherit well, so we remove the
+                // attribute instead (#2881, #3909)
                 if (value === 'inherit') {
                     element.removeAttribute(key);
                 } else if (this[key] !== value) { // #6747
@@ -4064,11 +4079,15 @@
                     otherZIndex,
                     element = this.element,
                     inserted,
+                    undefinedOtherZIndex,
+                    svgParent = parentNode === renderer.box,
                     run = this.added,
                     i;
 
                 if (defined(value)) {
-                    element.zIndex = value; // So we can read it for other elements in the group
+                    // So we can read it for other elements in the group
+                    element.zIndex = value;
+
                     value = +value;
                     if (this[key] === value) { // Only update when needed (#3865)
                         run = false;
@@ -4076,9 +4095,9 @@
                     this[key] = value;
                 }
 
-                // Insert according to this and other elements' zIndex. Before .add() is called,
-                // nothing is done. Then on add, or by later calls to zIndexSetter, the node
-                // is placed on the right place in the DOM.
+                // Insert according to this and other elements' zIndex. Before .add() is
+                // called, nothing is done. Then on add, or by later calls to
+                // zIndexSetter, the node is placed on the right place in the DOM.
                 if (run) {
                     value = this.zIndex;
 
@@ -4087,26 +4106,41 @@
                     }
 
                     childNodes = parentNode.childNodes;
-                    for (i = 0; i < childNodes.length && !inserted; i++) {
+                    for (i = childNodes.length - 1; i >= 0 && !inserted; i--) {
                         otherElement = childNodes[i];
                         otherZIndex = otherElement.zIndex;
-                        if (otherElement !== element && (
-                                // Insert before the first element with a higher zIndex
-                                pInt(otherZIndex) > value ||
-                                // If no zIndex given, insert before the first element with a zIndex
-                                (!defined(value) && defined(otherZIndex)) ||
+                        undefinedOtherZIndex = !defined(otherZIndex);
+
+                        if (otherElement !== element) {
+                            if (
                                 // Negative zIndex versus no zIndex:
                                 // On all levels except the highest. If the parent is <svg>,
                                 // then we don't want to put items before <desc> or <defs>
-                                (value < 0 && !defined(otherZIndex) && parentNode !== renderer.box)
-
-                            )) {
-                            parentNode.insertBefore(element, otherElement);
-                            inserted = true;
+                                (value < 0 && undefinedOtherZIndex && !svgParent && !i)
+                            ) {
+                                parentNode.insertBefore(element, childNodes[i]);
+                                inserted = true;
+                            } else if (
+                                // Insert after the first element with a lower zIndex
+                                pInt(otherZIndex) <= value ||
+                                // If negative zIndex, add this before first undefined zIndex element
+                                (undefinedOtherZIndex && (!defined(value) || value >= 0))
+                            ) {
+                                parentNode.insertBefore(
+                                    element,
+                                    childNodes[i + 1] || null // null for oldIE export
+                                );
+                                inserted = true;
+                            }
                         }
                     }
+
                     if (!inserted) {
-                        parentNode.appendChild(element);
+                        parentNode.insertBefore(
+                            element,
+                            childNodes[svgParent ? 3 : 0] || null // null for oldIE
+                        );
+                        inserted = true;
                     }
                 }
                 return inserted;
@@ -4117,10 +4151,17 @@
         });
 
         // Some shared setters and getters
-        SVGElement.prototype.yGetter = SVGElement.prototype.xGetter;
-        SVGElement.prototype.translateXSetter = SVGElement.prototype.translateYSetter =
-            SVGElement.prototype.rotationSetter = SVGElement.prototype.verticalAlignSetter =
-            SVGElement.prototype.scaleXSetter = SVGElement.prototype.scaleYSetter = function(value, key) {
+        SVGElement.prototype.yGetter =
+            SVGElement.prototype.xGetter;
+        SVGElement.prototype.translateXSetter =
+            SVGElement.prototype.translateYSetter =
+            SVGElement.prototype.rotationSetter =
+            SVGElement.prototype.verticalAlignSetter =
+            SVGElement.prototype.rotationOriginXSetter =
+            SVGElement.prototype.rotationOriginYSetter =
+            SVGElement.prototype.scaleXSetter =
+            SVGElement.prototype.scaleYSetter =
+            SVGElement.prototype.matrixSetter = function(value, key) {
                 this[key] = value;
                 this.doTransform = true;
             };
@@ -4131,7 +4172,8 @@
          * Allows direct access to the Highcharts rendering layer in order to draw
          * primitive shapes like circles, rectangles, paths or text directly on a chart,
          * or independent from any chart. The SVGRenderer represents a wrapper object
-         * for SVGin modern browsers and through the VMLRenderer, for VML in IE < 8.
+         * for SVG in modern browsers. Through the VMLRenderer, part of the `oldie.js`
+         * module, it also brings vector graphics to IE <= 8.
          *
          * An existing chart's renderer can be accessed through {@link Chart.renderer}.
          * The renderer can also be used completely decoupled from a chart.
@@ -4148,8 +4190,10 @@
          * // Use directly without a chart object.
          * var renderer = new Highcharts.Renderer(parentNode, 600, 400);
          *
-         * @sample highcharts/members/renderer-on-chart - Annotating a chart programmatically.
-         * @sample highcharts/members/renderer-basic - Independent SVG drawing.
+         * @sample highcharts/members/renderer-on-chart
+         *         Annotating a chart programmatically.
+         * @sample highcharts/members/renderer-basic
+         *         Independent SVG drawing.
          *
          * @class Highcharts.SVGRenderer
          */
@@ -4182,6 +4226,10 @@
                 element = boxWrapper.element;
                 container.appendChild(element);
 
+                // Always use ltr on the container, otherwise text-anchor will be
+                // flipped and text appear outside labels, buttons, tooltip etc (#3482)
+                attr(container, 'dir', 'ltr');
+
                 // For browsers other than IE, add the namespace attribute (#1978)
                 if (container.innerHTML.indexOf('xmlns') === -1) {
                     attr(element, 'xmlns', this.SVG_NS);
@@ -4212,17 +4260,24 @@
                  * @type {string}
                  */
                 // #24, #672, #1070
-                this.url = (isFirefox || isWebKit) && doc.getElementsByTagName('base').length ?
+                this.url = (
+                        (isFirefox || isWebKit) &&
+                        doc.getElementsByTagName('base').length
+                    ) ?
                     win.location.href
                     .replace(/#.*?$/, '') // remove the hash
                     .replace(/<[^>]*>/g, '') // wing cut HTML
-                    .replace(/([\('\)])/g, '\\$1') // escape parantheses and quotes
-                    .replace(/ /g, '%20') : // replace spaces (needed for Safari only)
+                    // escape parantheses and quotes
+                    .replace(/([\('\)])/g, '\\$1')
+                    // replace spaces (needed for Safari only)
+                    .replace(/ /g, '%20') :
                     '';
 
                 // Add description
                 desc = this.createElement('desc').add();
-                desc.element.appendChild(doc.createTextNode('Created with Highstock 5.0.14'));
+                desc.element.appendChild(
+                    doc.createTextNode('Created with Highstock 6.0.4')
+                );
 
                 /**
                  * A pointer to the `defs` node of the root SVG.
@@ -4243,11 +4298,12 @@
 
 
                 // Issue 110 workaround:
-                // In Firefox, if a div is positioned by percentage, its pixel position may land
-                // between pixels. The container itself doesn't display this, but an SVG element
-                // inside this container will be drawn at subpixel precision. In order to draw
-                // sharp lines, this must be compensated for. This doesn't seem to work inside
-                // iframes though (like in jsFiddle).
+                // In Firefox, if a div is positioned by percentage, its pixel position
+                // may land between pixels. The container itself doesn't display this,
+                // but an SVG element inside this container will be drawn at subpixel
+                // precision. In order to draw sharp lines, this must be compensated
+                // for. This doesn't seem to work inside iframes though (like in
+                // jsFiddle).
                 var subPixelFix, rect;
                 if (isFirefox && container.getBoundingClientRect) {
                     subPixelFix = function() {
@@ -4275,9 +4331,9 @@
              *   for gradients, fills, filters etc. Styled mode only. A hook for adding
              *   general definitions to the SVG's defs tag. Definitions can be
              *   referenced from the CSS by its `id`. Read more in
-             *   [gradients, shadows and patterns]{@link http://www.highcharts.com/docs/chart-design-and-style/gradients-shadows-and-patterns}.
-             *   {@link http://www.highcharts.com/docs/chart-design-and-style/style-by-css|
-             *   Styled mode} only.
+             *   [gradients, shadows and patterns]{@link http://www.highcharts.com/docs/
+             *   chart-design-and-style/gradients-shadows-and-patterns}.
+             *   Styled mode only.
              *
              * @param {Object} def - A serialized form of an SVG definition, including
              *   children
@@ -4295,7 +4351,11 @@
 
                         // Set attributes
                         objectEach(item, function(val, key) {
-                            if (key !== 'tagName' && key !== 'children' && key !== 'textContent') {
+                            if (
+                                key !== 'tagName' &&
+                                key !== 'children' &&
+                                key !== 'textContent'
+                            ) {
                                 attr[key] = val;
                             }
                         });
@@ -4306,7 +4366,9 @@
 
                         // Add text content
                         if (item.textContent) {
-                            node.element.appendChild(doc.createTextNode(item.textContent));
+                            node.element.appendChild(
+                                doc.createTextNode(item.textContent)
+                            );
                         }
 
                         // Recurse
@@ -4327,7 +4389,7 @@
             /**
              * Detect whether the renderer is hidden. This happens when one of the
              * parent elements has `display: none`. Used internally to detect when we
-             * needto render preliminarily in another div to get the text bounding boxes 
+             * needto render preliminarily in another div to get the text bounding boxes
              * right.
              *
              * @returns {boolean} True if it is hidden.
@@ -4396,8 +4458,10 @@
              */
             getRadialAttr: function(radialReference, gradAttr) {
                 return {
-                    cx: (radialReference[0] - radialReference[2] / 2) + gradAttr.cx * radialReference[2],
-                    cy: (radialReference[1] - radialReference[2] / 2) + gradAttr.cy * radialReference[2],
+                    cx: (radialReference[0] - radialReference[2] / 2) +
+                        gradAttr.cx * radialReference[2],
+                    cy: (radialReference[1] - radialReference[2] / 2) +
+                        gradAttr.cy * radialReference[2],
                     r: gradAttr.r * radialReference[2]
                 };
             },
@@ -4409,7 +4473,10 @@
 
                 // Old IE cannot measure the actualWidth for SVG elements (#2314)
                 if (!svg && renderer.forExport) {
-                    actualWidth = renderer.measureSpanWidth(tspan.firstChild.data, wrapper.styles);
+                    actualWidth = renderer.measureSpanWidth(
+                        tspan.firstChild.data,
+                        wrapper.styles
+                    );
                 }
                 return actualWidth;
             },
@@ -4460,6 +4527,26 @@
             },
 
             /**
+             * A collection of characters mapped to HTML entities. When `useHTML` on an
+             * element is true, these entities will be rendered correctly by HTML. In 
+             * the SVG pseudo-HTML, they need to be unescaped back to simple characters,
+             * so for example `&lt;` will render as `<`.
+             *
+             * @example
+             * // Add support for unescaping quotes
+             * Highcharts.SVGRenderer.prototype.escapes['"'] = '&quot;';
+             * 
+             * @type {Object}
+             */
+            escapes: {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                "'": '&#39;', // eslint-disable-line quotes
+                '"': '&quot;'
+            },
+
+            /**
              * Parse a simple HTML string into SVG tspans. Called internally when text
              *   is set on an SVGElement. The function supports a subset of HTML tags,
              *   CSS text features like `width`, `text-overflow`, `white-space`, and
@@ -4503,8 +4590,14 @@
                                 tspan.getAttribute('style') ? tspan : textNode
                             ).h;
                     },
-                    unescapeAngleBrackets = function(inputStr) {
-                        return inputStr.replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+                    unescapeEntities = function(inputStr) {
+                        objectEach(renderer.escapes, function(value, key) {
+                            inputStr = inputStr.replace(
+                                new RegExp(value, 'g'),
+                                key
+                            );
+                        });
+                        return inputStr;
                     };
 
                 // The buildText code is quite heavy, so if we're not changing something
@@ -4523,15 +4616,20 @@
                 }
                 wrapper.textCache = textCache;
 
-                /// remove old text
+                // Remove old text
                 while (i--) {
                     textNode.removeChild(childNodes[i]);
                 }
 
                 // Skip tspans, add text directly to text node. The forceTSpan is a hook
                 // used in text outline hack.
-                if (!hasMarkup && !textOutline && !ellipsis && !width && textStr.indexOf(' ') === -1) {
-                    textNode.appendChild(doc.createTextNode(unescapeAngleBrackets(textStr)));
+                if (!hasMarkup &&
+                    !textOutline &&
+                    !ellipsis &&
+                    !width &&
+                    textStr.indexOf(' ') === -1
+                ) {
+                    textNode.appendChild(doc.createTextNode(unescapeEntities(textStr)));
 
                     // Complex strings, add more logic
                 } else {
@@ -4541,14 +4639,21 @@
                     hrefRegex = /<.*href="([^"]+)".*>/;
 
                     if (tempParent) {
-                        tempParent.appendChild(textNode); // attach it to the DOM to read offset width
+                        // attach it to the DOM to read offset width
+                        tempParent.appendChild(textNode);
                     }
 
                     if (hasMarkup) {
                         lines = textStr
 
-                            .replace(/<(b|strong)>/g, '<span class="highcharts-strong">')
-                            .replace(/<(i|em)>/g, '<span class="highcharts-emphasized">')
+                            .replace(
+                                /<(b|strong)>/g,
+                                '<span class="highcharts-strong">'
+                            )
+                            .replace(
+                                /<(i|em)>/g,
+                                '<span class="highcharts-emphasized">'
+                            )
 
                             .replace(/<a/g, '<span')
                             .replace(/<\/(b|strong|i|em|a)>/g, '</span>')
@@ -4570,7 +4675,9 @@
                         var spans,
                             spanNo = 0;
                         line = line
-                            .replace(/^\s+|\s+$/g, '') // Trim to prevent useless/costly process on the spaces (#5258)
+                            // Trim to prevent useless/costly process on the spaces
+                            // (#5258)
+                            .replace(/^\s+|\s+$/g, '')
                             .replace(/<span/g, '|||<span')
                             .replace(/<\/span>/g, '</span>|||');
                         spans = line.split('|||');
@@ -4578,7 +4685,10 @@
                         each(spans, function buildTextSpans(span) {
                             if (span !== '' || spans.length === 1) {
                                 var attributes = {},
-                                    tspan = doc.createElementNS(renderer.SVG_NS, 'tspan'),
+                                    tspan = doc.createElementNS(
+                                        renderer.SVG_NS,
+                                        'tspan'
+                                    ),
                                     spanCls,
                                     spanStyle; // #390
                                 if (clsRegex.test(span)) {
@@ -4586,25 +4696,39 @@
                                     attr(tspan, 'class', spanCls);
                                 }
                                 if (styleRegex.test(span)) {
-                                    spanStyle = span.match(styleRegex)[1].replace(/(;| |^)color([ :])/, '$1fill$2');
+                                    spanStyle = span.match(styleRegex)[1].replace(
+                                        /(;| |^)color([ :])/,
+                                        '$1fill$2'
+                                    );
                                     attr(tspan, 'style', spanStyle);
                                 }
-                                if (hrefRegex.test(span) && !forExport) { // Not for export - #1529
-                                    attr(tspan, 'onclick', 'location.href=\"' + span.match(hrefRegex)[1] + '\"');
-                                    css(tspan, {
-                                        cursor: 'pointer'
-                                    });
+
+                                // Not for export - #1529
+                                if (hrefRegex.test(span) && !forExport) {
+                                    attr(
+                                        tspan,
+                                        'onclick',
+                                        'location.href=\"' +
+                                        span.match(hrefRegex)[1] + '\"'
+                                    );
+                                    attr(tspan, 'class', 'highcharts-anchor');
+
                                 }
 
-                                span = unescapeAngleBrackets(span.replace(/<(.|\n)*?>/g, '') || ' ');
+                                // Strip away unsupported HTML tags (#7126)
+                                span = unescapeEntities(
+                                    span.replace(/<[a-zA-Z\/](.|\n)*?>/g, '') || ' '
+                                );
 
-                                // Nested tags aren't supported, and cause crash in Safari (#1596)
+                                // Nested tags aren't supported, and cause crash in
+                                // Safari (#1596)
                                 if (span !== ' ') {
 
                                     // add the text node
                                     tspan.appendChild(doc.createTextNode(span));
 
-                                    if (!spanNo) { // first span in a line, align it to the left
+                                    // First span in a line, align it to the left
+                                    if (!spanNo) {
                                         if (lineNo && parentX !== null) {
                                             attributes.x = parentX;
                                         }
@@ -4618,18 +4742,20 @@
                                     // Append it
                                     textNode.appendChild(tspan);
 
-                                    // first span on subsequent line, add the line height
+                                    // first span on subsequent line, add the line
+                                    // height
                                     if (!spanNo && isSubsequentLine) {
 
-                                        // allow getting the right offset height in exporting in IE
+                                        // allow getting the right offset height in
+                                        // exporting in IE
                                         if (!svg && forExport) {
                                             css(tspan, {
                                                 display: 'block'
                                             });
                                         }
 
-                                        // Set the line height based on the font size of either
-                                        // the text element or the tspan element
+                                        // Set the line height based on the font size of
+                                        // either the text element or the tspan element
                                         attr(
                                             tspan,
                                             'dy',
@@ -4637,14 +4763,23 @@
                                         );
                                     }
 
-                                    /*if (width) {
+                                    /* 
+                                    if (width) {
                                     	renderer.breakText(wrapper, width);
-                                    }*/
+                                    }
+                                    */
 
                                     // Check width and apply soft breaks or ellipsis
                                     if (width) {
-                                        var words = span.replace(/([^\^])-/g, '$1- ').split(' '), // #1273
-                                            hasWhiteSpace = spans.length > 1 || lineNo || (words.length > 1 && !noWrap),
+                                        var words = span.replace(
+                                                /([^\^])-/g,
+                                                '$1- '
+                                            ).split(' '), // #1273
+                                            hasWhiteSpace = (
+                                                spans.length > 1 ||
+                                                lineNo ||
+                                                (words.length > 1 && !noWrap)
+                                            ),
                                             tooLong,
                                             rest = [],
                                             actualWidth,
@@ -4652,27 +4787,44 @@
                                             rotation = wrapper.rotation;
 
                                         if (ellipsis) {
-                                            wasTooLong = renderer.applyEllipsis(wrapper, tspan, span, width);
+                                            wasTooLong = renderer.applyEllipsis(
+                                                wrapper,
+                                                tspan,
+                                                span,
+                                                width
+                                            );
                                         }
 
-                                        while (!ellipsis && hasWhiteSpace && (words.length || rest.length)) {
-                                            wrapper.rotation = 0; // discard rotation when computing box
-                                            actualWidth = renderer.getSpanWidth(wrapper, tspan);
+                                        while (!ellipsis &&
+                                            hasWhiteSpace &&
+                                            (words.length || rest.length)
+                                        ) {
+                                            // discard rotation when computing box
+                                            wrapper.rotation = 0;
+                                            actualWidth = renderer.getSpanWidth(
+                                                wrapper,
+                                                tspan
+                                            );
                                             tooLong = actualWidth > width;
 
-                                            // For ellipsis, do a binary search for the correct string length
+                                            // For ellipsis, do a binary search for the 
+                                            // correct string length
                                             if (wasTooLong === undefined) {
                                                 wasTooLong = tooLong; // First time
                                             }
 
-                                            // Looping down, this is the first word sequence that is not too long,
-                                            // so we can move on to build the next line.
+                                            // Looping down, this is the first word
+                                            // sequence that is not too long, so we can
+                                            // move on to build the next line.
                                             if (!tooLong || words.length === 1) {
                                                 words = rest;
                                                 rest = [];
 
                                                 if (words.length && !noWrap) {
-                                                    tspan = doc.createElementNS(SVG_NS, 'tspan');
+                                                    tspan = doc.createElementNS(
+                                                        SVG_NS,
+                                                        'tspan'
+                                                    );
                                                     attr(tspan, {
                                                         dy: dy,
                                                         x: parentX
@@ -4682,7 +4834,9 @@
                                                     }
                                                     textNode.appendChild(tspan);
                                                 }
-                                                if (actualWidth > width) { // a single word is pressing it out
+
+                                                // a single word is pressing it out
+                                                if (actualWidth > width) {
                                                     width = actualWidth;
                                                 }
                                             } else { // append to existing line tspan
@@ -4690,7 +4844,12 @@
                                                 rest.unshift(words.pop());
                                             }
                                             if (words.length) {
-                                                tspan.appendChild(doc.createTextNode(words.join(' ').replace(/- /g, '-')));
+                                                tspan.appendChild(
+                                                    doc.createTextNode(
+                                                        words.join(' ')
+                                                        .replace(/- /g, '-')
+                                                    )
+                                                );
                                             }
                                         }
                                         wrapper.rotation = rotation;
@@ -4700,15 +4859,19 @@
                                 }
                             }
                         });
-                        // To avoid beginning lines that doesn't add to the textNode (#6144)
-                        isSubsequentLine = isSubsequentLine || textNode.childNodes.length;
+                        // To avoid beginning lines that doesn't add to the textNode
+                        // (#6144)
+                        isSubsequentLine = (
+                            isSubsequentLine ||
+                            textNode.childNodes.length
+                        );
                     });
 
                     if (wasTooLong) {
                         wrapper.attr('title', wrapper.textStr);
                     }
                     if (tempParent) {
-                        tempParent.removeChild(textNode); // attach it to the DOM to read offset width
+                        tempParent.removeChild(textNode);
                     }
 
                     // Apply the text outline
@@ -4725,7 +4888,8 @@
             	var bBox = wrapper.getBBox(),
             		node = wrapper.element,
             		textLength = node.textContent.length,
-            		pos = Math.round(width * textLength / bBox.width), // try this position first, based on average character width
+            		// try this position first, based on average character width
+            		pos = Math.round(width * textLength / bBox.width),
             		increment = 0,
             		finalPos;
 
@@ -4749,7 +4913,12 @@
             			pos += increment;
             		}
             	}
-            	console.log('width', width, 'stringWidth', node.getSubStringLength(0, finalPos))
+            	console.log(
+            		'width',
+            		width,
+            		'stringWidth',
+            		node.getSubStringLength(0, finalPos)
+            	)
             },
             */
 
@@ -4790,8 +4959,28 @@
              * @param {Symbol} [shape=rect] - The shape type.
              * @returns {SVGRenderer} The button element.
              */
-            button: function(text, x, y, callback, normalState, hoverState, pressedState, disabledState, shape) {
-                var label = this.label(text, x, y, shape, null, null, null, null, 'button'),
+            button: function(
+                text,
+                x,
+                y,
+                callback,
+                normalState,
+                hoverState,
+                pressedState,
+                disabledState,
+                shape
+            ) {
+                var label = this.label(
+                        text,
+                        x,
+                        y,
+                        shape,
+                        null,
+                        null,
+                        null,
+                        null,
+                        'button'
+                    ),
                     curState = 0;
 
                 // Default, non-stylable attributes
@@ -4802,7 +4991,8 @@
 
 
 
-                // Add the events. IE9 and IE10 need mouseover and mouseout to funciton (#667).
+                // Add the events. IE9 and IE10 need mouseover and mouseout to funciton
+                // (#667).
                 addEvent(label.element, isMS ? 'mouseover' : 'mouseenter', function() {
                     if (curState !== 3) {
                         label.setState(1);
@@ -4820,8 +5010,12 @@
                         label.state = curState = state;
                     }
                     // Update visuals
-                    label.removeClass(/highcharts-button-(normal|hover|pressed|disabled)/)
-                        .addClass('highcharts-button-' + ['normal', 'hover', 'pressed', 'disabled'][state || 0]);
+                    label.removeClass(
+                            /highcharts-button-(normal|hover|pressed|disabled)/
+                        )
+                        .addClass(
+                            'highcharts-button-' + ['normal', 'hover', 'pressed', 'disabled'][state || 0]
+                        );
 
 
                 };
@@ -4849,7 +5043,8 @@
             crispLine: function(points, width) {
                 // normalize to a crisp line
                 if (points[1] === points[4]) {
-                    // Substract due to #1129. Now bottom and left axis gridlines behave the same.
+                    // Substract due to #1129. Now bottom and left axis gridlines behave
+                    // the same.
                     points[1] = points[4] = Math.round(points[1]) - (width % 2 / 2);
                 }
                 if (points[2] === points[5]) {
@@ -5048,7 +5243,8 @@
                 }, {
                     step: function() {
                         this.attr({
-                            viewBox: '0 0 ' + this.attr('width') + ' ' + this.attr('height')
+                            viewBox: '0 0 ' + this.attr('width') + ' ' +
+                                this.attr('height')
                         });
                     },
                     duration: pick(animate, true) ? undefined : 0
@@ -5060,8 +5256,9 @@
             },
 
             /**
-             * Create and return an svg group element. Child {@link Highcharts.SVGElement}
-             * objects are added to the group by using the group as the first parameter
+             * Create and return an svg group element. Child
+             * {@link Highcharts.SVGElement} objects are added to the group by using the
+             * group as the first parameter
              * in {@link Highcharts.SVGElement#add|add()}.
              * 
              * @param {string} [name] The group will be given a class name of
@@ -5118,14 +5315,16 @@
                         'href', src);
                 } else {
                     // could be exporting in IE
-                    // using href throws "not supported" in ie7 and under, requries regex shim to fix later
+                    // using href throws "not supported" in ie7 and under, requries
+                    // regex shim to fix later
                     elemWrapper.element.setAttribute('hc-svg-href', src);
                 }
                 return elemWrapper;
             },
 
             /**
-             * Draw a symbol out of pre-defined shape paths from {@link SVGRenderer#symbols}.
+             * Draw a symbol out of pre-defined shape paths from
+             * {@link SVGRenderer#symbols}.
              * It is used in Highcharts for point makers, which cake a `symbol` option,
              * and label and button backgrounds like in the tooltip and stock flags.
              *
@@ -5254,21 +5453,22 @@
                     if (defined(obj.imgwidth) && defined(obj.imgheight)) {
                         centerImage();
                     } else {
-                        // Initialize image to be 0 size so export will still function if there's no cached sizes.
+                        // Initialize image to be 0 size so export will still function
+                        // if there's no cached sizes.
                         obj.attr({
                             width: 0,
                             height: 0
                         });
 
-                        // Create a dummy JavaScript image to get the width and height. Due to a bug in IE < 8,
-                        // the created element must be assigned to a variable in order to load (#292).
+                        // Create a dummy JavaScript image to get the width and height. 
                         createElement('img', {
                             onload: function() {
 
                                 var chart = charts[ren.chartIndex];
 
-                                // Special case for SVGs on IE11, the width is not accessible until the image is
-                                // part of the DOM (#2854).
+                                // Special case for SVGs on IE11, the width is not
+                                // accessible until the image is part of the DOM
+                                // (#2854).
                                 if (this.width === 0) {
                                     css(this, {
                                         position: 'absolute',
@@ -5294,7 +5494,8 @@
                                     this.parentNode.removeChild(this);
                                 }
 
-                                // Fire the load event when all external images are loaded
+                                // Fire the load event when all external images are
+                                // loaded
                                 ren.imgCount--;
                                 if (!ren.imgCount && chart && chart.onload) {
                                     chart.onload();
@@ -5422,7 +5623,8 @@
                 },
 
                 /**
-                 * Callout shape used for default tooltips, also used for rounded rectangles in VML
+                 * Callout shape used for default tooltips, also used for rounded
+                 * rectangles in VML
                  */
                 callout: function(x, y, w, h, options) {
                     var arrowLength = 6,
@@ -5438,7 +5640,7 @@
                         'L', x + w - r, y, // top side
                         'C', x + w, y, x + w, y, x + w, y + r, // top-right corner
                         'L', x + w, y + h - r, // right side
-                        'C', x + w, y + h, x + w, y + h, x + w - r, y + h, // bottom-right corner
+                        'C', x + w, y + h, x + w, y + h, x + w - r, y + h, // bottom-rgt
                         'L', x + r, y + h, // bottom side
                         'C', x, y + h, x, y + h, x, y + h - r, // bottom-left corner
                         'L', x, y + r, // left side
@@ -5449,7 +5651,10 @@
                     if (anchorX && anchorX > w) {
 
                         // Chevron
-                        if (anchorY > y + safeDistance && anchorY < y + h - safeDistance) {
+                        if (
+                            anchorY > y + safeDistance &&
+                            anchorY < y + h - safeDistance
+                        ) {
                             path.splice(13, 3,
                                 'L', x + w, anchorY - halfDistance,
                                 x + w + arrowLength, anchorY,
@@ -5471,7 +5676,10 @@
                     } else if (anchorX && anchorX < 0) {
 
                         // Chevron
-                        if (anchorY > y + safeDistance && anchorY < y + h - safeDistance) {
+                        if (
+                            anchorY > y + safeDistance &&
+                            anchorY < y + h - safeDistance
+                        ) {
                             path.splice(33, 3,
                                 'L', x, anchorY + halfDistance,
                                 x - arrowLength, anchorY,
@@ -5489,14 +5697,25 @@
                             );
                         }
 
-                    } else if (anchorY && anchorY > h && anchorX > x + safeDistance && anchorX < x + w - safeDistance) { // replace bottom
+                    } else if ( // replace bottom
+                        anchorY &&
+                        anchorY > h &&
+                        anchorX > x + safeDistance &&
+                        anchorX < x + w - safeDistance
+                    ) {
                         path.splice(23, 3,
                             'L', anchorX + halfDistance, y + h,
                             anchorX, y + h + arrowLength,
                             anchorX - halfDistance, y + h,
                             x + r, y + h
                         );
-                    } else if (anchorY && anchorY < 0 && anchorX > x + safeDistance && anchorX < x + w - safeDistance) { // replace top
+
+                    } else if ( // replace top
+                        anchorY &&
+                        anchorY < 0 &&
+                        anchorX > x + safeDistance &&
+                        anchorX < x + w - safeDistance
+                    ) {
                         path.splice(3, 3,
                             'L', anchorX - halfDistance, y,
                             anchorX, y - arrowLength,
@@ -5592,7 +5811,6 @@
 
                 // declare variables
                 var renderer = this,
-                    fakeSVG = !svg && renderer.forExport,
                     wrapper,
                     attribs = {};
 
@@ -5600,7 +5818,7 @@
                     return renderer.html(str, x, y);
                 }
 
-                attribs.x = Math.round(x || 0); // X is always needed for line-wrap logic
+                attribs.x = Math.round(x || 0); // X always needed for line-wrap logic
                 if (y) {
                     attribs.y = Math.round(y);
                 }
@@ -5611,13 +5829,6 @@
                 wrapper = renderer.createElement('text')
                     .attr(attribs);
 
-                // Prevent wrapping from creating false offsetWidths in export in legacy IE (#1079, #1063)
-                if (fakeSVG) {
-                    wrapper.css({
-                        position: 'absolute'
-                    });
-                }
-
                 if (!useHTML) {
                     wrapper.xSetter = function(value, key, element) {
                         var tspans = element.getElementsByTagName('tspan'),
@@ -5626,7 +5837,8 @@
                             i;
                         for (i = 0; i < tspans.length; i++) {
                             tspan = tspans[i];
-                            // If the x values are equal, the tspan represents a linebreak
+                            // If the x values are equal, the tspan represents a
+                            // linebreak
                             if (tspan.getAttribute(key) === parentVal) {
                                 tspan.setAttribute(key, value);
                             }
@@ -5738,7 +5950,17 @@
              * @sample highcharts/members/renderer-label-on-chart/
              *         A label on the chart
              */
-            label: function(str, x, y, shape, anchorX, anchorY, useHTML, baseline, className) {
+            label: function(
+                str,
+                x,
+                y,
+                shape,
+                anchorX,
+                anchorY,
+                useHTML,
+                baseline,
+                className
+            ) {
 
                 var renderer = this,
                     wrapper = renderer.g(className !== 'button' && 'label'),
@@ -5778,34 +6000,44 @@
 
 
                 /**
-                 * This function runs after the label is added to the DOM (when the bounding box is
-                 * available), and after the text of the label is updated to detect the new bounding
-                 * box and reflect it in the border box.
+                 * This function runs after the label is added to the DOM (when the
+                 * bounding box is available), and after the text of the label is
+                 * updated to detect the new bounding box and reflect it in the border
+                 * box.
                  */
                 updateBoxSize = function() {
                     var style = text.element.style,
                         crispAdjust,
                         attribs = {};
 
-                    bBox = (width === undefined || height === undefined || textAlign) && defined(text.textStr) &&
-                        text.getBBox(); //#3295 && 3514 box failure when string equals 0
-                    wrapper.width = (width || bBox.width || 0) + 2 * padding + paddingLeft;
+                    bBox = (
+                        (width === undefined || height === undefined || textAlign) &&
+                        defined(text.textStr) &&
+                        text.getBBox()
+                    ); // #3295 && 3514 box failure when string equals 0
+                    wrapper.width = (
+                        (width || bBox.width || 0) +
+                        2 * padding +
+                        paddingLeft
+                    );
                     wrapper.height = (height || bBox.height || 0) + 2 * padding;
 
                     // Update the label-scoped y offset
-                    baselineOffset = padding + renderer.fontMetrics(style && style.fontSize, text).b;
+                    baselineOffset = padding +
+                        renderer.fontMetrics(style && style.fontSize, text).b;
 
 
                     if (needsBox) {
 
                         // Create the border box if it is not already present
                         if (!box) {
-                            wrapper.box = box = renderer.symbols[shape] || hasBGImage ? // Symbol definition exists (#5324)
+                            // Symbol definition exists (#5324)
+                            wrapper.box = box = renderer.symbols[shape] || hasBGImage ?
                                 renderer.symbol(shape) :
                                 renderer.rect();
 
-                            box.addClass(
-                                (className === 'button' ? '' : 'highcharts-label-box') + // Don't use label className for buttons
+                            box.addClass( // Don't use label className for buttons
+                                (className === 'button' ? '' : 'highcharts-label-box') +
                                 (className ? ' highcharts-' + className + '-box' : '')
                             );
 
@@ -5826,7 +6058,8 @@
                 };
 
                 /**
-                 * This function runs after setting text or padding, but only if padding is changed
+                 * This function runs after setting text or padding, but only if padding
+                 * is changed
                  */
                 updateTextPadding = function() {
                     var textX = paddingLeft + padding,
@@ -5836,11 +6069,16 @@
                     textY = baseline ? 0 : baselineOffset;
 
                     // compensate for alignment
-                    if (defined(width) && bBox && (textAlign === 'center' || textAlign === 'right')) {
+                    if (
+                        defined(width) &&
+                        bBox &&
+                        (textAlign === 'center' || textAlign === 'right')
+                    ) {
                         textX += {
-                            center: 0.5,
-                            right: 1
-                        }[textAlign] * (width - bBox.width);
+                                center: 0.5,
+                                right: 1
+                            }[textAlign] *
+                            (width - bBox.width);
                     }
 
                     // update if anything changed
@@ -5870,13 +6108,15 @@
                 };
 
                 /**
-                 * After the text element is added, get the desired size of the border box
-                 * and add it before the text in the DOM.
+                 * After the text element is added, get the desired size of the border
+                 * box and add it before the text in the DOM.
                  */
                 wrapper.onAdd = function() {
                     text.add(wrapper);
                     wrapper.attr({
-                        text: (str || str === 0) ? str : '', // alignment is available now // #3295: 0 not rendered if given as a value
+                        // Alignment is available now  (#3295, 0 not rendered if given
+                        // as a value)
+                        text: (str || str === 0) ? str : '',
                         x: x,
                         y: y
                     });
@@ -5926,7 +6166,8 @@
                     }[value];
                     if (value !== alignFactor) {
                         alignFactor = value;
-                        if (bBox) { // Bounding box exists, means we're dynamically changing
+                        // Bounding box exists, means we're dynamically changing
+                        if (bBox) {
                             wrapper.attr({
                                 x: wrapperX
                             }); // #5134
@@ -5990,7 +6231,9 @@
                     css: function(styles) {
                         if (styles) {
                             var textStyles = {};
-                            styles = merge(styles); // create a copy to avoid altering the original object (#537)
+                            // Create a copy to avoid altering the original object
+                            // (#537)
+                            styles = merge(styles);
                             each(wrapper.textProps, function(prop) {
                                 if (styles[prop] !== undefined) {
                                     textStyles[prop] = styles[prop];
@@ -6034,7 +6277,11 @@
                         SVGElement.prototype.destroy.call(wrapper);
 
                         // Release local pointers (#1298)
-                        wrapper = renderer = updateBoxSize = updateTextPadding = boxAttr = null;
+                        wrapper =
+                            renderer =
+                            updateBoxSize =
+                            updateTextPadding =
+                            boxAttr = null;
                     }
                 });
             }
@@ -6061,6 +6308,7 @@
             isFirefox = H.isFirefox,
             isMS = H.isMS,
             isWebKit = H.isWebKit,
+            pick = H.pick,
             pInt = H.pInt,
             SVGElement = H.SVGElement,
             SVGRenderer = H.SVGRenderer,
@@ -6104,12 +6352,6 @@
             htmlGetBBox: function() {
                 var wrapper = this,
                     element = wrapper.element;
-
-                // faking getBBox in exported SVG in legacy IE (is this a duplicate of
-                // the fix for #1079?)
-                if (element.nodeName === 'text') {
-                    element.style.position = 'absolute';
-                }
 
                 return {
                     x: element.offsetLeft,
@@ -6241,16 +6483,7 @@
              */
             setSpanRotation: function(rotation, alignCorrection, baseline) {
                 var rotationStyle = {},
-                    cssTransformKey =
-                    isMS ?
-                    '-ms-transform' :
-                    isWebKit ?
-                    '-webkit-transform' :
-                    isFirefox ?
-                    'MozTransform' :
-                    win.opera ?
-                    '-o-transform' :
-                    '';
+                    cssTransformKey = this.renderer.getTransformKey();
 
                 rotationStyle[cssTransformKey] = rotationStyle.transform =
                     'rotate(' + rotation + 'deg)';
@@ -6271,6 +6504,19 @@
 
         // Extend SvgRenderer for useHTML option.
         extend(SVGRenderer.prototype, /** @lends SVGRenderer.prototype */ {
+
+            getTransformKey: function() {
+                return isMS && !/Edge/.test(win.navigator.userAgent) ?
+                    '-ms-transform' :
+                    isWebKit ?
+                    '-webkit-transform' :
+                    isFirefox ?
+                    'MozTransform' :
+                    win.opera ?
+                    '-o-transform' :
+                    '';
+            },
+
             /**
              * Create HTML text node. This is used by the VML renderer as well as the
              * SVG renderer through the useHTML option.
@@ -6305,7 +6551,8 @@
                     if (value !== element.innerHTML) {
                         delete this.bBox;
                     }
-                    element.innerHTML = this.textStr = value;
+                    this.textStr = value;
+                    element.innerHTML = pick(value, '');
                     wrapper.htmlUpdateTransform();
                 };
 
@@ -6379,6 +6626,39 @@
                                     var htmlGroupStyle,
                                         cls = attr(parentGroup.element, 'class');
 
+                                    // Common translate setter for X and Y on the HTML
+                                    // group. Using CSS transform instead of left and
+                                    // right prevents flickering in IE and Edge when 
+                                    // moving tooltip (#6957).
+                                    function translateSetter(value, key) {
+                                        parentGroup[key] = value;
+
+                                        // In IE and Edge, use translate because items
+                                        // would flicker below a HTML tooltip (#6957)
+                                        if (isMS) {
+                                            htmlGroupStyle[renderer.getTransformKey()] =
+                                                'translate(' + (
+                                                    parentGroup.x ||
+                                                    parentGroup.translateX
+                                                ) + 'px,' + (
+                                                    parentGroup.y ||
+                                                    parentGroup.translateY
+                                                ) + 'px)';
+
+                                            // Otherwise, use left and top. Using translate
+                                            // doesn't work well with offline export (#7254,
+                                            // #7280)
+                                        } else {
+                                            if (key === 'translateX') {
+                                                htmlGroupStyle.left = value + 'px';
+                                            } else {
+                                                htmlGroupStyle.top = value + 'px';
+                                            }
+                                        }
+
+                                        parentGroup.doTransform = true;
+                                    }
+
                                     if (cls) {
                                         cls = {
                                             className: cls
@@ -6409,10 +6689,17 @@
                                     // Set listeners to update the HTML div's position
                                     // whenever the SVG group position is changed.
                                     extend(parentGroup, {
-                                        classSetter: function(value) {
-                                            this.element.setAttribute('class', value);
-                                            htmlGroup.className = value;
-                                        },
+                                        // (#7287) Pass htmlGroup to use
+                                        // the related group 
+                                        classSetter: (function(htmlGroup) {
+                                            return function(value) {
+                                                this.element.setAttribute(
+                                                    'class',
+                                                    value
+                                                );
+                                                htmlGroup.className = value;
+                                            };
+                                        }(htmlGroup)),
                                         on: function() {
                                             if (parents[0].div) { // #6418
                                                 wrapper.on.apply({
@@ -6423,16 +6710,8 @@
                                             }
                                             return parentGroup;
                                         },
-                                        translateXSetter: function(value, key) {
-                                            htmlGroupStyle.left = value + 'px';
-                                            parentGroup[key] = value;
-                                            parentGroup.doTransform = true;
-                                        },
-                                        translateYSetter: function(value, key) {
-                                            htmlGroupStyle.top = value + 'px';
-                                            parentGroup[key] = value;
-                                            parentGroup.doTransform = true;
-                                        }
+                                        translateXSetter: translateSetter,
+                                        translateYSetter: translateSetter
                                     });
                                     addSetters(parentGroup, htmlGroupStyle);
                                 });
@@ -6464,17 +6743,7 @@
          *
          * License: www.highcharts.com/license
          */
-
-
-    }(Highcharts));
-    (function(H) {
-        /**
-         * (c) 2010-2017 Torstein Honsi
-         *
-         * License: www.highcharts.com/license
-         */
         var color = H.color,
-            each = H.each,
             getTZOffset = H.getTZOffset,
             isTouchDevice = H.isTouchDevice,
             merge = H.merge,
@@ -6491,7 +6760,20 @@
         H.defaultOptions = {
 
 
+
             /**
+             * Styled mode only. Configuration object for adding SVG definitions for
+             * reusable elements. See [gradients, shadows and patterns](http://www.
+             * highcharts.com/docs/chart-design-and-style/gradients-shadows-and-
+             * patterns) for more information and code examples.
+             * 
+             * @type {Object}
+             * @since 5.0.0
+             * @apioption defs
+             */
+
+            /**
+             * @ignore
              */
             symbols: ['circle', 'diamond', 'square', 'triangle', 'triangle-down'],
             lang: {
@@ -6502,7 +6784,6 @@
                  * 
                  * @type {String}
                  * @default Loading...
-                 * @product highcharts highstock highmaps
                  */
                 loading: 'Loading...',
 
@@ -6514,7 +6795,6 @@
                  * @default [ "January" , "February" , "March" , "April" , "May" ,
                  *          "June" , "July" , "August" , "September" , "October" ,
                  *          "November" , "December"]
-                 * @product highcharts highstock highmaps
                  */
                 months: [
                     'January', 'February', 'March', 'April', 'May', 'June', 'July',
@@ -6540,13 +6820,32 @@
                  * @type {Array<String>}
                  * @default ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday",
                  *          "Friday", "Saturday"]
-                 * @product highcharts highstock highmaps
                  */
                 weekdays: [
                     'Sunday', 'Monday', 'Tuesday', 'Wednesday',
                     'Thursday', 'Friday', 'Saturday'
                 ],
-                // invalidDate: '',
+
+                /**
+                 * Short week days, starting Sunday. If not specified, Highcharts uses
+                 * the first three letters of the `lang.weekdays` option.
+                 * 
+                 * @type {Array<String>}
+                 * @sample highcharts/lang/shortweekdays/
+                 *         Finnish two-letter abbreviations
+                 * @since 4.2.4
+                 * @apioption lang.shortWeekdays
+                 */
+
+                /**
+                 * What to show in a date field for invalid dates. Defaults to an empty
+                 * string.
+                 * 
+                 * @type {String}
+                 * @since 4.1.8
+                 * @product highcharts highstock
+                 * @apioption lang.invalidDate
+                 */
 
                 /**
                  * The default decimal point used in the `Highcharts.numberFormat`
@@ -6555,7 +6854,6 @@
                  * @type {String}
                  * @default .
                  * @since 1.2.2
-                 * @product highcharts highstock highmaps
                  */
                 decimalPoint: '.',
 
@@ -6566,13 +6864,27 @@
                  * to `null` disables shortening altogether.
                  * 
                  * @type {Array<String>}
-                 * @sample {highcharts} highcharts/lang/numericsymbols/ Replacing the symbols with text
-                 * @sample {highstock} highcharts/lang/numericsymbols/ Replacing the symbols with text
+                 * @sample {highcharts} highcharts/lang/numericsymbols/
+                 *         Replacing the symbols with text
+                 * @sample {highstock} highcharts/lang/numericsymbols/
+                 *         Replacing the symbols with text
                  * @default [ "k" , "M" , "G" , "T" , "P" , "E"]
                  * @since 2.3.0
-                 * @product highcharts highstock highmaps
                  */
-                numericSymbols: ['k', 'M', 'G', 'T', 'P', 'E'], // SI prefixes used in axis labels
+                numericSymbols: ['k', 'M', 'G', 'T', 'P', 'E'],
+
+                /**
+                 * The magnitude of [numericSymbols](#lang.numericSymbol) replacements.
+                 * Use 10000 for Japanese, Korean and various Chinese locales, which
+                 * use symbols for 10^4, 10^8 and 10^12.
+                 * 
+                 * @type {Number}
+                 * @sample highcharts/lang/numericsymbolmagnitude/
+                 *         10000 magnitude for Japanese
+                 * @default 1000
+                 * @since 5.0.3
+                 * @apioption lang.numericSymbolMagnitude
+                 */
 
                 /**
                  * The text for the label appearing when a chart is zoomed.
@@ -6580,7 +6892,6 @@
                  * @type {String}
                  * @default Reset zoom
                  * @since 1.2.4
-                 * @product highcharts highstock highmaps
                  */
                 resetZoom: 'Reset zoom',
 
@@ -6590,7 +6901,6 @@
                  * @type {String}
                  * @default Reset zoom level 1:1
                  * @since 1.2.4
-                 * @product highcharts highstock highmaps
                  */
                 resetZoomTitle: 'Reset zoom level 1:1',
 
@@ -6606,7 +6916,6 @@
                  * @type {String}
                  * @default  
                  * @since 1.2.2
-                 * @product highcharts highstock highmaps
                  */
                 thousandsSep: ' '
             },
@@ -6617,12 +6926,11 @@
              * method.
              * 
              * <pre>Highcharts.setOptions({
-             * global: {
-             * useUTC: false
-             * }
+             *     global: {
+             *         useUTC: false
+             *     }
              * });</pre>
-             * 
-             * @product highcharts highstock highmaps
+             *
              */
             global: {
 
@@ -6638,11 +6946,91 @@
                  * @sample {highcharts} highcharts/global/useutc-true/ True by default
                  * @sample {highcharts} highcharts/global/useutc-false/ False
                  * @default true
-                 * @product highcharts highstock highmaps
                  */
-                useUTC: true,
-                //timezoneOffset: 0
+                useUTC: true
 
+                /**
+                 * A custom `Date` class for advanced date handling. For example,
+                 * [JDate](https://githubcom/tahajahangir/jdate) can be hooked in to
+                 * handle Jalali dates.
+                 * 
+                 * @type {Object}
+                 * @since 4.0.4
+                 * @product highcharts highstock
+                 * @apioption global.Date
+                 */
+
+                /**
+                 * _Canvg rendering for Android 2.x is removed as of Highcharts 5.0\.
+                 * Use the [libURL](#exporting.libURL) option to configure exporting._
+                 * 
+                 * The URL to the additional file to lazy load for Android 2.x devices.
+                 * These devices don't support SVG, so we download a helper file that
+                 * contains [canvg](http://code.google.com/p/canvg/), its dependency
+                 * rbcolor, and our own CanVG Renderer class. To avoid hotlinking to
+                 * our site, you can install canvas-tools.js on your own server and
+                 * change this option accordingly.
+                 * 
+                 * @type {String}
+                 * @deprecated
+                 * @default http://code.highcharts.com/{version}/modules/canvas-tools.js
+                 * @product highcharts highmaps
+                 * @apioption global.canvasToolsURL
+                 */
+
+                /**
+                 * A callback to return the time zone offset for a given datetime. It
+                 * takes the timestamp in terms of milliseconds since January 1 1970,
+                 * and returns the timezone offset in minutes. This provides a hook
+                 * for drawing time based charts in specific time zones using their
+                 * local DST crossover dates, with the help of external libraries.
+                 * 
+                 * @type {Function}
+                 * @see [global.timezoneOffset](#global.timezoneOffset)
+                 * @sample {highcharts} highcharts/global/gettimezoneoffset/
+                 *         Use moment.js to draw Oslo time regardless of browser locale
+                 * @sample {highstock} highcharts/global/gettimezoneoffset/
+                 *         Use moment.js to draw Oslo time regardless of browser locale
+                 * @since 4.1.0
+                 * @product highcharts highstock
+                 * @apioption global.getTimezoneOffset
+                 */
+
+                /**
+                 * Requires [moment.js](http://momentjs.com/). If the timezone option
+                 * is specified, it creates a default
+                 * [getTimezoneOffset](#global.getTimezoneOffset) function that looks
+                 * up the specified timezone in moment.js. If moment.js is not included,
+                 * this throws a Highcharts error in the console, but does not crash the
+                 * chart.
+                 * 
+                 * @type {String}
+                 * @see [getTimezoneOffset](#global.getTimezoneOffset)
+                 * @sample {highcharts} highcharts/global/timezone/ Europe/Oslo
+                 * @sample {highstock} highcharts/global/timezone/ Europe/Oslo
+                 * @default undefined
+                 * @since 5.0.7
+                 * @product highcharts highstock
+                 * @apioption global.timezone
+                 */
+
+                /**
+                 * The timezone offset in minutes. Positive values are west, negative
+                 * values are east of UTC, as in the ECMAScript [getTimezoneOffset](https://developer.
+                 * mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/getTimezoneOffset)
+                 * method. Use this to display UTC based data in a predefined time zone.
+                 * 
+                 * @type {Number}
+                 * @see [global.getTimezoneOffset](#global.getTimezoneOffset)
+                 * @sample {highcharts} highcharts/global/timezoneoffset/
+                 *         Timezone offset
+                 * @sample {highstock} highcharts/global/timezoneoffset/
+                 *         Timezone offset
+                 * @default 0
+                 * @since 3.0.8
+                 * @product highcharts highstock
+                 * @apioption global.timezoneOffset
+                 */
             },
             chart: {
 
@@ -6752,10 +7140,10 @@
                  * is milliseconds since 1970-01-01 00:00:00.
                  * 
                  * <pre>click: function(e) {
-                 * console.log(
-                 * Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', e.xAxis[0].value),
-                 * e.yAxis[0].value
-                 * )
+                 *     console.log(
+                 *         Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', e.xAxis[0].value),
+                 *         e.yAxis[0].value
+                 *     )
                  * }</pre>
                  * 
                  * @type {Function}
@@ -6838,14 +7226,13 @@
                  * since 1970-01-01 00:00:00.
                  * 
                  * <pre>selection: function(event) {
-                 * // log the min and max of the primary, datetime x-axis
-                 * console.log(
-                 * Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', event.xAxis[0].min),
-                 * 
-                 * Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', event.xAxis[0].max)
-                 * );
-                 * // log the min and max of the y axis
-                 * console.log(event.yAxis[0].min, event.yAxis[0].max);
+                 *     // log the min and max of the primary, datetime x-axis
+                 *     console.log(
+                 *         Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', event.xAxis[0].min),
+                 *         Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', event.xAxis[0].max)
+                 *     );
+                 *     // log the min and max of the y axis
+                 *     console.log(event.yAxis[0].min, event.yAxis[0].max);
                  * }</pre>
                  * 
                  * @type {Function}
@@ -7004,14 +7391,12 @@
                  * @sample {highstock} stock/chart/border/ 10px radius
                  * @sample {highmaps} maps/chart/border/ Border options
                  * @default 0
-                 * @product highcharts highstock highmaps
                  */
                 borderRadius: 0,
 
 
                 /**
-                 * In [styled mode](http://www.highcharts.com/docs/chart-design-and-
-                 * style/style-by-css), this sets how many colors the class names
+                 * In styled mode, this sets how many colors the class names
                  * should rotate between. With ten colors, series (or points) are
                  * given class names like `highcharts-color-0`, `highcharts-color-
                  * 0` [...] `highcharts-color-9`. The equivalent in non-styled mode
@@ -7020,7 +7405,6 @@
                  * @type {Number}
                  * @default 10
                  * @since 5.0.0
-                 * @product highcharts highstock highmaps
                  */
                 colorCount: 10,
 
@@ -7094,15 +7478,13 @@
                  * @see [chart.margin](#chart.margin)
                  * @default [10, 10, 15, 10]
                  * @since 3.0.6
-                 * @product highcharts highstock highmaps
                  */
                 spacing: [10, 10, 15, 10],
 
                 /**
                  * The button that appears after a selection zoom, allowing the user
                  * to reset zoom.
-                 * 
-                 * @product highcharts highstock highmaps
+                 *
                  */
                 resetZoomButton: {
 
@@ -7114,16 +7496,19 @@
                      * in `theme.states.hover`.
                      * 
                      * @type {Object}
-                     * @sample {highcharts} highcharts/chart/resetzoombutton-theme/ Theming the button
-                     * @sample {highstock} highcharts/chart/resetzoombutton-theme/ Theming the button
+                     * @sample {highcharts} highcharts/chart/resetzoombutton-theme/
+                     *         Theming the button
+                     * @sample {highstock} highcharts/chart/resetzoombutton-theme/
+                     *         Theming the button
                      * @since 2.2
-                     * @product highcharts highstock highmaps
                      */
                     theme: {
 
                         /**
+                         * The Z index for the reset zoom button. The default value 
+                         * places it below the tooltip that has Z index 7.
                          */
-                        zIndex: 20
+                        zIndex: 6
                     },
 
                     /**
@@ -7137,7 +7522,6 @@
                      * @sample {highmaps} highcharts/chart/resetzoombutton-position/
                      *         Above the plot area
                      * @since 2.2
-                     * @product highcharts highstock highmaps
                      */
                     position: {
 
@@ -7197,7 +7581,6 @@
                  * @sample {highstock} stock/chart/width/ 800px wide
                  * @sample {highmaps} maps/chart/size/ Chart with explicit size
                  * @default null
-                 * @product highcharts highstock highmaps
                  */
                 width: null,
 
@@ -7222,7 +7605,6 @@
                  * @sample highcharts/chart/height-percent/
                  *         Highcharts with percentage height
                  * @default null
-                 * @product highcharts highstock highmaps
                  */
                 height: null,
 
@@ -7257,8 +7639,7 @@
                  * in on) an area of the chart.
                  * 
                  * @type {Color}
-                 * @see In [styled mode](http://www.highcharts.com/docs/chart-design-and-
-                 * style/style-by-css), the selection marker fill is set with the
+                 * @see In styled mode, the selection marker fill is set with the
                  * `.highcharts-selection-marker` class.
                  * @default rgba(51,92,173,0.25)
                  * @since 2.1.7
@@ -7351,7 +7732,7 @@
                  * 
                  * @type {Number}
                  * @sample {highcharts} highcharts/chart/spacingtop-100/
-                 * A top spacing of 100
+                 *         A top spacing of 100
                  * @sample {highcharts} highcharts/chart/spacingtop-10/
                  *         Floating chart title makes the plot area align to the default
                  *         spacingTop of 10.
@@ -7370,9 +7751,7 @@
                  * is ignorant of the individual chart options and must be set globally.
                  * 
                  * @type {CSSObject}
-                 * @see In [styled mode](http://www.highcharts.com/docs/chart-design-and-
-                 * style/style-by-css), general chart styles can be set with the `.highcharts-
-                 * root` class.
+                 * @see In styled mode, general chart styles can be set with the `.highcharts-root` class.
                  * @sample {highcharts} highcharts/chart/style-serif-font/
                  *         Using a serif type font
                  * @sample {highcharts} highcharts/css/em/
@@ -7427,7 +7806,6 @@
              * The chart's main title.
              * 
              * @sample {highmaps} maps/title/title/ Title options demonstrated
-             * @product highcharts highstock highmaps
              */
             title: {
 
@@ -7438,10 +7816,8 @@
                  * @type {String}
                  * @sample {highcharts} highcharts/title/text/ Custom title
                  * @sample {highstock} stock/chart/title-text/ Custom title
-                 * @default {highcharts} Chart title
+                 * @default {highcharts|highmaps} Chart title
                  * @default {highstock} null
-                 * @default {highmaps} Chart title
-                 * @product highcharts highstock highmaps
                  */
                 text: 'Chart title',
 
@@ -7455,10 +7831,8 @@
                  * @sample {highstock} stock/chart/title-align/ Aligned to the plot area (x = 50px     = margin left - spacing left)
                  * @default center
                  * @since 2.0
-                 * @product highcharts highstock highmaps
                  */
                 align: 'center',
-                // floating: false,
 
                 /**
                  * The margin between the title and the plot area, or if a subtitle
@@ -7470,13 +7844,8 @@
                  * @sample {highstock} stock/chart/title-margin/ A chart title margin of 50
                  * @default 15
                  * @since 2.1
-                 * @product highcharts highstock highmaps
                  */
                 margin: 15,
-                // x: 0,
-                // verticalAlign: 'top',
-                // y: null,
-                // style: {}, // defined inline
 
                 /**
                  * Adjustment made to the title width, normally to reserve space for
@@ -7488,9 +7857,90 @@
                  * @sample {highmaps} highcharts/title/widthadjust/ Wider menu, greater padding
                  * @default -44
                  * @since 4.2.5
-                 * @product highcharts highstock highmaps
                  */
                 widthAdjust: -44
+
+                /**
+                 * When the title is floating, the plot area will not move to make space
+                 * for it.
+                 * 
+                 * @type {Boolean}
+                 * @sample {highcharts} highcharts/chart/zoomtype-none/ False by default
+                 * @sample {highcharts} highcharts/title/floating/
+                 *         True - title on top of the plot area
+                 * @sample {highstock} stock/chart/title-floating/
+                 *         True - title on top of the plot area
+                 * @default false
+                 * @since 2.1
+                 * @apioption title.floating
+                 */
+
+                /**
+                 * CSS styles for the title. Use this for font styling, but use `align`,
+                 * `x` and `y` for text alignment.
+                 * 
+                 * In styled mode, the title style is given in the `.highcharts-title` class.
+                 * 
+                 * @type {CSSObject}
+                 * @sample {highcharts} highcharts/title/style/ Custom color and weight
+                 * @sample {highstock} stock/chart/title-style/ Custom color and weight
+                 * @sample highcharts/css/titles/ Styled mode
+                 * @default {highcharts|highmaps} { "color": "#333333", "fontSize": "18px" }
+                 * @default {highstock} { "color": "#333333", "fontSize": "16px" }
+                 * @apioption title.style
+                 */
+
+                /**
+                 * Whether to [use HTML](http://www.highcharts.com/docs/chart-concepts/labels-
+                 * and-string-formatting#html) to render the text.
+                 * 
+                 * @type {Boolean}
+                 * @default false
+                 * @apioption title.useHTML
+                 */
+
+                /**
+                 * The vertical alignment of the title. Can be one of `"top"`, `"middle"`
+                 * and `"bottom"`. When a value is given, the title behaves as if [floating](#title.
+                 * floating) were `true`.
+                 * 
+                 * @validvalue ["top", "middle", "bottom"]
+                 * @type {String}
+                 * @sample {highcharts} highcharts/title/verticalalign/
+                 *         Chart title in bottom right corner
+                 * @sample {highstock} stock/chart/title-verticalalign/
+                 *         Chart title in bottom right corner
+                 * @since 2.1
+                 * @apioption title.verticalAlign
+                 */
+
+                /**
+                 * The x position of the title relative to the alignment within chart.
+                 * spacingLeft and chart.spacingRight.
+                 * 
+                 * @type {Number}
+                 * @sample {highcharts} highcharts/title/align/
+                 *         Aligned to the plot area (x = 70px = margin left - spacing left)
+                 * @sample {highstock} stock/chart/title-align/
+                 *         Aligned to the plot area (x = 50px = margin left - spacing left)
+                 * @default 0
+                 * @since 2.0
+                 * @apioption title.x
+                 */
+
+                /**
+                 * The y position of the title relative to the alignment within [chart.
+                 * spacingTop](#chart.spacingTop) and [chart.spacingBottom](#chart.spacingBottom).
+                 *  By default it depends on the font size.
+                 * 
+                 * @type {Number}
+                 * @sample {highcharts} highcharts/title/y/
+                 *         Title inside the plot area
+                 * @sample {highstock} stock/chart/title-verticalalign/
+                 *         Chart title in bottom right corner
+                 * @since 2.0
+                 * @apioption title.y
+                 */
 
             },
 
@@ -7501,7 +7951,6 @@
              * `Chart.setTitle` method.
              * 
              * @sample {highmaps} maps/title/subtitle/ Subtitle options demonstrated
-             * @product highcharts highstock highmaps
              */
             subtitle: {
 
@@ -7513,7 +7962,6 @@
                  * @sample {highcharts} highcharts/subtitle/text-formatted/ Formatted and linked text.
                  * @sample {highstock} stock/chart/subtitle-text Custom subtitle
                  * @sample {highstock} stock/chart/subtitle-text-formatted Formatted and linked text.
-                 * @product highcharts highstock highmaps
                  */
                 text: '',
 
@@ -7527,14 +7975,8 @@
                  * @sample {highstock} stock/chart/subtitle-footnote Footnote at bottom right of plot area
                  * @default center
                  * @since 2.0
-                 * @product highcharts highstock highmaps
                  */
                 align: 'center',
-                // floating: false
-                // x: 0,
-                // verticalAlign: 'top',
-                // y: null,
-                // style: {}, // defined inline
 
                 /**
                  * Adjustment made to the subtitle width, normally to reserve space
@@ -7547,9 +7989,97 @@
                  * @sample {highmaps} highcharts/title/widthadjust/ Wider menu, greater padding
                  * @default -44
                  * @since 4.2.5
-                 * @product highcharts highstock highmaps
                  */
                 widthAdjust: -44
+
+                /**
+                 * When the subtitle is floating, the plot area will not move to make
+                 * space for it.
+                 * 
+                 * @type {Boolean}
+                 * @sample {highcharts} highcharts/subtitle/floating/
+                 *         Floating title and subtitle
+                 * @sample {highstock} stock/chart/subtitle-footnote
+                 *         Footnote floating at bottom right of plot area
+                 * @default false
+                 * @since 2.1
+                 * @apioption subtitle.floating
+                 */
+
+                /**
+                 * CSS styles for the title.
+                 * 
+                 * In styled mode, the subtitle style is given in the `.highcharts-subtitle` class.
+                 * 
+                 * @type {CSSObject}
+                 * @sample {highcharts} highcharts/subtitle/style/
+                 *         Custom color and weight
+                 * @sample {highcharts} highcharts/css/titles/
+                 *         Styled mode
+                 * @sample {highstock} stock/chart/subtitle-style
+                 *         Custom color and weight
+                 * @sample {highstock} highcharts/css/titles/
+                 *         Styled mode
+                 * @sample {highmaps} highcharts/css/titles/
+                 *         Styled mode
+                 * @default { "color": "#666666" }
+                 * @apioption subtitle.style
+                 */
+
+                /**
+                 * Whether to [use HTML](http://www.highcharts.com/docs/chart-concepts/labels-
+                 * and-string-formatting#html) to render the text.
+                 * 
+                 * @type {Boolean}
+                 * @default false
+                 * @apioption subtitle.useHTML
+                 */
+
+                /**
+                 * The vertical alignment of the title. Can be one of "top", "middle"
+                 * and "bottom". When a value is given, the title behaves as floating.
+                 * 
+                 * @validvalue ["top", "middle", "bottom"]
+                 * @type {String}
+                 * @sample {highcharts} highcharts/subtitle/verticalalign/
+                 *         Footnote at the bottom right of plot area
+                 * @sample {highstock} stock/chart/subtitle-footnote
+                 *         Footnote at the bottom right of plot area
+                 * @default  
+                 * @since 2.1
+                 * @apioption subtitle.verticalAlign
+                 */
+
+                /**
+                 * The x position of the subtitle relative to the alignment within chart.
+                 * spacingLeft and chart.spacingRight.
+                 * 
+                 * @type {Number}
+                 * @sample {highcharts} highcharts/subtitle/align/
+                 *         Footnote at right of plot area
+                 * @sample {highstock} stock/chart/subtitle-footnote
+                 *         Footnote at the bottom right of plot area
+                 * @default 0
+                 * @since 2.0
+                 * @apioption subtitle.x
+                 */
+
+                /**
+                 * The y position of the subtitle relative to the alignment within chart.
+                 * spacingTop and chart.spacingBottom. By default the subtitle is laid
+                 * out below the title unless the title is floating.
+                 * 
+                 * @type {Number}
+                 * @sample {highcharts} highcharts/subtitle/verticalalign/
+                 *         Footnote at the bottom right of plot area
+                 * @sample {highstock} stock/chart/subtitle-footnote
+                 *         Footnote at the bottom right of plot area
+                 * @default {highcharts}  null
+                 * @default {highstock}  null
+                 * @default {highmaps}  
+                 * @since 2.0
+                 * @apioption subtitle.y
+                 */
             },
 
             /**
@@ -7562,35 +8092,51 @@
              * series) object. Then options for all series of a specific type are
              * given in the plotOptions of that type, for example plotOptions.line.
              * Next, options for one single series are given in [the series array](#series).
-             * 
-             * @product highcharts highstock highmaps
+             *
              */
             plotOptions: {},
 
             /**
              * HTML labels that can be positioned anywhere in the chart area.
-             * 
-             * @product highcharts highstock highmaps
+             *
              */
             labels: {
-                //items: [],
+
+                /**
+                 * A HTML label that can be positioned anywhere in the chart area.
+                 * 
+                 * @type {Array<Object>}
+                 * @apioption labels.items
+                 */
+
+                /**
+                 * Inner HTML or text for the label.
+                 * 
+                 * @type {String}
+                 * @apioption labels.items.html
+                 */
+
+                /**
+                 * CSS styles for each label. To position the label, use left and top
+                 * like this:
+                 * 
+                 * <pre>style: {
+                 *     left: '100px',
+                 *     top: '100px'
+                 * }</pre>
+                 * 
+                 * @type {CSSObject}
+                 * @apioption labels.items.style
+                 */
 
                 /**
                  * Shared CSS styles for all labels.
                  * 
                  * @type {CSSObject}
                  * @default { "color": "#333333" }
-                 * @product highcharts highstock highmaps
                  */
                 style: {
-                    //font: defaultFont,
-
-                    /**
-                     */
                     position: 'absolute',
-
-                    /**
-                     */
                     color: '#333333'
                 }
             },
@@ -7612,6 +8158,31 @@
             legend: {
 
                 /**
+                 * The background color of the legend.
+                 * 
+                 * @type {Color}
+                 * @see In styled mode, the legend background fill can be applied with
+                 * the `.highcharts-legend-box` class.
+                 * @sample {highcharts} highcharts/legend/backgroundcolor/ Yellowish background
+                 * @sample {highstock} stock/legend/align/ Various legend options
+                 * @sample {highmaps} maps/legend/border-background/ Border and background options
+                 * @apioption legend.backgroundColor
+                 */
+
+                /**
+                 * The width of the drawn border around the legend.
+                 * 
+                 * @type {Number}
+                 * @see In styled mode, the legend border stroke width can be applied
+                 * with the `.highcharts-legend-box` class.
+                 * @sample {highcharts} highcharts/legend/borderwidth/ 2px border width
+                 * @sample {highstock} stock/legend/align/ Various legend options
+                 * @sample {highmaps} maps/legend/border-background/ Border and background options
+                 * @default 0
+                 * @apioption legend.borderWidth
+                 */
+
+                /**
                  * Enable or disable the legend.
                  * 
                  * @type {Boolean}
@@ -7620,7 +8191,6 @@
                  * @sample {highmaps} maps/legend/enabled-false/ Legend disabled
                  * @default {highstock} false
                  * @default {highmaps} true
-                 * @product highcharts highstock highmaps
                  */
                 enabled: true,
 
@@ -7634,15 +8204,28 @@
                  * 
                  * @validvalue ["left", "center", "right"]
                  * @type {String}
-                 * @sample {highcharts} highcharts/legend/align/ Legend at the right of the chart
-                 * @sample {highstock} stock/legend/align/ Various legend options
-                 * @sample {highmaps} maps/legend/alignment/ Legend alignment
-                 * @default center
+                 * @sample {highcharts} highcharts/legend/align/
+                 *         Legend at the right of the chart
+                 * @sample {highstock} stock/legend/align/
+                 *         Various legend options
+                 * @sample {highmaps} maps/legend/alignment/
+                 *         Legend alignment
                  * @since 2.0
-                 * @product highcharts highstock highmaps
                  */
                 align: 'center',
-                //floating: false,
+
+                /**
+                 * When the legend is floating, the plot area ignores it and is allowed
+                 * to be placed below it.
+                 * 
+                 * @type {Boolean}
+                 * @sample {highcharts} highcharts/legend/floating-false/ False by default
+                 * @sample {highcharts} highcharts/legend/floating-true/ True
+                 * @sample {highmaps} maps/legend/alignment/ Floating legend
+                 * @default false
+                 * @since 2.1
+                 * @apioption legend.floating
+                 */
 
                 /**
                  * The layout of the legend items. Can be one of "horizontal" or "vertical".
@@ -7655,9 +8238,69 @@
                  * @sample {highmaps} maps/legend/padding-itemmargin/ Vertical with data classes
                  * @sample {highmaps} maps/legend/layout-vertical/ Vertical with color axis gradient
                  * @default horizontal
-                 * @product highcharts highstock highmaps
                  */
                 layout: 'horizontal',
+
+                /**
+                 * In a legend with horizontal layout, the itemDistance defines the
+                 * pixel distance between each item.
+                 * 
+                 * @type {Number}
+                 * @sample {highcharts} highcharts/legend/layout-horizontal/ 50px item distance
+                 * @sample {highstock} highcharts/legend/layout-horizontal/ 50px item distance
+                 * @default {highcharts} 20
+                 * @default {highstock} 20
+                 * @default {highmaps} 8
+                 * @since 3.0.3
+                 * @apioption legend.itemDistance
+                 */
+
+                /**
+                 * The pixel bottom margin for each legend item.
+                 * 
+                 * @type {Number}
+                 * @sample {highcharts} highcharts/legend/padding-itemmargin/ Padding and item margins demonstrated
+                 * @sample {highstock} highcharts/legend/padding-itemmargin/ Padding and item margins demonstrated
+                 * @sample {highmaps} maps/legend/padding-itemmargin/ Padding and item margins demonstrated
+                 * @default 0
+                 * @since 2.2.0
+                 * @apioption legend.itemMarginBottom
+                 */
+
+                /**
+                 * The pixel top margin for each legend item.
+                 * 
+                 * @type {Number}
+                 * @sample {highcharts} highcharts/legend/padding-itemmargin/ Padding and item margins demonstrated
+                 * @sample {highstock} highcharts/legend/padding-itemmargin/ Padding and item margins demonstrated
+                 * @sample {highmaps} maps/legend/padding-itemmargin/ Padding and item margins demonstrated
+                 * @default 0
+                 * @since 2.2.0
+                 * @apioption legend.itemMarginTop
+                 */
+
+                /**
+                 * The width for each legend item. This is useful in a horizontal layout
+                 * with many items when you want the items to align vertically. .
+                 * 
+                 * @type {Number}
+                 * @sample {highcharts} highcharts/legend/itemwidth-default/ Null by default
+                 * @sample {highcharts} highcharts/legend/itemwidth-80/ 80 for aligned legend items
+                 * @default null
+                 * @since 2.0
+                 * @apioption legend.itemWidth
+                 */
+
+                /**
+                 * A [format string](http://www.highcharts.com/docs/chart-concepts/labels-
+                 * and-string-formatting) for each legend label. Available variables
+                 * relates to properties on the series, or the point in case of pies.
+                 * 
+                 * @type {String}
+                 * @default {name}
+                 * @since 1.3
+                 * @apioption legend.labelFormat
+                 */
 
                 /**
                  * Callback function to format each of the series' labels. The `this`
@@ -7676,20 +8319,53 @@
                 labelFormatter: function() {
                     return this.name;
                 },
-                //borderWidth: 0,
+
+                /**
+                 * Line height for the legend items. Deprecated as of 2.1\. Instead,
+                 * the line height for each item can be set using itemStyle.lineHeight,
+                 * and the padding between items using itemMarginTop and itemMarginBottom.
+                 * 
+                 * @type {Number}
+                 * @sample {highcharts} highcharts/legend/lineheight/ Setting padding
+                 * @default 16
+                 * @since 2.0
+                 * @product highcharts
+                 * @apioption legend.lineHeight
+                 */
+
+                /**
+                 * If the plot area sized is calculated automatically and the legend
+                 * is not floating, the legend margin is the space between the legend
+                 * and the axis labels or plot area.
+                 * 
+                 * @type {Number}
+                 * @sample {highcharts} highcharts/legend/margin-default/ 12 pixels by default
+                 * @sample {highcharts} highcharts/legend/margin-30/ 30 pixels
+                 * @default 12
+                 * @since 2.1
+                 * @apioption legend.margin
+                 */
+
+                /**
+                 * Maximum pixel height for the legend. When the maximum height is extended,
+                 *  navigation will show.
+                 * 
+                 * @type {Number}
+                 * @default undefined
+                 * @since 2.3.0
+                 * @apioption legend.maxHeight
+                 */
 
                 /**
                  * The color of the drawn border around the legend.
                  * 
                  * @type {Color}
-                 * @see In [styled mode](http://www.highcharts.com/docs/chart-design-and-
-                 * style/style-by-css), the legend border stroke can be applied with
+                 * @see In styled mode, the legend border stroke can be applied with
                  * the `.highcharts-legend-box` class.
                  * @sample {highcharts} highcharts/legend/bordercolor/ Brown border
                  * @sample {highstock} stock/legend/align/ Various legend options
                  * @sample {highmaps} maps/legend/border-background/ Border and background options
                  * @default #999999
-                 * @product highcharts highstock highmaps
                  */
                 borderColor: '#999999',
 
@@ -7701,7 +8377,6 @@
                  * @sample {highcharts} highcharts/legend/borderradius-round/ 5px rounded
                  * @sample {highmaps} maps/legend/border-background/ Border and background options
                  * @default 0
-                 * @product highcharts highstock highmaps
                  */
                 borderRadius: 0,
 
@@ -7711,37 +8386,132 @@
                  * exported images. One way of working around that is to [increase
                  * the chart height in export](http://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/legend/navigation-
                  * enabled-false/).
-                 * 
-                 * @product highcharts highstock highmaps
+                 *
                  */
                 navigation: {
 
-                    // animation: true,
-                    // arrowSize: 12
-                    // style: {} // text styles
+
+                    /**
+                     * How to animate the pages when navigating up or down. A value of `true`
+                     * applies the default navigation given in the chart.animation option.
+                     * Additional options can be given as an object containing values for
+                     * easing and duration.
+                     * 
+                     * @type {Boolean|Object}
+                     * @sample {highcharts} highcharts/legend/navigation/
+                     *         Legend page navigation demonstrated
+                     * @sample {highstock} highcharts/legend/navigation/
+                     *         Legend page navigation demonstrated
+                     * @default true
+                     * @since 2.2.4
+                     * @apioption legend.navigation.animation
+                     */
+
+                    /**
+                     * The pixel size of the up and down arrows in the legend paging
+                     * navigation.
+                     * 
+                     * @type {Number}
+                     * @sample {highcharts} highcharts/legend/navigation/
+                     *         Legend page navigation demonstrated
+                     * @sample {highstock} highcharts/legend/navigation/
+                     *         Legend page navigation demonstrated
+                     * @default 12
+                     * @since 2.2.4
+                     * @apioption legend.navigation.arrowSize
+                     */
+
+                    /**
+                     * Whether to enable the legend navigation. In most cases, disabling
+                     * the navigation results in an unwanted overflow.
+                     * 
+                     * See also the [adapt chart to legend](http://www.highcharts.com/plugin-
+                     * registry/single/8/Adapt-Chart-To-Legend) plugin for a solution to
+                     * extend the chart height to make room for the legend, optionally in
+                     * exported charts only.
+                     * 
+                     * @type {Boolean}
+                     * @default true
+                     * @since 4.2.4
+                     * @apioption legend.navigation.enabled
+                     */
+
+                    /**
+                     * Text styles for the legend page navigation.
+                     * 
+                     * @type {CSSObject}
+                     * @see In styled mode, the navigation items are styled with the
+                     * `.highcharts-legend-navigation` class.
+                     * @sample {highcharts} highcharts/legend/navigation/
+                     *         Legend page navigation demonstrated
+                     * @sample {highstock} highcharts/legend/navigation/
+                     *         Legend page navigation demonstrated
+                     * @since 2.2.4
+                     * @apioption legend.navigation.style
+                     */
                 },
-                // margin: 20,
-                // reversed: false,
-                // backgroundColor: null,
-                /*style: {
-                	padding: '5px'
-                },*/
+
+                /**
+                 * The inner padding of the legend box.
+                 * 
+                 * @type {Number}
+                 * @sample {highcharts} highcharts/legend/padding-itemmargin/
+                 *         Padding and item margins demonstrated
+                 * @sample {highstock} highcharts/legend/padding-itemmargin/
+                 *         Padding and item margins demonstrated
+                 * @sample {highmaps} maps/legend/padding-itemmargin/
+                 *         Padding and item margins demonstrated
+                 * @default 8
+                 * @since 2.2.0
+                 * @apioption legend.padding
+                 */
+
+                /**
+                 * Whether to reverse the order of the legend items compared to the
+                 * order of the series or points as defined in the configuration object.
+                 * 
+                 * @type {Boolean}
+                 * @see [yAxis.reversedStacks](#yAxis.reversedStacks),
+                 *      [series.legendIndex](#series.legendIndex)
+                 * @sample {highcharts} highcharts/legend/reversed/
+                 *         Stacked bar with reversed legend
+                 * @default false
+                 * @since 1.2.5
+                 * @apioption legend.reversed
+                 */
+
+                /**
+                 * Whether to show the symbol on the right side of the text rather than
+                 * the left side. This is common in Arabic and Hebraic.
+                 * 
+                 * @type {Boolean}
+                 * @sample {highcharts} highcharts/legend/rtl/ Symbol to the right
+                 * @default false
+                 * @since 2.2
+                 * @apioption legend.rtl
+                 */
+
+                /**
+                 * CSS styles for the legend area. In the 1.x versions the position
+                 * of the legend area was determined by CSS. In 2.x, the position is
+                 * determined by properties like `align`, `verticalAlign`, `x` and `y`,
+                 *  but the styles are still parsed for backwards compatibility.
+                 * 
+                 * @type {CSSObject}
+                 * @deprecated
+                 * @product highcharts highstock
+                 * @apioption legend.style
+                 */
+
 
 
                 /**
+                 * Default styling for the checkbox next to a legend item when
+                 * `showCheckbox` is true.
                  */
                 itemCheckboxStyle: {
-
-                    /**
-                     */
                     position: 'absolute',
-
-                    /**
-                     */
                     width: '13px', // for IE precision
-
-                    /**
-                     */
                     height: '13px'
                 },
                 // itemWidth: undefined,
@@ -7754,7 +8524,6 @@
                  * @type {Boolean}
                  * @default true
                  * @since 5.0.0
-                 * @product highcharts highstock highmaps
                  */
                 squareSymbol: true,
 
@@ -7833,7 +8602,6 @@
                  * @type {Number}
                  * @sample {highcharts} highcharts/legend/symbolpadding/ Greater symbol width and padding
                  * @default 5
-                 * @product highcharts highstock highmaps
                  */
                 symbolPadding: 5,
 
@@ -7853,7 +8621,6 @@
                  * @sample {highmaps} maps/legend/alignment/ Legend alignment
                  * @default bottom
                  * @since 2.0
-                 * @product highcharts highstock highmaps
                  */
                 verticalAlign: 'bottom',
                 // width: undefined,
@@ -7867,7 +8634,6 @@
                  * @sample {highcharts} highcharts/legend/width/ Aligned to the plot area
                  * @default 0
                  * @since 2.0
-                 * @product highcharts highstock highmaps
                  */
                 x: 0,
 
@@ -7882,7 +8648,6 @@
                  * @sample {highmaps} maps/legend/alignment/ Legend alignment
                  * @default 0
                  * @since 2.0
-                 * @product highcharts highstock highmaps
                  */
                 y: 0,
 
@@ -7892,10 +8657,17 @@
                  * @sample {highcharts} highcharts/legend/title/ Legend title
                  * @sample {highmaps} maps/legend/alignment/ Legend with title
                  * @since 3.0
-                 * @product highcharts highstock highmaps
                  */
                 title: {
-                    //text: null
+                    /**
+                     * A text or HTML string for the title.
+                     * 
+                     * @type {String}
+                     * @default null
+                     * @since 3.0
+                     * @apioption legend.title.text
+                     */
+
 
                 }
             },
@@ -7909,8 +8681,7 @@
              * is going on, for example while retrieving new data via an XHR connection.
              * The "Loading..." text itself is not part of this configuration
              * object, but part of the `lang` object.
-             * 
-             * @product highcharts highstock highmaps
+             *
              */
             loading: {
 
@@ -7940,8 +8711,7 @@
             /**
              * Options for the tooltip that appears when the user hovers over a
              * series or point.
-             * 
-             * @product highcharts highstock highmaps
+             *
              */
             tooltip: {
 
@@ -7952,7 +8722,6 @@
                  * @sample {highcharts} highcharts/tooltip/enabled/ Disabled
                  * @sample {highcharts} highcharts/plotoptions/series-point-events-mouseover/ Disable tooltip and show values on chart instead
                  * @default true
-                 * @product highcharts highstock highmaps
                  */
                 enabled: true,
 
@@ -7963,10 +8732,8 @@
                  * @type {Boolean}
                  * @default true
                  * @since 2.3.0
-                 * @product highcharts highstock highmaps
                  */
                 animation: svg,
-                //crosshairs: null,
 
                 /**
                  * The radius of the rounded border corners.
@@ -7976,7 +8743,6 @@
                  * @sample {highcharts} highcharts/tooltip/borderradius-0/ Square borders
                  * @sample {highmaps} maps/tooltip/background-border/ Background and border demo
                  * @default 3
-                 * @product highcharts highstock highmaps
                  */
                 borderRadius: 3,
 
@@ -7990,14 +8756,14 @@
                  * Defaults to:
                  * 
                  * <pre>{
-                 * millisecond:"%A, %b %e, %H:%M:%S.%L",
-                 * second:"%A, %b %e, %H:%M:%S",
-                 * minute:"%A, %b %e, %H:%M",
-                 * hour:"%A, %b %e, %H:%M",
-                 * day:"%A, %b %e, %Y",
-                 * week:"Week from %A, %b %e, %Y",
-                 * month:"%B %Y",
-                 * year:"%Y"
+                 *     millisecond:"%A, %b %e, %H:%M:%S.%L",
+                 *     second:"%A, %b %e, %H:%M:%S",
+                 *     minute:"%A, %b %e, %H:%M",
+                 *     hour:"%A, %b %e, %H:%M",
+                 *     day:"%A, %b %e, %Y",
+                 *     week:"Week from %A, %b %e, %Y",
+                 *     month:"%B %Y",
+                 *     year:"%Y"
                  * }</pre>
                  * 
                  * @type {Object}
@@ -8005,55 +8771,24 @@
                  * @product highcharts highstock
                  */
                 dateTimeLabelFormats: {
-
-                    /**
-                     */
                     millisecond: '%A, %b %e, %H:%M:%S.%L',
-
-                    /**
-                     */
                     second: '%A, %b %e, %H:%M:%S',
-
-                    /**
-                     */
                     minute: '%A, %b %e, %H:%M',
-
-                    /**
-                     */
                     hour: '%A, %b %e, %H:%M',
-
-                    /**
-                     */
                     day: '%A, %b %e, %Y',
-
-                    /**
-                     */
                     week: 'Week from %A, %b %e, %Y',
-
-                    /**
-                     */
                     month: '%B %Y',
-
-                    /**
-                     */
                     year: '%Y'
                 },
 
                 /**
                  * A string to append to the tooltip format.
                  * 
-                 * @type {String}
                  * @sample {highcharts} highcharts/tooltip/footerformat/ A table for value alignment
                  * @sample {highmaps} maps/tooltip/format/ Format demo
-                 * @default false
                  * @since 2.2
-                 * @product highcharts highmaps
                  */
                 footerFormat: '',
-                //formatter: defaultFormatter,
-                /* todo: em font-size when finished comparing against HC4
-                headerFormat: '<span style="font-size: 0.85em">{point.key}</span><br/>',
-                */
 
                 /**
                  * Padding inside the tooltip, in pixels.
@@ -8061,12 +8796,8 @@
                  * @type {Number}
                  * @default 8
                  * @since 5.0.0
-                 * @product highcharts highstock highmaps
                  */
                 padding: 8,
-
-                //shape: 'callout',
-                //shared: false,
 
                 /**
                  * Proximity snap for graphs or single points. It defaults to 10 for
@@ -8092,18 +8823,298 @@
                     '\u25CF</span> {series.name}: <span class="highcharts-strong">' +
                     '{point.y}</span><br/>',
 
-                //xDateFormat: '%A, %b %e, %Y',
-                //valueDecimals: null,
-                //valuePrefix: '',
-                //valueSuffix: ''
+
+
+                /**
+                 * The color of the tooltip border. When `null`, the border takes the
+                 * color of the corresponding series or point.
+                 * 
+                 * @type {Color}
+                 * @sample {highcharts} highcharts/tooltip/bordercolor-default/
+                 *         Follow series by default
+                 * @sample {highcharts} highcharts/tooltip/bordercolor-black/
+                 *         Black border
+                 * @sample {highstock} stock/tooltip/general/
+                 *         Styled tooltip
+                 * @sample {highmaps} maps/tooltip/background-border/
+                 *         Background and border demo
+                 * @default null
+                 * @apioption tooltip.borderColor
+                 */
+
+                /**
+                 * Since 4.1, the crosshair definitions are moved to the Axis object
+                 * in order for a better separation from the tooltip. See [xAxis.crosshair](#xAxis.
+                 * crosshair)<a>.</a>
+                 * 
+                 * @type {Mixed}
+                 * @deprecated
+                 * @sample {highcharts} highcharts/tooltip/crosshairs-x/
+                 *         Enable a crosshair for the x value
+                 * @default true
+                 * @apioption tooltip.crosshairs
+                 */
+
+                /**
+                 * Whether the tooltip should follow the mouse as it moves across columns,
+                 * pie slices and other point types with an extent. By default it behaves
+                 * this way for scatter, bubble and pie series by override in the `plotOptions`
+                 * for those series types.
+                 * 
+                 * For touch moves to behave the same way, [followTouchMove](#tooltip.
+                 * followTouchMove) must be `true` also.
+                 * 
+                 * @type {Boolean}
+                 * @default {highcharts} false
+                 * @default {highstock} false
+                 * @default {highmaps} true
+                 * @since 3.0
+                 * @apioption tooltip.followPointer
+                 */
+
+                /**
+                 * Whether the tooltip should follow the finger as it moves on a touch
+                 * device. If this is `true` and [chart.panning](#chart.panning) is
+                 * set,`followTouchMove` will take over one-finger touches, so the user
+                 * needs to use two fingers for zooming and panning.
+                 * 
+                 * @type {Boolean}
+                 * @default {highcharts} true
+                 * @default {highstock} true
+                 * @default {highmaps} false
+                 * @since 3.0.1
+                 * @apioption tooltip.followTouchMove
+                 */
+
+                /**
+                 * Callback function to format the text of the tooltip from scratch. Return
+                 * `false` to disable tooltip for a specific point on series.
+                 * 
+                 * A subset of HTML is supported. Unless `useHTML` is true, the HTML of the
+                 * tooltip is parsed and converted to SVG, therefore this isn't a complete HTML
+                 * renderer. The following tags are supported: `<b>`, `<strong>`, `<i>`, `<em>`,
+                 * `<br/>`, `<span>`. Spans can be styled with a `style` attribute,
+                 * but only text-related CSS that is shared with SVG is handled.
+                 * 
+                 * Since version 2.1 the tooltip can be shared between multiple series
+                 * through the `shared` option. The available data in the formatter
+                 * differ a bit depending on whether the tooltip is shared or not. In
+                 * a shared tooltip, all properties except `x`, which is common for
+                 * all points, are kept in an array, `this.points`.
+                 * 
+                 * Available data are:
+                 * 
+                 * <dl>
+                 * 
+                 * <dt>this.percentage (not shared) / this.points[i].percentage (shared)</dt>
+                 * 
+                 * <dd>Stacked series and pies only. The point's percentage of the total.
+                 * </dd>
+                 * 
+                 * <dt>this.point (not shared) / this.points[i].point (shared)</dt>
+                 * 
+                 * <dd>The point object. The point name, if defined, is available through
+                 * `this.point.name`.</dd>
+                 * 
+                 * <dt>this.points</dt>
+                 * 
+                 * <dd>In a shared tooltip, this is an array containing all other properties
+                 * for each point.</dd>
+                 * 
+                 * <dt>this.series (not shared) / this.points[i].series (shared)</dt>
+                 * 
+                 * <dd>The series object. The series name is available through
+                 * `this.series.name`.</dd>
+                 * 
+                 * <dt>this.total (not shared) / this.points[i].total (shared)</dt>
+                 * 
+                 * <dd>Stacked series only. The total value at this point's x value.
+                 * </dd>
+                 * 
+                 * <dt>this.x</dt>
+                 * 
+                 * <dd>The x value. This property is the same regardless of the tooltip
+                 * being shared or not.</dd>
+                 * 
+                 * <dt>this.y (not shared) / this.points[i].y (shared)</dt>
+                 * 
+                 * <dd>The y value.</dd>
+                 * 
+                 * </dl>
+                 * 
+                 * @type {Function}
+                 * @sample {highcharts} highcharts/tooltip/formatter-simple/
+                 *         Simple string formatting
+                 * @sample {highcharts} highcharts/tooltip/formatter-shared/
+                 *         Formatting with shared tooltip
+                 * @sample {highstock} stock/tooltip/formatter/
+                 *         Formatting with shared tooltip
+                 * @sample {highmaps} maps/tooltip/formatter/
+                 *         String formatting
+                 * @apioption tooltip.formatter
+                 */
+
+                /**
+                 * The number of milliseconds to wait until the tooltip is hidden when
+                 * mouse out from a point or chart.
+                 * 
+                 * @type {Number}
+                 * @default 500
+                 * @since 3.0
+                 * @apioption tooltip.hideDelay
+                 */
+
+                /**
+                 * A callback function for formatting the HTML output for a single point
+                 * in the tooltip. Like the `pointFormat` string, but with more flexibility.
+                 * 
+                 * @type {Function}
+                 * @context Point
+                 * @since 4.1.0
+                 * @apioption tooltip.pointFormatter
+                 */
+
+                /**
+                 * A callback function to place the tooltip in a default position. The
+                 * callback receives three parameters: `labelWidth`, `labelHeight` and
+                 * `point`, where point contains values for `plotX` and `plotY` telling
+                 * where the reference point is in the plot area. Add `chart.plotLeft`
+                 * and `chart.plotTop` to get the full coordinates.
+                 * 
+                 * The return should be an object containing x and y values, for example
+                 * `{ x: 100, y: 100 }`.
+                 * 
+                 * @type {Function}
+                 * @sample {highcharts} highcharts/tooltip/positioner/ A fixed tooltip position
+                 * @sample {highstock} stock/tooltip/positioner/ A fixed tooltip position on top of the chart
+                 * @sample {highmaps} maps/tooltip/positioner/ A fixed tooltip position
+                 * @since 2.2.4
+                 * @apioption tooltip.positioner
+                 */
+
+                /**
+                 * The name of a symbol to use for the border around the tooltip.
+                 * 
+                 * @type {String}
+                 * @default callout
+                 * @validvalue ["callout", "square"]
+                 * @since 4.0
+                 * @apioption tooltip.shape
+                 */
+
+                /**
+                 * When the tooltip is shared, the entire plot area will capture mouse
+                 * movement or touch events. Tooltip texts for series types with ordered
+                 * data (not pie, scatter, flags etc) will be shown in a single bubble.
+                 * This is recommended for single series charts and for tablet/mobile
+                 * optimized charts.
+                 * 
+                 * See also [tooltip.split](#tooltip.split), that is better suited for
+                 * charts with many series, especially line-type series.
+                 * 
+                 * @type {Boolean}
+                 * @sample {highcharts} highcharts/tooltip/shared-false/ False by default
+                 * @sample {highcharts} highcharts/tooltip/shared-true/ True
+                 * @sample {highcharts} highcharts/tooltip/shared-x-crosshair/ True with x axis crosshair
+                 * @sample {highcharts} highcharts/tooltip/shared-true-mixed-types/ True with mixed series types
+                 * @default false
+                 * @since 2.1
+                 * @product highcharts highstock
+                 * @apioption tooltip.shared
+                 */
+
+                /**
+                 * Split the tooltip into one label per series, with the header close
+                 * to the axis. This is recommended over [shared](#tooltip.shared) tooltips
+                 * for charts with multiple line series, generally making them easier
+                 * to read.
+                 *
+                 * @productdesc {highstock} In Highstock, tooltips are split by default
+                 * since v6.0.0. Stock charts typically contain multi-dimension points
+                 * and multiple panes, making split tooltips the preferred layout over
+                 * the previous `shared` tooltip.
+                 * 
+                 * @type {Boolean}
+                 * @sample {highcharts} highcharts/tooltip/split/ Split tooltip
+                 * @sample {highstock} highcharts/tooltip/split/ Split tooltip
+                 * @sample {highmaps} highcharts/tooltip/split/ Split tooltip
+                 * @default {highcharts} false
+                 * @default {highstock} true
+                 * @product highcharts highstock
+                 * @since 5.0.0
+                 * @apioption tooltip.split
+                 */
+
+                /**
+                 * Use HTML to render the contents of the tooltip instead of SVG. Using
+                 * HTML allows advanced formatting like tables and images in the tooltip.
+                 * It is also recommended for rtl languages as it works around rtl
+                 * bugs in early Firefox.
+                 * 
+                 * @type {Boolean}
+                 * @sample {highcharts} highcharts/tooltip/footerformat/ A table for value alignment
+                 * @sample {highcharts} highcharts/tooltip/fullhtml/ Full HTML tooltip
+                 * @sample {highstock} highcharts/tooltip/footerformat/ A table for value alignment
+                 * @sample {highstock} highcharts/tooltip/fullhtml/ Full HTML tooltip
+                 * @sample {highmaps} maps/tooltip/usehtml/ Pure HTML tooltip
+                 * @default false
+                 * @since 2.2
+                 * @apioption tooltip.useHTML
+                 */
+
+                /**
+                 * How many decimals to show in each series' y value. This is overridable
+                 * in each series' tooltip options object. The default is to preserve
+                 * all decimals.
+                 * 
+                 * @type {Number}
+                 * @sample {highcharts} highcharts/tooltip/valuedecimals/ Set decimals, prefix and suffix for the value
+                 * @sample {highstock} highcharts/tooltip/valuedecimals/ Set decimals, prefix and suffix for the value
+                 * @sample {highmaps} maps/tooltip/valuedecimals/ Set decimals, prefix and suffix for the value
+                 * @since 2.2
+                 * @apioption tooltip.valueDecimals
+                 */
+
+                /**
+                 * A string to prepend to each series' y value. Overridable in each
+                 * series' tooltip options object.
+                 * 
+                 * @type {String}
+                 * @sample {highcharts} highcharts/tooltip/valuedecimals/ Set decimals, prefix and suffix for the value
+                 * @sample {highstock} highcharts/tooltip/valuedecimals/ Set decimals, prefix and suffix for the value
+                 * @sample {highmaps} maps/tooltip/valuedecimals/ Set decimals, prefix and suffix for the value
+                 * @since 2.2
+                 * @apioption tooltip.valuePrefix
+                 */
+
+                /**
+                 * A string to append to each series' y value. Overridable in each series'
+                 * tooltip options object.
+                 * 
+                 * @type {String}
+                 * @sample {highcharts} highcharts/tooltip/valuedecimals/ Set decimals, prefix and suffix for the value
+                 * @sample {highstock} highcharts/tooltip/valuedecimals/ Set decimals, prefix and suffix for the value
+                 * @sample {highmaps} maps/tooltip/valuedecimals/ Set decimals, prefix and suffix for the value
+                 * @since 2.2
+                 * @apioption tooltip.valueSuffix
+                 */
+
+                /**
+                 * The format for the date in the tooltip header if the X axis is a
+                 * datetime axis. The default is a best guess based on the smallest
+                 * distance between points in the chart.
+                 * 
+                 * @type {String}
+                 * @sample {highcharts} highcharts/tooltip/xdateformat/ A different format
+                 * @product highcharts highstock
+                 * @apioption tooltip.xDateFormat
+                 */
             },
 
 
             /**
              * Highchart by default puts a credits label in the lower right corner
              * of the chart. This can be changed using these options.
-             * 
-             * @product highcharts highstock highmaps
              */
             credits: {
 
@@ -8115,7 +9126,6 @@
                  * @sample {highstock} stock/credits/enabled/ Credits disabled
                  * @sample {highmaps} maps/credits/enabled-false/ Credits disabled
                  * @default true
-                 * @product highcharts highstock highmaps
                  */
                 enabled: true,
 
@@ -8128,7 +9138,6 @@
                  * @default {highcharts} http://www.highcharts.com
                  * @default {highstock} "http://www.highcharts.com"
                  * @default {highmaps} http://www.highcharts.com
-                 * @product highcharts highstock highmaps
                  */
                 href: 'http://www.highcharts.com',
 
@@ -8141,7 +9150,6 @@
                  * @sample {highmaps} maps/credits/customized/ Left aligned
                  * @sample {highmaps} maps/credits/customized/ Left aligned
                  * @since 2.1
-                 * @product highcharts highstock highmaps
                  */
                 position: {
 
@@ -8151,7 +9159,6 @@
                      * @validvalue ["left", "center", "right"]
                      * @type {String}
                      * @default right
-                     * @product highcharts highstock highmaps
                      */
                     align: 'right',
 
@@ -8160,7 +9167,6 @@
                      * 
                      * @type {Number}
                      * @default -10
-                     * @product highcharts highstock highmaps
                      */
                     x: -10,
 
@@ -8170,7 +9176,6 @@
                      * @validvalue ["top", "middle", "bottom"]
                      * @type {String}
                      * @default bottom
-                     * @product highcharts highstock highmaps
                      */
                     verticalAlign: 'bottom',
 
@@ -8179,7 +9184,6 @@
                      * 
                      * @type {Number}
                      * @default -5
-                     * @product highcharts highstock highmaps
                      */
                     y: -5
                 },
@@ -8246,11 +9250,15 @@
                 Date,
                 useUTC = globalOptions.useUTC,
                 GET = useUTC ? 'getUTC' : 'get',
-                SET = useUTC ? 'setUTC' : 'set';
+                SET = useUTC ? 'setUTC' : 'set',
+                setters = ['Minutes', 'Hours', 'Day', 'Date', 'Month', 'FullYear'],
+                getters = setters.concat(['Milliseconds', 'Seconds']),
+                n;
 
             H.Date = Date = globalOptions.Date || win.Date; // Allow using a different Date class
             Date.hcTimezoneOffset = useUTC && globalOptions.timezoneOffset;
             Date.hcGetTimezoneOffset = getTimezoneOffsetOption();
+            Date.hcHasTimeZone = !!(Date.hcTimezoneOffset || Date.hcGetTimezoneOffset);
             Date.hcMakeTime = function(year, month, date, hours, minutes, seconds) {
                 var d;
                 if (useUTC) {
@@ -8268,12 +9276,15 @@
                 }
                 return d;
             };
-            each(['Minutes', 'Hours', 'Day', 'Date', 'Month', 'FullYear'], function(s) {
-                Date['hcGet' + s] = GET + s;
-            });
-            each(['Milliseconds', 'Seconds', 'Minutes', 'Hours', 'Date', 'Month', 'FullYear'], function(s) {
-                Date['hcSet' + s] = SET + s;
-            });
+
+            // Dynamically set setters and getters. Use for loop, H.each is not yet 
+            // overridden in oldIE.
+            for (n = 0; n < setters.length; n++) {
+                Date['hcGet' + setters[n]] = GET + setters[n];
+            }
+            for (n = 0; n < getters.length; n++) {
+                Date['hcSet' + getters[n]] = SET + getters[n];
+            }
         }
 
         /**
@@ -8367,12 +9378,13 @@
                     tickPositionInfo = tickPositions.info,
                     dateTimeLabelFormat;
 
-                // Set the datetime label format. If a higher rank is set for this position, use that. If not,
-                // use the general format.
+                // Set the datetime label format. If a higher rank is set for this
+                // position, use that. If not, use the general format.
                 if (axis.isDatetimeAxis && tickPositionInfo) {
                     dateTimeLabelFormat =
                         options.dateTimeLabelFormats[
-                            tickPositionInfo.higherRanks[pos] || tickPositionInfo.unitName
+                            tickPositionInfo.higherRanks[pos] ||
+                            tickPositionInfo.unitName
                         ];
                 }
                 // set properties for access in render method
@@ -8390,9 +9402,6 @@
                     pos: pos
                 });
 
-                // prepare CSS
-                //css = width && { width: Math.max(1, Math.round(width - 2 * (labelOptions.padding || 10))) + 'px' };
-
                 // first call
                 if (!defined(label)) {
 
@@ -8407,8 +9416,11 @@
 
                         .add(axis.labelGroup) :
                         null;
-                    tick.labelLength = label && label.getBBox().width; // Un-rotated length
-                    tick.rotation = 0; // Base value to detect change for new calls to getBBox
+
+                    // Un-rotated length
+                    tick.labelLength = label && label.getBBox().width;
+                    // Base value to detect change for new calls to getBBox
+                    tick.rotation = 0;
 
                     // update
                 } else if (label) {
@@ -8428,23 +9440,31 @@
             },
 
             /**
-             * Handle the label overflow by adjusting the labels to the left and right edge, or
-             * hide them if they collide into the neighbour label.
+             * Handle the label overflow by adjusting the labels to the left and right
+             * edge, or hide them if they collide into the neighbour label.
              */
             handleOverflow: function(xy) {
                 var axis = this.axis,
+                    labelOptions = axis.options.labels,
                     pxPos = xy.x,
                     chartWidth = axis.chart.chartWidth,
                     spacing = axis.chart.spacing,
                     leftBound = pick(axis.labelLeft, Math.min(axis.pos, spacing[3])),
-                    rightBound = pick(axis.labelRight, Math.max(axis.pos + axis.len, chartWidth - spacing[1])),
+                    rightBound = pick(
+                        axis.labelRight,
+                        Math.max(!axis.isRadial ? axis.pos + axis.len : 0,
+                            chartWidth - spacing[1]
+                        )
+                    ),
                     label = this.label,
                     rotation = this.rotation,
                     factor = {
                         left: 0,
                         center: 0.5,
                         right: 1
-                    }[axis.labelAlign],
+                    }[
+                        axis.labelAlign || label.attr('align')
+                    ],
                     labelWidth = label.getBBox().width,
                     slotWidth = axis.getSlotWidth(),
                     modifiedSlotWidth = slotWidth,
@@ -8455,41 +9475,59 @@
                     textWidth,
                     css = {};
 
-                // Check if the label overshoots the chart spacing box. If it does, move it.
-                // If it now overshoots the slotWidth, add ellipsis.
-                if (!rotation) {
+                // Check if the label overshoots the chart spacing box. If it does, move
+                // it. If it now overshoots the slotWidth, add ellipsis.
+                if (!rotation && labelOptions.overflow !== false) {
                     leftPos = pxPos - factor * labelWidth;
                     rightPos = pxPos + (1 - factor) * labelWidth;
 
                     if (leftPos < leftBound) {
                         modifiedSlotWidth = xy.x + modifiedSlotWidth * (1 - factor) - leftBound;
                     } else if (rightPos > rightBound) {
-                        modifiedSlotWidth = rightBound - xy.x + modifiedSlotWidth * factor;
+                        modifiedSlotWidth =
+                            rightBound - xy.x + modifiedSlotWidth * factor;
                         goRight = -1;
                     }
 
                     modifiedSlotWidth = Math.min(slotWidth, modifiedSlotWidth); // #4177
                     if (modifiedSlotWidth < slotWidth && axis.labelAlign === 'center') {
-                        xy.x += goRight * (slotWidth - modifiedSlotWidth - xCorrection *
-                            (slotWidth - Math.min(labelWidth, modifiedSlotWidth)));
+                        xy.x += (
+                            goRight *
+                            (
+                                slotWidth -
+                                modifiedSlotWidth -
+                                xCorrection * (
+                                    slotWidth - Math.min(labelWidth, modifiedSlotWidth)
+                                )
+                            )
+                        );
                     }
-                    // If the label width exceeds the available space, set a text width to be
-                    // picked up below. Also, if a width has been set before, we need to set a new
-                    // one because the reported labelWidth will be limited by the box (#3938).
-                    if (labelWidth > modifiedSlotWidth || (axis.autoRotation && (label.styles || {}).width)) {
+                    // If the label width exceeds the available space, set a text width
+                    // to be picked up below. Also, if a width has been set before, we
+                    // need to set a new one because the reported labelWidth will be
+                    // limited by the box (#3938).
+                    if (
+                        labelWidth > modifiedSlotWidth ||
+                        (axis.autoRotation && (label.styles || {}).width)
+                    ) {
                         textWidth = modifiedSlotWidth;
                     }
 
-                    // Add ellipsis to prevent rotated labels to be clipped against the edge of the chart
+                    // Add ellipsis to prevent rotated labels to be clipped against the edge
+                    // of the chart
                 } else if (rotation < 0 && pxPos - factor * labelWidth < leftBound) {
-                    textWidth = Math.round(pxPos / Math.cos(rotation * deg2rad) - leftBound);
+                    textWidth = Math.round(
+                        pxPos / Math.cos(rotation * deg2rad) - leftBound
+                    );
                 } else if (rotation > 0 && pxPos + factor * labelWidth > rightBound) {
-                    textWidth = Math.round((chartWidth - pxPos) / Math.cos(rotation * deg2rad));
+                    textWidth = Math.round(
+                        (chartWidth - pxPos) / Math.cos(rotation * deg2rad)
+                    );
                 }
 
                 if (textWidth) {
                     css.width = textWidth;
-                    if (!(axis.options.labels.style || {}).textOverflow) {
+                    if (!(labelOptions.style || {}).textOverflow) {
                         css.textOverflow = 'ellipsis';
                     }
                     label.css(css);
@@ -8506,14 +9544,39 @@
 
                 return {
                     x: horiz ?
-                        axis.translate(pos + tickmarkOffset, null, null, old) + axis.transB : axis.left + axis.offset +
-                        (axis.opposite ?
-                            ((old && chart.oldChartWidth) || chart.chartWidth) - axis.right - axis.left :
-                            0
+                        (
+                            axis.translate(pos + tickmarkOffset, null, null, old) +
+                            axis.transB
+                        ) :
+                        (
+                            axis.left +
+                            axis.offset +
+                            (
+                                axis.opposite ?
+                                (
+                                    (
+                                        (old && chart.oldChartWidth) ||
+                                        chart.chartWidth
+                                    ) -
+                                    axis.right -
+                                    axis.left
+                                ) :
+                                0
+                            )
                         ),
 
                     y: horiz ?
-                        cHeight - axis.bottom + axis.offset - (axis.opposite ? axis.height : 0) : cHeight - axis.translate(pos + tickmarkOffset, null, null, old) - axis.transB
+                        (
+                            cHeight -
+                            axis.bottom +
+                            axis.offset -
+                            (axis.opposite ? axis.height : 0)
+                        ) :
+                        (
+                            cHeight -
+                            axis.translate(pos + tickmarkOffset, null, null, old) -
+                            axis.transB
+                        )
                 };
 
             },
@@ -8521,7 +9584,16 @@
             /**
              * Get the x, y position of the tick label
              */
-            getLabelPosition: function(x, y, label, horiz, labelOptions, tickmarkOffset, index, step) {
+            getLabelPosition: function(
+                x,
+                y,
+                label,
+                horiz,
+                labelOptions,
+                tickmarkOffset,
+                index,
+                step
+            ) {
                 var axis = this.axis,
                     transA = axis.transA,
                     reversed = axis.reversed,
@@ -8531,6 +9603,14 @@
                         y: 0
                     },
                     yOffset = labelOptions.y,
+
+                    // Adjust for label alignment if we use reserveSpace: true (#5286)
+                    labelOffsetCorrection = (!horiz && !axis.reserveSpaceDefault ?
+                        -axis.labelOffset * (
+                            axis.labelAlign === 'center' ? 0.5 : 1
+                        ) :
+                        0
+                    ),
                     line;
 
                 if (!defined(yOffset)) {
@@ -8540,12 +9620,20 @@
                         yOffset = rotCorr.y + 8;
                     } else {
                         // #3140, #3140
-                        yOffset = Math.cos(label.rotation * deg2rad) * (rotCorr.y - label.getBBox(false, 0).height / 2);
+                        yOffset = Math.cos(label.rotation * deg2rad) *
+                            (rotCorr.y - label.getBBox(false, 0).height / 2);
                     }
                 }
 
-                x = x + labelOptions.x + rotCorr.x - (tickmarkOffset && horiz ?
-                    tickmarkOffset * transA * (reversed ? -1 : 1) : 0);
+                x = x +
+                    labelOptions.x +
+                    labelOffsetCorrection +
+                    rotCorr.x -
+                    (
+                        tickmarkOffset && horiz ?
+                        tickmarkOffset * transA * (reversed ? -1 : 1) :
+                        0
+                    );
                 y = y + yOffset - (tickmarkOffset && !horiz ?
                     tickmarkOffset * transA * (reversed ? 1 : -1) : 0);
 
@@ -8739,8 +9827,13 @@
                         show = false;
 
                         // Handle label overflow and show or hide accordingly
-                    } else if (horiz && !axis.isRadial && !labelOptions.step &&
-                        !labelOptions.rotation && !old && opacity !== 0) {
+                    } else if (
+                        horiz &&
+                        !labelOptions.step &&
+                        !labelOptions.rotation &&
+                        !old &&
+                        opacity !== 0
+                    ) {
                         tick.handleOverflow(xy);
                     }
 
@@ -8759,7 +9852,6 @@
                         label.attr('y', -9999); // #1338
                         tick.isNewLabel = true;
                     }
-                    tick.isNew = false;
                 }
             },
 
@@ -8793,6 +9885,8 @@
 
                 // the label is created on init - now move it into place
                 this.renderLabel(xy, old, opacity, index);
+
+                tick.isNew = false;
             },
 
             /**
@@ -8879,8 +9973,7 @@
              * though if the chart is inverted this is the vertical axis. In case of
              * multiple axes, the xAxis node is an array of configuration objects.
              * 
-             * See [../class-reference/Highcharts.Axis](the Axis object) for
-             * programmatic access to the axis.
+             * See [the Axis object](#Axis) for programmatic access to the axis.
              *
              * @productdesc {highmaps}
              * In Highmaps, the axis is hidden, but it is used behind the scenes to
@@ -8890,86 +9983,465 @@
              * @optionparent xAxis
              */
             defaultOptions: {
+                /**
+                 * Whether to allow decimals in this axis' ticks. When counting
+                 * integers, like persons or hits on a web page, decimals should
+                 * be avoided in the labels.
+                 *
+                 * @type      {Boolean}
+                 * @see       [minTickInterval](#xAxis.minTickInterval)
+                 * @sample    {highcharts|highstock}
+                 *            highcharts/yaxis/allowdecimals-true/
+                 *            True by default
+                 * @sample    {highcharts|highstock}
+                 *            highcharts/yaxis/allowdecimals-false/
+                 *            False
+                 * @default   true
+                 * @since     2.0
+                 * @apioption xAxis.allowDecimals
+                 */
                 // allowDecimals: null,
+
+
+                /**
+                 * When using an alternate grid color, a band is painted across the
+                 * plot area between every other grid line.
+                 *
+                 * @type      {Color}
+                 * @sample    {highcharts} highcharts/yaxis/alternategridcolor/
+                 *            Alternate grid color on the Y axis
+                 * @sample    {highstock} stock/xaxis/alternategridcolor/
+                 *            Alternate grid color on the Y axis
+                 * @default   null
+                 * @apioption xAxis.alternateGridColor
+                 */
                 // alternateGridColor: null,
+
+                /**
+                 * An array defining breaks in the axis, the sections defined will be
+                 * left out and all the points shifted closer to each other.
+                 *
+                 * @productdesc {highcharts}
+                 * Requires that the broken-axis.js module is loaded.
+                 *
+                 * @type      {Array}
+                 * @sample    {highcharts}
+                 *            highcharts/axisbreak/break-simple/
+                 *            Simple break
+                 * @sample    {highcharts|highstock}
+                 *            highcharts/axisbreak/break-visualized/
+                 *            Advanced with callback
+                 * @sample    {highstock}
+                 *            stock/demo/intraday-breaks/
+                 *            Break on nights and weekends
+                 * @since     4.1.0
+                 * @product   highcharts highstock
+                 * @apioption xAxis.breaks
+                 */
+
+                /**
+                 * A number indicating how much space should be left between the start
+                 * and the end of the break. The break size is given in axis units,
+                 * so for instance on a `datetime` axis, a break size of 3600000 would
+                 * indicate the equivalent of an hour.
+                 *
+                 * @type      {Number}
+                 * @default   0
+                 * @since     4.1.0
+                 * @product   highcharts highstock
+                 * @apioption xAxis.breaks.breakSize
+                 */
+
+                /**
+                 * The point where the break starts.
+                 *
+                 * @type      {Number}
+                 * @since     4.1.0
+                 * @product   highcharts highstock
+                 * @apioption xAxis.breaks.from
+                 */
+
+                /**
+                 * Defines an interval after which the break appears again. By default
+                 * the breaks do not repeat.
+                 *
+                 * @type      {Number}
+                 * @default   0
+                 * @since     4.1.0
+                 * @product   highcharts highstock
+                 * @apioption xAxis.breaks.repeat
+                 */
+
+                /**
+                 * The point where the break ends.
+                 *
+                 * @type      {Number}
+                 * @since     4.1.0
+                 * @product   highcharts highstock
+                 * @apioption xAxis.breaks.to
+                 */
+
+                /**
+                 * If categories are present for the xAxis, names are used instead of
+                 * numbers for that axis. Since Highcharts 3.0, categories can also
+                 * be extracted by giving each point a [name](#series.data) and setting
+                 * axis [type](#xAxis.type) to `category`. However, if you have multiple
+                 * series, best practice remains defining the `categories` array.
+                 *
+                 * Example:
+                 *
+                 * <pre>categories: ['Apples', 'Bananas', 'Oranges']</pre>
+                 *
+                 * @type      {Array<String>}
+                 * @sample    {highcharts} highcharts/chart/reflow-true/
+                 *            With
+                 * @sample    {highcharts} highcharts/xaxis/categories/
+                 *            Without
+                 * @product   highcharts
+                 * @default   null
+                 * @apioption xAxis.categories
+                 */
                 // categories: [],
 
                 /**
+                 * The highest allowed value for automatically computed axis extremes.
+                 *
+                 * @type      {Number}
+                 * @see       [floor](#xAxis.floor)
+                 * @sample    {highcharts|highstock} highcharts/yaxis/floor-ceiling/
+                 *            Floor and ceiling
+                 * @since     4.0
+                 * @product   highcharts highstock
+                 * @apioption xAxis.ceiling
+                 */
+
+                /**
+                 * A class name that opens for styling the axis by CSS, especially in
+                 * Highcharts styled mode. The class name is applied to group elements
+                 * for the grid, axis elements and labels.
+                 *
+                 * @type      {String}
+                 * @sample    {highcharts|highstock|highmaps}
+                 *            highcharts/css/axis/
+                 *            Multiple axes with separate styling
+                 * @since     5.0.0
+                 * @apioption xAxis.className
+                 */
+
+                /**
+                 * Configure a crosshair that follows either the mouse pointer or the
+                 * hovered point.
+                 *
+                 * In styled mode, the crosshairs are styled in the
+                 * `.highcharts-crosshair`, `.highcharts-crosshair-thin` or
+                 * `.highcharts-xaxis-category` classes.
+                 *
+                 * @productdesc {highstock}
+                 * In Highstock, bu default, the crosshair is enabled on the X axis and
+                 * disabled on the Y axis.
+                 *
+                 * @type      {Boolean|Object}
+                 * @sample    {highcharts} highcharts/xaxis/crosshair-both/
+                 *            Crosshair on both axes
+                 * @sample    {highstock} stock/xaxis/crosshairs-xy/
+                 *            Crosshair on both axes
+                 * @sample    {highmaps} highcharts/xaxis/crosshair-both/
+                 *            Crosshair on both axes
+                 * @default   false
+                 * @since     4.1
+                 * @apioption xAxis.crosshair
+                 */
+
+                /**
+                 * A class name for the crosshair, especially as a hook for styling.
+                 *
+                 * @type      {String}
+                 * @since     5.0.0
+                 * @apioption xAxis.crosshair.className
+                 */
+
+                /**
+                 * The color of the crosshair. Defaults to `#cccccc` for numeric and
+                 * datetime axes, and `rgba(204,214,235,0.25)` for category axes, where
+                 * the crosshair by default highlights the whole category.
+                 *
+                 * @type      {Color}
+                 * @sample    {highcharts|highstock|highmaps}
+                 *            highcharts/xaxis/crosshair-customized/
+                 *            Customized crosshairs
+                 * @default   #cccccc
+                 * @since     4.1
+                 * @apioption xAxis.crosshair.color
+                 */
+
+                /**
+                 * The dash style for the crosshair. See
+                 * [series.dashStyle](#plotOptions.series.dashStyle)
+                 * for possible values.
+                 *
+                 * @validvalue ["Solid", "ShortDash", "ShortDot", "ShortDashDot",
+                 *              "ShortDashDotDot", "Dot", "Dash" ,"LongDash",
+                 *              "DashDot", "LongDashDot", "LongDashDotDot"]
+                 * @type       {String}
+                 * @sample     {highcharts|highmaps} highcharts/xaxis/crosshair-dotted/
+                 *             Dotted crosshair
+                 * @sample     {highstock} stock/xaxis/crosshair-dashed/
+                 *             Dashed X axis crosshair
+                 * @default    Solid
+                 * @since      4.1
+                 * @apioption  xAxis.crosshair.dashStyle
+                 */
+
+                /**
+                 * Whether the crosshair should snap to the point or follow the pointer
+                 * independent of points.
+                 *
+                 * @type      {Boolean}
+                 * @sample    {highcharts|highstock}
+                 *            highcharts/xaxis/crosshair-snap-false/
+                 *            True by default
+                 * @sample    {highmaps}
+                 *            maps/demo/latlon-advanced/
+                 *            Snap is false
+                 * @default   true
+                 * @since     4.1
+                 * @apioption xAxis.crosshair.snap
+                 */
+
+                /**
+                 * The pixel width of the crosshair. Defaults to 1 for numeric or
+                 * datetime axes, and for one category width for category axes.
+                 *
+                 * @type      {Number}
+                 * @sample    {highcharts} highcharts/xaxis/crosshair-customized/
+                 *            Customized crosshairs
+                 * @sample    {highstock} highcharts/xaxis/crosshair-customized/
+                 *            Customized crosshairs
+                 * @sample    {highmaps} highcharts/xaxis/crosshair-customized/
+                 *            Customized crosshairs
+                 * @default   1
+                 * @since     4.1
+                 * @apioption xAxis.crosshair.width
+                 */
+
+                /**
+                 * The Z index of the crosshair. Higher Z indices allow drawing the
+                 * crosshair on top of the series or behind the grid lines.
+                 *
+                 * @type      {Number}
+                 * @default   2
+                 * @since     4.1
+                 * @apioption xAxis.crosshair.zIndex
+                 */
+
+                /**
                  * For a datetime axis, the scale will automatically adjust to the
-                 * appropriate unit. This member gives the default string representations
-                 * used for each unit. For intermediate values, different units may
-                 * be used, for example the `day` unit can be used on midnight and
-                 * `hour` unit be used for intermediate values on the same axis. For
-                 * an overview of the replacement codes, see [dateFormat](#Highcharts.
-                 * dateFormat). Defaults to:
+                 * appropriate unit. This member gives the default string
+                 * representations used for each unit. For intermediate values,
+                 * different units may be used, for example the `day` unit can be used
+                 * on midnight and `hour` unit be used for intermediate values on the
+                 * same axis. For an overview of the replacement codes, see
+                 * [dateFormat](#Highcharts.dateFormat). Defaults to:
                  * 
                  * <pre>{
-                 * millisecond: '%H:%M:%S.%L',
-                 * second: '%H:%M:%S',
-                 * minute: '%H:%M',
-                 * hour: '%H:%M',
-                 * day: '%e. %b',
-                 * week: '%e. %b',
-                 * month: '%b \'%y',
-                 * year: '%Y'
+                 *     millisecond: '%H:%M:%S.%L',
+                 *     second: '%H:%M:%S',
+                 *     minute: '%H:%M',
+                 *     hour: '%H:%M',
+                 *     day: '%e. %b',
+                 *     week: '%e. %b',
+                 *     month: '%b \'%y',
+                 *     year: '%Y'
                  * }</pre>
                  * 
-                 * @type {Object}
-                 * @sample {highcharts} highcharts/xaxis/datetimelabelformats/ Different day format on X axis
-                 * @sample {highstock} stock/xaxis/datetimelabelformats/ More information in x axis labels
+                 * @type    {Object}
+                 * @sample  {highcharts} highcharts/xaxis/datetimelabelformats/
+                 *          Different day format on X axis
+                 * @sample  {highstock} stock/xaxis/datetimelabelformats/
+                 *          More information in x axis labels
                  * @product highcharts highstock
                  */
                 dateTimeLabelFormats: {
-
-                    /**
-                     */
                     millisecond: '%H:%M:%S.%L',
-
-                    /**
-                     */
                     second: '%H:%M:%S',
-
-                    /**
-                     */
                     minute: '%H:%M',
-
-                    /**
-                     */
                     hour: '%H:%M',
-
-                    /**
-                     */
                     day: '%e. %b',
-
-                    /**
-                     */
                     week: '%e. %b',
-
-                    /**
-                     */
                     month: '%b \'%y',
-
-                    /**
-                     */
                     year: '%Y'
                 },
 
                 /**
+                 * _Requires Accessibility module_
+                 *
+                 * Description of the axis to screen reader users.
+                 *
+                 * @type      {String}
+                 * @default   undefined
+                 * @since     5.0.0
+                 * @apioption xAxis.description
+                 */
+
+                /**
                  * Whether to force the axis to end on a tick. Use this option with
                  * the `maxPadding` option to control the axis end.
+                 *
+                 * @productdesc {highstock}
+                 * In Highstock, `endOnTick` is always false when the navigator is
+                 * enabled, to prevent jumpy scrolling.
                  * 
-                 * @type {Boolean}
-                 * @sample {highcharts} highcharts/chart/reflow-true/ True by default
-                 * @sample {highcharts} highcharts/yaxis/endontick/ False
-                 * @sample {highstock} stock/demo/basic-line/ True by default
-                 * @sample {highstock} stock/xaxis/endontick/ False
-                 * @default false
-                 * @since 1.2.0
-                 * @product highcharts highstock highmaps
+                 * @sample {highcharts} highcharts/chart/reflow-true/
+                 *         True by default
+                 * @sample {highcharts} highcharts/yaxis/endontick/
+                 *         False
+                 * @sample {highstock} stock/demo/basic-line/
+                 *         True by default
+                 * @sample {highstock} stock/xaxis/endontick/
+                 *         False
+                 * @since  1.2.0
                  */
                 endOnTick: false,
-                // reversed: false,
 
+                /**
+                 * Event handlers for the axis.
+                 *
+                 * @apioption xAxis.events
+                 */
+
+                /**
+                 * An event fired after the breaks have rendered.
+                 *
+                 * @type      {Function}
+                 * @see       [breaks](#xAxis.breaks)
+                 * @sample    {highcharts} highcharts/axisbreak/break-event/
+                 *            AfterBreak Event
+                 * @since     4.1.0
+                 * @product   highcharts
+                 * @apioption xAxis.events.afterBreaks
+                 */
+
+                /**
+                 * As opposed to the `setExtremes` event, this event fires after the
+                 * final min and max values are computed and corrected for `minRange`.
+                 *
+                 *
+                 * Fires when the minimum and maximum is set for the axis, either by
+                 * calling the `.setExtremes()` method or by selecting an area in the
+                 * chart. One parameter, `event`, is passed to the function, containing
+                 * common event information.
+                 *
+                 * The new user set minimum and maximum values can be found by `event.
+                 * min` and `event.max`. These reflect the axis minimum and maximum
+                 * in axis values. The actual data extremes are found in `event.dataMin`
+                 * and `event.dataMax`.
+                 *
+                 * @type      {Function}
+                 * @context   Axis
+                 * @since     2.3
+                 * @apioption xAxis.events.afterSetExtremes
+                 */
+
+                /**
+                 * An event fired when a break from this axis occurs on a point.
+                 *
+                 * @type      {Function}
+                 * @see       [breaks](#xAxis.breaks)
+                 * @context   Axis
+                 * @sample    {highcharts} highcharts/axisbreak/break-visualized/
+                 *            Visualization of a Break
+                 * @since     4.1.0
+                 * @product   highcharts
+                 * @apioption xAxis.events.pointBreak
+                 */
+
+                /**
+                 * An event fired when a point falls inside a break from this axis.
+                 *
+                 * @type      {Function}
+                 * @context   Axis
+                 * @product   highcharts highstock
+                 * @apioption xAxis.events.pointInBreak
+                 */
+
+                /**
+                 * Fires when the minimum and maximum is set for the axis, either by
+                 * calling the `.setExtremes()` method or by selecting an area in the
+                 * chart. One parameter, `event`, is passed to the function,
+                 * containing common event information.
+                 *
+                 * The new user set minimum and maximum values can be found by `event.
+                 * min` and `event.max`. These reflect the axis minimum and maximum
+                 * in data values. When an axis is zoomed all the way out from the 
+                 * "Reset zoom" button, `event.min` and `event.max` are null, and
+                 * the new extremes are set based on `this.dataMin` and `this.dataMax`.
+                 *
+                 * @type      {Function}
+                 * @context   Axis
+                 * @sample    {highstock} stock/xaxis/events-setextremes/
+                 *            Log new extremes on x axis
+                 * @since     1.2.0
+                 * @apioption xAxis.events.setExtremes
+                 */
+
+                /**
+                 * The lowest allowed value for automatically computed axis extremes.
+                 *
+                 * @type      {Number}
+                 * @see       [ceiling](#yAxis.ceiling)
+                 * @sample    {highcharts} highcharts/yaxis/floor-ceiling/
+                 *            Floor and ceiling
+                 * @sample    {highstock} stock/demo/lazy-loading/
+                 *            Prevent negative stock price on Y axis
+                 * @default   null
+                 * @since     4.0
+                 * @product   highcharts highstock
+                 * @apioption xAxis.floor
+                 */
+
+                /**
+                 * The dash or dot style of the grid lines. For possible values, see
+                 * [this demonstration](http://jsfiddle.net/gh/get/library/pure/
+                 *highcharts/highcharts/tree/master/samples/highcharts/plotoptions/
+                 *series-dashstyle-all/).
+                 *
+                 * @validvalue ["Solid", "ShortDash", "ShortDot", "ShortDashDot",
+                 *              "ShortDashDotDot", "Dot", "Dash" ,"LongDash",
+                 *              "DashDot", "LongDashDot", "LongDashDotDot"]
+                 * @type       {String}
+                 * @sample     {highcharts} highcharts/yaxis/gridlinedashstyle/
+                 *             Long dashes
+                 * @sample     {highstock} stock/xaxis/gridlinedashstyle/
+                 *             Long dashes
+                 * @default    Solid
+                 * @since      1.2
+                 * @apioption  xAxis.gridLineDashStyle
+                 */
+
+                /**
+                 * The Z index of the grid lines.
+                 *
+                 * @type      {Number}
+                 * @sample    {highcharts|highstock} highcharts/xaxis/gridzindex/
+                 *            A Z index of 4 renders the grid above the graph
+                 * @default   1
+                 * @product   highcharts highstock
+                 * @apioption xAxis.gridZIndex
+                 */
+
+                /**
+                 * An id for the axis. This can be used after render time to get
+                 * a pointer to the axis object through `chart.get()`.
+                 *
+                 * @type      {String}
+                 * @sample    {highcharts} highcharts/xaxis/id/
+                 *            Get the object
+                 * @sample    {highstock} stock/xaxis/id/
+                 *            Get the object
+                 * @default   null
+                 * @since     1.2.0
+                 * @apioption xAxis.id
+                 */
 
                 /**
                  * The axis labels show the number or category for each tick.
@@ -8980,60 +10452,308 @@
                  * and can be enabled on X and Y axes too.
                  */
                 labels: {
+                    /**
+                     * What part of the string the given position is anchored to.
+                     * If `left`, the left side of the string is at the axis position.
+                     * Can be one of `"left"`, `"center"` or `"right"`. Defaults to
+                     * an intelligent guess based on which side of the chart the axis
+                     * is on and the rotation of the label.
+                     *
+                     * @validvalue ["left", "center", "right"]
+                     * @type       {String}
+                     * @sample     {highcharts} highcharts/xaxis/labels-align-left/
+                     *             Left
+                     * @sample     {highcharts} highcharts/xaxis/labels-align-right/
+                     *             Right
+                     * @sample     {highcharts}
+                     *             highcharts/xaxis/labels-reservespace-true/
+                     *             Left-aligned labels on a vertical category axis
+                     * @see        [reserveSpace](#xAxis.labels.reserveSpace)
+                     * @apioption  xAxis.labels.align
+                     */
+                    // align: 'center',
+
+                    /**
+                     * For horizontal axes, the allowed degrees of label rotation
+                     * to prevent overlapping labels. If there is enough space,
+                     * labels are not rotated. As the chart gets narrower, it
+                     * will start rotating the labels -45 degrees, then remove
+                     * every second label and try again with rotations 0 and -45 etc.
+                     * Set it to `false` to disable rotation, which will
+                     * cause the labels to word-wrap if possible.
+                     *
+                     * @type      {Array<Number>}
+                     * @sample    {highcharts|highstock}
+                     *            highcharts/xaxis/labels-autorotation-default/
+                     *            Default auto rotation of 0 or -45
+                     * @sample    {highcharts|highstock}
+                     *            highcharts/xaxis/labels-autorotation-0-90/
+                     *            Custom graded auto rotation
+                     * @default   [-45]
+                     * @since     4.1.0
+                     * @product   highcharts highstock
+                     * @apioption xAxis.labels.autoRotation
+                     */
+
+                    /**
+                     * When each category width is more than this many pixels, we don't
+                     * apply auto rotation. Instead, we lay out the axis label with word
+                     * wrap. A lower limit makes sense when the label contains multiple
+                     * short words that don't extend the available horizontal space for
+                     * each label.
+                     *
+                     * @type      {Number}
+                     * @sample    {highcharts}
+                     *            highcharts/xaxis/labels-autorotationlimit/
+                     *            Lower limit
+                     * @default   80
+                     * @since     4.1.5
+                     * @product   highcharts
+                     * @apioption xAxis.labels.autoRotationLimit
+                     */
+
+                    /**
+                     * Polar charts only. The label's pixel distance from the perimeter
+                     * of the plot area.
+                     *
+                     * @type      {Number}
+                     * @default   15
+                     * @product   highcharts
+                     * @apioption xAxis.labels.distance
+                     */
 
                     /**
                      * Enable or disable the axis labels.
                      * 
-                     * @type {Boolean}
-                     * @sample {highcharts} highcharts/xaxis/labels-enabled/ X axis labels disabled
-                     * @sample {highstock} stock/xaxis/labels-enabled/ X axis labels disabled
-                     * @default {highstock} true
+                     * @sample  {highcharts} highcharts/xaxis/labels-enabled/
+                     *          X axis labels disabled
+                     * @sample  {highstock} stock/xaxis/labels-enabled/
+                     *          X axis labels disabled
+                     * @default {highcharts|highstock} true
                      * @default {highmaps} false
-                     * @product highcharts highstock highmaps
                      */
                     enabled: true,
+
+                    /**
+                     * A [format string](http://www.highcharts.com/docs/chart-
+                     * concepts/labels-and-string-formatting) for the axis label.
+                     *
+                     * @type      {String}
+                     * @sample    {highcharts|highstock} highcharts/yaxis/labels-format/
+                     *            Add units to Y axis label
+                     * @default   {value}
+                     * @since     3.0
+                     * @apioption xAxis.labels.format
+                     */
+
+                    /**
+                     * Callback JavaScript function to format the label. The value
+                     * is given by `this.value`. Additional properties for `this` are
+                     * `axis`, `chart`, `isFirst` and `isLast`. The value of the default
+                     * label formatter can be retrieved by calling
+                     * `this.axis.defaultLabelFormatter.call(this)` within the function.
+                     *
+                     * Defaults to:
+                     *
+                     * <pre>function() {
+                     *     return this.value;
+                     * }</pre>
+                     *
+                     * @type      {Function}
+                     * @sample    {highcharts}
+                     *            highcharts/xaxis/labels-formatter-linked/
+                     *            Linked category names
+                     * @sample    {highcharts}
+                     *            highcharts/xaxis/labels-formatter-extended/
+                     *            Modified numeric labels
+                     * @sample    {highstock}
+                     *            stock/xaxis/labels-formatter/
+                     *            Added units on Y axis
+                     * @apioption xAxis.labels.formatter
+                     */
+
+                    /**
+                     * How to handle overflowing labels on horizontal axis. Can be
+                     * undefined, `false` or `"justify"`. By default it aligns inside
+                     * the chart area. If "justify", labels will not render outside
+                     * the plot area. If `false`, it will not be aligned at all.
+                     * If there is room to move it, it will be aligned to the edge,
+                     * else it will be removed.
+                     *
+                     * @deprecated
+                     * @validvalue [null, "justify"]
+                     * @type       {String}
+                     * @since      2.2.5
+                     * @apioption  xAxis.labels.overflow
+                     */
+
+                    /**
+                     * The pixel padding for axis labels, to ensure white space between
+                     * them.
+                     *
+                     * @type      {Number}
+                     * @default   5
+                     * @product   highcharts
+                     * @apioption xAxis.labels.padding
+                     */
+
+                    /**
+                     * Whether to reserve space for the labels. By default, space is
+                     * reserved for the labels in these cases:
+                     * 
+                     * * On all horizontal axes.
+                     * * On vertical axes if `label.align` is `right` on a left-side
+                     * axis or `left` on a right-side axis.
+                     * * On vertical axes if `label.align` is `center`.
+                     * 
+                     * This can be turned off when for example the labels are rendered
+                     * inside the plot area instead of outside.
+                     *
+                     * @type      {Boolean}
+                     * @sample    {highcharts} highcharts/xaxis/labels-reservespace/
+                     *            No reserved space, labels inside plot
+                     * @sample    {highcharts}
+                     *            highcharts/xaxis/labels-reservespace-true/
+                     *            Left-aligned labels on a vertical category axis
+                     * @see       [labels.align](#xAxis.labels.align)
+                     * @default   null
+                     * @since     4.1.10
+                     * @product   highcharts
+                     * @apioption xAxis.labels.reserveSpace
+                     */
+
+                    /**
+                     * Rotation of the labels in degrees.
+                     *
+                     * @type      {Number}
+                     * @sample    {highcharts} highcharts/xaxis/labels-rotation/
+                     *            X axis labels rotated 90°
+                     * @default   0
+                     * @apioption xAxis.labels.rotation
+                     */
                     // rotation: 0,
-                    // align: 'center',
+
+                    /**
+                     * Horizontal axes only. The number of lines to spread the labels
+                     * over to make room or tighter labels.
+                     *
+                     * @type      {Number}
+                     * @sample    {highcharts} highcharts/xaxis/labels-staggerlines/
+                     *            Show labels over two lines
+                     * @sample    {highstock} stock/xaxis/labels-staggerlines/
+                     *            Show labels over two lines
+                     * @default   null
+                     * @since     2.1
+                     * @apioption xAxis.labels.staggerLines
+                     */
+
+                    /**
+                     * To show only every _n_'th label on the axis, set the step to _n_.
+                     * Setting the step to 2 shows every other label.
+                     *
+                     * By default, the step is calculated automatically to avoid
+                     * overlap. To prevent this, set it to 1\. This usually only
+                     * happens on a category axis, and is often a sign that you have
+                     * chosen the wrong axis type.
+                     *
+                     * Read more at
+                     * [Axis docs](http://www.highcharts.com/docs/chart-concepts/axes)
+                     * => What axis should I use?
+                     *
+                     * @type      {Number}
+                     * @sample    {highcharts} highcharts/xaxis/labels-step/
+                     *            Showing only every other axis label on a categorized
+                     *            x axis
+                     * @sample    {highcharts} highcharts/xaxis/labels-step-auto/
+                     *            Auto steps on a category axis
+                     * @default   null
+                     * @since     2.1
+                     * @apioption xAxis.labels.step
+                     */
                     // step: null,
 
+
+
+                    /**
+                     * Whether to [use HTML](http://www.highcharts.com/docs/chart-
+                     * concepts/labels-and-string-formatting#html) to render the labels.
+                     *
+                     * @type      {Boolean}
+                     * @default   false
+                     * @apioption xAxis.labels.useHTML
+                     */
 
                     /**
                      * The x position offset of the label relative to the tick position
                      * on the axis.
                      * 
-                     * @type {Number}
-                     * @sample {highcharts} highcharts/xaxis/labels-x/ Y axis labels placed on grid lines
-                     * @default 0
-                     * @product highcharts highstock highmaps
+                     * @sample {highcharts} highcharts/xaxis/labels-x/
+                     *         Y axis labels placed on grid lines
                      */
                     x: 0
-                    //y: undefined
-                    /*formatter: function () {
-                    	return this.value;
-                    },*/
+
+                    /**
+                     * The y position offset of the label relative to the tick position
+                     * on the axis. The default makes it adapt to the font size on
+                     * bottom axis.
+                     *
+                     * @type      {Number}
+                     * @sample    {highcharts} highcharts/xaxis/labels-x/
+                     *            Y axis labels placed on grid lines
+                     * @default   null
+                     * @apioption xAxis.labels.y
+                     */
+
+                    /**
+                     * The Z index for the axis labels.
+                     *
+                     * @type {Number}
+                     * @default 7
+                     * @apioption xAxis.labels.zIndex
+                     */
                 },
-                //linkedTo: null,
-                //max: undefined,
-                //min: undefined,
 
                 /**
-                 * Padding of the min value relative to the length of the axis. A
-                 * padding of 0.05 will make a 100px axis 5px longer. This is useful
-                 * when you don't want the lowest data value to appear on the edge
-                 * of the plot area. When the axis' `min` option is set or a min extreme
-                 * is set using `axis.setExtremes()`, the minPadding will be ignored.
-                 * 
-                 * @type {Number}
-                 * @sample {highcharts} highcharts/yaxis/minpadding/ Min padding of 0.2
-                 * @sample {highstock} stock/xaxis/minpadding-maxpadding/ Greater min- and maxPadding
-                 * @sample {highmaps} maps/chart/plotbackgroundcolor-gradient/ Add some padding
-                 * @default {highcharts} 0.01
-                 * @default {highstock} 0
-                 * @default {highmaps} 0
-                 * @since 1.2.0
-                 * @product highcharts highstock highmaps
+                 * Index of another axis that this axis is linked to. When an axis is
+                 * linked to a master axis, it will take the same extremes as
+                 * the master, but as assigned by min or max or by setExtremes.
+                 * It can be used to show additional info, or to ease reading the
+                 * chart by duplicating the scales.
+                 *
+                 * @type      {Number}
+                 * @sample    {highcharts} highcharts/xaxis/linkedto/
+                 *            Different string formats of the same date
+                 * @sample    {highcharts} highcharts/yaxis/linkedto/
+                 *            Y values on both sides
+                 * @default   null
+                 * @since     2.0.2
+                 * @product   highcharts highstock
+                 * @apioption xAxis.linkedTo
                  */
-                minPadding: 0.01,
+
+                /**
+                 * The maximum value of the axis. If `null`, the max value is
+                 * automatically calculated.
+                 *
+                 * If the `endOnTick` option is true, the `max` value might
+                 * be rounded up.
+                 *
+                 * If a [tickAmount](#yAxis.tickAmount) is set, the axis may be extended
+                 * beyond the set max in order to reach the given number of ticks. The
+                 * same may happen in a chart with multiple axes, determined by [chart.
+                 * alignTicks](#chart), where a `tickAmount` is applied internally.
+                 *
+                 * @type      {Number}
+                 * @sample    {highcharts} highcharts/yaxis/max-200/
+                 *            Y axis max of 200
+                 * @sample    {highcharts} highcharts/yaxis/max-logarithmic/
+                 *            Y axis max on logarithmic axis
+                 * @sample    {highstock} stock/xaxis/min-max/
+                 *            Fixed min and max on X axis
+                 * @sample    {highmaps} maps/axis/min-max/
+                 *            Pre-zoomed to a specific area
+                 * @apioption xAxis.max
+                 */
 
                 /**
                  * Padding of the max value relative to the length of the axis. A
@@ -9042,28 +10762,108 @@
                  * of the plot area. When the axis' `max` option is set or a max extreme
                  * is set using `axis.setExtremes()`, the maxPadding will be ignored.
                  * 
-                 * @type {Number}
-                 * @sample {highcharts} highcharts/yaxis/maxpadding/ Max padding of 0.25 on y axis
-                 * @sample {highstock} stock/xaxis/minpadding-maxpadding/ Greater min- and maxPadding
-                 * @sample {highmaps} maps/chart/plotbackgroundcolor-gradient/ Add some padding
+                 * @sample  {highcharts} highcharts/yaxis/maxpadding/
+                 *          Max padding of 0.25 on y axis
+                 * @sample  {highstock} stock/xaxis/minpadding-maxpadding/
+                 *          Greater min- and maxPadding
+                 * @sample  {highmaps} maps/chart/plotbackgroundcolor-gradient/
+                 *          Add some padding
                  * @default {highcharts} 0.01
-                 * @default {highstock} 0
-                 * @default {highmaps} 0
-                 * @since 1.2.0
-                 * @product highcharts highstock highmaps
+                 * @default {highstock|highmaps} 0
+                 * @since   1.2.0
                  */
                 maxPadding: 0.01,
-                //minRange: null,
-                //minorTickInterval: null,
+
+                /**
+                 * Deprecated. Use `minRange` instead.
+                 *
+                 * @deprecated
+                 * @type       {Number}
+                 * @product    highcharts highstock
+                 * @apioption  xAxis.maxZoom
+                 */
+
+                /**
+                 * The minimum value of the axis. If `null` the min value is 
+                 * automatically calculated.
+                 *
+                 * If the `startOnTick` option is true (default), the `min` value might
+                 * be rounded down.
+                 *
+                 * The automatically calculated minimum value is also affected by
+                 * [floor](#yAxis.floor), [softMin](#yAxis.softMin),
+                 * [minPadding](#yAxis.minPadding), [minRange](#yAxis.minRange)
+                 * as well as [series.threshold](#plotOptions.series.threshold)
+                 * and [series.softThreshold](#plotOptions.series.softThreshold).
+                 *
+                 * @type      {Number}
+                 * @sample    {highcharts} highcharts/yaxis/min-startontick-false/
+                 *            -50 with startOnTick to false
+                 * @sample    {highcharts} highcharts/yaxis/min-startontick-true/
+                 *            -50 with startOnTick true by default
+                 * @sample    {highstock} stock/xaxis/min-max/
+                 *            Set min and max on X axis
+                 * @sample    {highmaps} maps/axis/min-max/
+                 *            Pre-zoomed to a specific area
+                 * @apioption xAxis.min
+                 */
+
+                /**
+                 * The dash or dot style of the minor grid lines. For possible values,
+                 * see [this demonstration](http://jsfiddle.net/gh/get/library/pure/
+                 * highcharts/highcharts/tree/master/samples/highcharts/plotoptions/
+                 * series-dashstyle-all/).
+                 *
+                 * @validvalue ["Solid", "ShortDash", "ShortDot", "ShortDashDot",
+                 *              "ShortDashDotDot", "Dot", "Dash" ,"LongDash",
+                 *              "DashDot", "LongDashDot", "LongDashDotDot"]
+                 * @type       {String}
+                 * @sample     {highcharts} highcharts/yaxis/minorgridlinedashstyle/
+                 *             Long dashes on minor grid lines
+                 * @sample     {highstock} stock/xaxis/minorgridlinedashstyle/
+                 *             Long dashes on minor grid lines
+                 * @default    Solid
+                 * @since      1.2
+                 * @apioption  xAxis.minorGridLineDashStyle
+                 */
+
+                /**
+                 * Specific tick interval in axis units for the minor ticks.
+                 * On a linear axis, if `"auto"`, the minor tick interval is
+                 * calculated as a fifth of the tickInterval. If `null`, minor
+                 * ticks are not shown.
+                 *
+                 * On logarithmic axes, the unit is the power of the value. For example,
+                 * setting the minorTickInterval to 1 puts one tick on each of 0.1,
+                 * 1, 10, 100 etc. Setting the minorTickInterval to 0.1 produces 9
+                 * ticks between 1 and 10, 10 and 100 etc.
+                 *
+                 * If user settings dictate minor ticks to become too dense, they don't
+                 * make sense, and will be ignored to prevent performance problems.
+                 *
+                 * @type      {Number|String}
+                 * @sample    {highcharts} highcharts/yaxis/minortickinterval-null/
+                 *            Null by default
+                 * @sample    {highcharts} highcharts/yaxis/minortickinterval-5/
+                 *            5 units
+                 * @sample    {highcharts} highcharts/yaxis/minortickinterval-log-auto/
+                 *            "auto"
+                 * @sample    {highcharts} highcharts/yaxis/minortickinterval-log/
+                 *            0.1
+                 * @sample    {highstock} stock/demo/basic-line/
+                 *            Null by default
+                 * @sample    {highstock} stock/xaxis/minortickinterval-auto/
+                 *            "auto"
+                 * @apioption xAxis.minorTickInterval
+                 */
 
                 /**
                  * The pixel length of the minor tick marks.
                  * 
-                 * @type {Number}
-                 * @sample {highcharts} highcharts/yaxis/minorticklength/ 10px on Y axis
-                 * @sample {highstock} stock/xaxis/minorticks/ 10px on Y axis
-                 * @default 2
-                 * @product highcharts highstock highmaps
+                 * @sample {highcharts} highcharts/yaxis/minorticklength/
+                 *         10px on Y axis
+                 * @sample {highstock} stock/xaxis/minorticks/
+                 *         10px on Y axis
                  */
                 minorTickLength: 2,
 
@@ -9072,41 +10872,195 @@
                  *  Can be one of `inside` and `outside`.
                  * 
                  * @validvalue ["inside", "outside"]
-                 * @type {String}
-                 * @sample {highcharts} highcharts/yaxis/minortickposition-outside/ Outside by default
-                 * @sample {highcharts} highcharts/yaxis/minortickposition-inside/ Inside
-                 * @sample {highstock} stock/xaxis/minorticks/ Inside
-                 * @default outside
-                 * @product highcharts highstock highmaps
+                 * @sample     {highcharts} highcharts/yaxis/minortickposition-outside/
+                 *             Outside by default
+                 * @sample     {highcharts} highcharts/yaxis/minortickposition-inside/
+                 *             Inside
+                 * @sample     {highstock} stock/xaxis/minorticks/
+                 *             Inside
                  */
-                minorTickPosition: 'outside', // inside or outside
-                //opposite: false,
-                //offset: 0,
-                //plotBands: [{
-                //	events: {},
-                //	zIndex: 1,
-                //	labels: { align, x, verticalAlign, y, style, rotation, textAlign }
-                //}],
-                //plotLines: [{
-                //	events: {}
-                //  dashStyle: {}
-                //	zIndex:
-                //	labels: { align, x, verticalAlign, y, style, rotation, textAlign }
-                //}],
-                //reversed: false,
-                // showFirstLabel: true,
-                // showLastLabel: true,
+                minorTickPosition: 'outside',
+
+                /**
+                 * Enable or disable minor ticks. Unless
+                 * [minorTickInterval](#xAxis.minorTickInterval) is set, the tick
+                 * interval is calculated as a fifth of the `tickInterval`.
+                 *
+                 * On a logarithmic axis, minor ticks are laid out based on a best
+                 * guess, attempting to enter approximately 5 minor ticks between
+                 * each major tick.
+                 *
+                 * Prior to v6.0.0, ticks were unabled in auto layout by setting
+                 * `minorTickInterval` to `"auto"`.
+                 *
+                 * @productdesc {highcharts}
+                 * On axes using [categories](#xAxis.categories), minor ticks are not
+                 * supported.
+                 *
+                 * @type      {Boolean}
+                 * @default   false
+                 * @since     6.0.0
+                 * @sample    {highcharts} highcharts/yaxis/minorticks-true/
+                 *            Enabled on linear Y axis
+                 * @apioption xAxis.minorTicks
+                 */
+
+                /**
+                 * The pixel width of the minor tick mark.
+                 *
+                 * @type      {Number}
+                 * @sample    {highcharts} highcharts/yaxis/minortickwidth/
+                 *            3px width
+                 * @sample    {highstock} stock/xaxis/minorticks/
+                 *            1px width
+                 * @default   0
+                 * @apioption xAxis.minorTickWidth
+                 */
+
+                /**
+                 * Padding of the min value relative to the length of the axis. A
+                 * padding of 0.05 will make a 100px axis 5px longer. This is useful
+                 * when you don't want the lowest data value to appear on the edge
+                 * of the plot area. When the axis' `min` option is set or a min extreme
+                 * is set using `axis.setExtremes()`, the minPadding will be ignored.
+                 * 
+                 * @sample  {highcharts} highcharts/yaxis/minpadding/
+                 *          Min padding of 0.2
+                 * @sample  {highstock} stock/xaxis/minpadding-maxpadding/
+                 *          Greater min- and maxPadding
+                 * @sample  {highmaps} maps/chart/plotbackgroundcolor-gradient/
+                 *          Add some padding
+                 * @default {highcharts} 0.01
+                 * @default {highstock|highmaps} 0
+                 * @since   1.2.0
+                 */
+                minPadding: 0.01,
+
+                /**
+                 * The minimum range to display on this axis. The entire axis will not
+                 * be allowed to span over a smaller interval than this. For example,
+                 * for a datetime axis the main unit is milliseconds. If minRange is
+                 * set to 3600000, you can't zoom in more than to one hour.
+                 *
+                 * The default minRange for the x axis is five times the smallest
+                 * interval between any of the data points.
+                 *
+                 * On a logarithmic axis, the unit for the minimum range is the power.
+                 * So a minRange of 1 means that the axis can be zoomed to 10-100,
+                 * 100-1000, 1000-10000 etc.
+                 *
+                 * Note that the `minPadding`, `maxPadding`, `startOnTick` and
+                 * `endOnTick` settings also affect how the extremes of the axis
+                 * are computed.
+                 *
+                 * @type      {Number}
+                 * @sample    {highcharts} highcharts/xaxis/minrange/
+                 *            Minimum range of 5
+                 * @sample    {highstock} stock/xaxis/minrange/
+                 *            Max zoom of 6 months overrides user selections
+                 * @sample    {highmaps} maps/axis/minrange/
+                 *            Minimum range of 1000
+                 * @apioption xAxis.minRange
+                 */
+
+                /**
+                 * The minimum tick interval allowed in axis values. For example on
+                 * zooming in on an axis with daily data, this can be used to prevent
+                 * the axis from showing hours. Defaults to the closest distance between
+                 * two points on the axis.
+                 *
+                 * @type      {Number}
+                 * @since     2.3.0
+                 * @apioption xAxis.minTickInterval
+                 */
+
+                /**
+                 * The distance in pixels from the plot area to the axis line.
+                 * A positive offset moves the axis with it's line, labels and ticks
+                 * away from the plot area. This is typically used when two or more
+                 * axes are displayed on the same side of the plot. With multiple
+                 * axes the offset is dynamically adjusted to avoid collision, this
+                 * can be overridden by setting offset explicitly.
+                 *
+                 * @type      {Number}
+                 * @sample    {highcharts} highcharts/yaxis/offset/
+                 *            Y axis offset of 70
+                 * @sample    {highcharts} highcharts/yaxis/offset-centered/
+                 *            Axes positioned in the center of the plot
+                 * @sample    {highstock} stock/xaxis/offset/
+                 *            Y axis offset by 70 px
+                 * @default   0
+                 * @apioption xAxis.offset
+                 */
+
+                /**
+                 * Whether to display the axis on the opposite side of the normal. The
+                 * normal is on the left side for vertical axes and bottom for
+                 * horizontal, so the opposite sides will be right and top respectively.
+                 * This is typically used with dual or multiple axes.
+                 *
+                 * @type      {Boolean}
+                 * @sample    {highcharts} highcharts/yaxis/opposite/
+                 *            Secondary Y axis opposite
+                 * @sample    {highstock} stock/xaxis/opposite/
+                 *            Y axis on left side
+                 * @default   false
+                 * @apioption xAxis.opposite
+                 */
+
+                /**
+                 * Refers to the index in the [panes](#panes) array. Used for circular
+                 * gauges and polar charts. When the option is not set then first pane
+                 * will be used.
+                 *
+                 * @type      {Number}
+                 * @sample    highcharts/demo/gauge-vu-meter
+                 *            Two gauges with different center
+                 * @product   highcharts
+                 * @apioption xAxis.pane
+                 */
+
+                /**
+                 * Whether to reverse the axis so that the highest number is closest
+                 * to the origin. If the chart is inverted, the x axis is reversed by
+                 * default.
+                 *
+                 * @type      {Boolean}
+                 * @sample    {highcharts} highcharts/yaxis/reversed/
+                 *            Reversed Y axis
+                 * @sample    {highstock} stock/xaxis/reversed/
+                 *            Reversed Y axis
+                 * @default   false
+                 * @apioption xAxis.reversed
+                 */
+                // reversed: false,
+
+                /**
+                 * Whether to show the last tick label. Defaults to `true` on cartesian
+                 * charts, and `false` on polar charts.
+                 *
+                 * @type      {Boolean}
+                 * @sample    {highcharts} highcharts/xaxis/showlastlabel-true/
+                 *            Set to true on X axis
+                 * @sample    {highstock} stock/xaxis/showfirstlabel/
+                 *            Labels below plot lines on Y axis
+                 * @default   true
+                 * @product   highcharts highstock
+                 * @apioption xAxis.showLastLabel
+                 */
 
                 /**
                  * For datetime axes, this decides where to put the tick between weeks.
                  *  0 = Sunday, 1 = Monday.
                  * 
-                 * @type {Number}
-                 * @sample {highcharts} highcharts/xaxis/startofweek-monday/ Monday by default
-                 * @sample {highcharts} highcharts/xaxis/startofweek-sunday/ Sunday
-                 * @sample {highstock} stock/xaxis/startofweek-1 Monday by default
-                 * @sample {highstock} stock/xaxis/startofweek-0 Sunday
-                 * @default 1
+                 * @sample  {highcharts} highcharts/xaxis/startofweek-monday/
+                 *          Monday by default
+                 * @sample  {highcharts} highcharts/xaxis/startofweek-sunday/
+                 *          Sunday
+                 * @sample  {highstock} stock/xaxis/startofweek-1
+                 *          Monday by default
+                 * @sample  {highstock} stock/xaxis/startofweek-0
+                 *          Sunday
                  * @product highcharts highstock
                  */
                 startOfWeek: 1,
@@ -9119,24 +11073,23 @@
                  * In Highstock, `startOnTick` is always false when the navigator is
                  * enabled, to prevent jumpy scrolling.
                  * 
-                 * @type {Boolean}
-                 * @sample {highcharts} highcharts/xaxis/startontick-false/ False by default
-                 * @sample {highcharts} highcharts/xaxis/startontick-true/ True
-                 * @sample {highstock} stock/xaxis/endontick/ False for Y axis
-                 * @default false
-                 * @since 1.2.0
+                 * @sample  {highcharts} highcharts/xaxis/startontick-false/
+                 *          False by default
+                 * @sample  {highcharts} highcharts/xaxis/startontick-true/
+                 *          True
+                 * @sample  {highstock} stock/xaxis/endontick/
+                 *          False for Y axis
+                 * @since   1.2.0
                  */
                 startOnTick: false,
-                //tickInterval: null,
 
                 /**
                  * The pixel length of the main tick marks.
                  * 
-                 * @type {Number}
-                 * @sample {highcharts} highcharts/xaxis/ticklength/ 20 px tick length on the X axis
-                 * @sample {highstock} stock/xaxis/ticks/ Formatted ticks on X axis
-                 * @default 10
-                 * @product highcharts highstock highmaps
+                 * @sample {highcharts} highcharts/xaxis/ticklength/
+                 *         20 px tick length on the X axis
+                 * @sample {highstock} stock/xaxis/ticks/
+                 *         Formatted ticks on X axis
                  */
                 tickLength: 10,
 
@@ -9147,47 +11100,43 @@
                  *  else `on`.
                  * 
                  * @validvalue [null, "on", "between"]
-                 * @type {String}
-                 * @sample {highcharts} highcharts/xaxis/tickmarkplacement-between/ "between" by default
-                 * @sample {highcharts} highcharts/xaxis/tickmarkplacement-on/ "on"
-                 * @default null
-                 * @product highcharts
+                 * @sample     {highcharts} highcharts/xaxis/tickmarkplacement-between/
+                 *             "between" by default
+                 * @sample     {highcharts} highcharts/xaxis/tickmarkplacement-on/
+                 *             "on"
+                 * @product    highcharts
                  */
-                tickmarkPlacement: 'between', // on or between
+                tickmarkPlacement: 'between',
 
                 /**
                  * If tickInterval is `null` this option sets the approximate pixel
                  * interval of the tick marks. Not applicable to categorized axis.
                  * 
-                 * 
                  * The tick interval is also influenced by the [minTickInterval](#xAxis.
                  * minTickInterval) option, that, by default prevents ticks from being
                  * denser than the data points.
                  * 
-                 * Defaults to `72` for the Y axis and `100` for the X axis.
-                 * 
-                 * @type {Number}
-                 * @see [tickInterval](#xAxis.tickInterval), [tickPositioner](#xAxis.tickPositioner),
-                 *  [tickPositions](#xAxis.tickPositions)-
-                 * @sample {highcharts} highcharts/xaxis/tickpixelinterval-50/ 50 px on X axis
-                 * @sample {highstock} stock/xaxis/tickpixelinterval/ 200 px on X axis
-                 * @product highcharts highstock highmaps
+                 * @see    [tickInterval](#xAxis.tickInterval),
+                 *         [tickPositioner](#xAxis.tickPositioner),
+                 *         [tickPositions](#xAxis.tickPositions).
+                 * @sample {highcharts} highcharts/xaxis/tickpixelinterval-50/
+                 *         50 px on X axis
+                 * @sample {highstock} stock/xaxis/tickpixelinterval/
+                 *         200 px on X axis
                  */
                 tickPixelInterval: 100,
 
                 /**
                  * The position of the major tick marks relative to the axis line.
-                 *  Can be one of `inside` and `outside`.
+                 * Can be one of `inside` and `outside`.
                  * 
                  * @validvalue ["inside", "outside"]
-                 * @type {String}
-                 * @sample {highcharts} highcharts/xaxis/tickposition-outside/ "outside" by default
-                 * @sample {highcharts} highcharts/xaxis/tickposition-inside/ "inside"
-                 * @sample {highstock} stock/xaxis/ticks/ Formatted ticks on X axis
-                 * @default {highcharts} outside
-                 * @default {highstock} "outside"
-                 * @default {highmaps} outside
-                 * @product highcharts highstock highmaps
+                 * @sample     {highcharts} highcharts/xaxis/tickposition-outside/
+                 *             "outside" by default
+                 * @sample     {highcharts} highcharts/xaxis/tickposition-inside/
+                 *             "inside"
+                 * @sample     {highstock} stock/xaxis/ticks/
+                 *             Formatted ticks on X axis
                  */
                 tickPosition: 'outside',
 
@@ -9200,117 +11149,159 @@
                  * and left by default.
                  */
                 title: {
-                    //text: null,
 
                     /**
-                     * Alignment of the title relative to the axis values. Possible values
-                     * are "low", "middle" or "high".
+                     * Alignment of the title relative to the axis values. Possible
+                     * values are "low", "middle" or "high".
                      * 
                      * @validvalue ["low", "middle", "high"]
-                     * @type {String}
-                     * @sample {highcharts} highcharts/xaxis/title-align-low/ "low"
-                     * @sample {highcharts} highcharts/xaxis/title-align-center/ "middle" by default
-                     * @sample {highcharts} highcharts/xaxis/title-align-high/ "high"
-                     * @sample {highcharts} highcharts/yaxis/title-offset/ Place the Y axis title on top of the axis
-                     * @sample {highstock} stock/xaxis/title-align/ Aligned to "high" value
-                     * @default {highcharts} middle
-                     * @default {highstock} "middle"
-                     * @default {highmaps} middle
-                     * @product highcharts highstock highmaps
+                     * @sample     {highcharts} highcharts/xaxis/title-align-low/
+                     *             "low"
+                     * @sample     {highcharts} highcharts/xaxis/title-align-center/
+                     *             "middle" by default
+                     * @sample     {highcharts} highcharts/xaxis/title-align-high/
+                     *             "high"
+                     * @sample     {highcharts} highcharts/yaxis/title-offset/
+                     *             Place the Y axis title on top of the axis
+                     * @sample     {highstock} stock/xaxis/title-align/
+                     *             Aligned to "high" value
                      */
-                    align: 'middle', // low, middle or high
-                    //margin: 0 for horizontal, 10 for vertical axes,
-                    // reserveSpace: true,
-                    //rotation: 0,
-                    //side: 'outside',
+                    align: 'middle'
 
-                    //x: 0,
-                    //y: 0
+
                 },
 
                 /**
                  * The type of axis. Can be one of `linear`, `logarithmic`, `datetime`
-                 * or `category`. In a datetime axis, the numbers are given in milliseconds,
-                 * and tick marks are placed on appropriate values like full hours
-                 * or days. In a category axis, the [point names](#series<line>.data.
-                 * name) of the chart's series are used for categories, if not a [categories](#xAxis.
-                 * categories) array is defined.
+                 * or `category`. In a datetime axis, the numbers are given in
+                 * milliseconds, and tick marks are placed on appropriate values like
+                 * full hours or days. In a category axis, the 
+                 * [point names](#series.line.data.name) of the chart's series are used
+                 * for categories, if not a [categories](#xAxis.categories) array is
+                 * defined.
                  * 
                  * @validvalue ["linear", "logarithmic", "datetime", "category"]
-                 * @type {String}
-                 * @sample {highcharts} highcharts/xaxis/type-linear/ Linear
-                 * @sample {highcharts} highcharts/yaxis/type-log/ Logarithmic
-                 * @sample {highcharts} highcharts/yaxis/type-log-minorgrid/ Logarithmic with minor grid lines
-                 * @sample {highcharts} highcharts/xaxis/type-log-both/ Logarithmic on two axes
-                 * @sample {highcharts} highcharts/yaxis/type-log-negative/ Logarithmic with extension to emulate negative values
-                 * @default linear
-                 * @product highcharts
+                 * @sample     {highcharts} highcharts/xaxis/type-linear/
+                 *             Linear
+                 * @sample     {highcharts} highcharts/yaxis/type-log/
+                 *             Logarithmic
+                 * @sample     {highcharts} highcharts/yaxis/type-log-minorgrid/
+                 *             Logarithmic with minor grid lines
+                 * @sample     {highcharts} highcharts/xaxis/type-log-both/
+                 *             Logarithmic on two axes
+                 * @sample     {highcharts} highcharts/yaxis/type-log-negative/
+                 *             Logarithmic with extension to emulate negative values
+                 * @product    highcharts
                  */
-                type: 'linear', // linear, logarithmic or datetime
-                //visible: true
+                type: 'linear'
+
 
             },
 
             /**
-             * This option set extends the defaultOptions for Y axes.
-             * @extends xAxis
+             * The Y axis or value axis. Normally this is the vertical axis,
+             * though if the chart is inverted this is the horizontal axis.
+             * In case of multiple axes, the yAxis node is an array of
+             * configuration objects.
+             *
+             * See [the Axis object](#Axis) for programmatic access to the axis.
+             *
+             * @extends      xAxis
+             * @excluding    ordinal,overscroll
              * @optionparent yAxis
              */
             defaultYAxisOptions: {
-
                 /**
-                 * Whether to force the axis to end on a tick. Use this option with
-                 * the `maxPadding` option to control the axis end.
-                 *
                  * @productdesc {highstock}
                  * In Highstock, `endOnTick` is always false when the navigator is
                  * enabled, to prevent jumpy scrolling.
-                 * 
-                 * @type {Boolean}
-                 * @sample {highcharts} highcharts/chart/reflow-true/ True by default
-                 * @sample {highcharts} highcharts/yaxis/endontick-false/ False
-                 * @sample {highcharts} highcharts/yaxis/endontick-log-false/ False
-                 * @sample {highstock} stock/demo/basic-line/ True by default
-                 * @sample {highstock} stock/xaxis/endontick/ False
-                 * @default true
-                 * @since 1.2.0
-                 * @product highcharts highstock
                  */
                 endOnTick: true,
 
                 /**
+                 * @productdesc {highstock}
+                 * In Highstock 1.x, the Y axis was placed on the left side by default.
+                 *
+                 * @sample    {highcharts} highcharts/yaxis/opposite/
+                 *            Secondary Y axis opposite
+                 * @sample    {highstock} stock/xaxis/opposite/
+                 *            Y axis on left side
+                 * @default   {highstock} true
+                 * @default   {highcharts} false
+                 * @product   highstock highcharts
+                 * @apioption yAxis.opposite
+                 */
+
+                /**
+                 * @see [tickInterval](#xAxis.tickInterval),
+                 *      [tickPositioner](#xAxis.tickPositioner),
+                 *      [tickPositions](#xAxis.tickPositions).
                  */
                 tickPixelInterval: 72,
 
-                /**
-                 * Whether to show the last tick label. Defaults to `true` on cartesian
-                 * charts, and `false` on polar charts.
-                 * 
-                 * @type {Boolean}
-                 * @sample {highcharts} highcharts/xaxis/showlastlabel-true/ Set to true on X axis
-                 * @sample {highstock} stock/xaxis/showfirstlabel/ Labels below plot lines on Y axis
-                 * @default false
-                 * @product highcharts highstock
-                 */
                 showLastLabel: true,
 
                 /**
                  * @extends xAxis.labels
-                 * @product highcharts highstock highmaps
                  */
                 labels: {
+                    /**
+                     * What part of the string the given position is anchored to. Can
+                     * be one of `"left"`, `"center"` or `"right"`. The exact position
+                     * also depends on the `labels.x` setting.
+                     *
+                     * Angular gauges and solid gauges defaults to `center`.
+                     *
+                     * @validvalue ["left", "center", "right"]
+                     * @type       {String}
+                     * @sample     {highcharts} highcharts/yaxis/labels-align-left/
+                     *             Left
+                     * @default    {highcharts|highmaps} right
+                     * @default    {highstock} left
+                     * @apioption  yAxis.labels.align
+                     */
 
                     /**
                      * The x position offset of the label relative to the tick position
                      * on the axis. Defaults to -15 for left axis, 15 for right axis.
                      * 
-                     * @type {Number}
-                     * @sample {highcharts} highcharts/xaxis/labels-x/ Y axis labels placed on grid lines
-                     * @default 0
-                     * @product highcharts highstock highmaps
+                     * @sample {highcharts} highcharts/xaxis/labels-x/
+                     *         Y axis labels placed on grid lines
                      */
                     x: -8
                 },
+
+                /**
+                 * @productdesc {highmaps}
+                 * In Highmaps, the axis line is hidden by default, because the axis is
+                 * not visible by default.
+                 * 
+                 * @apioption yAxis.lineColor
+                 */
+
+                /**
+                 * @sample    {highcharts} highcharts/yaxis/min-startontick-false/
+                 *            -50 with startOnTick to false
+                 * @sample    {highcharts} highcharts/yaxis/min-startontick-true/
+                 *            -50 with startOnTick true by default
+                 * @sample    {highstock} stock/yaxis/min-max/
+                 *            Fixed min and max on Y axis
+                 * @sample    {highmaps} maps/axis/min-max/
+                 *            Pre-zoomed to a specific area
+                 * @apioption yAxis.min
+                 */
+
+                /**
+                 * @sample    {highcharts} highcharts/yaxis/max-200/
+                 *            Y axis max of 200
+                 * @sample    {highcharts} highcharts/yaxis/max-logarithmic/
+                 *            Y axis max on logarithmic axis
+                 * @sample    {highstock} stock/yaxis/min-max/
+                 *            Fixed min and max on Y axis
+                 * @sample    {highmaps} maps/axis/min-max/
+                 *            Pre-zoomed to a specific area
+                 * @apioption yAxis.max
+                 */
 
                 /**
                  * Padding of the max value relative to the length of the axis. A
@@ -9319,11 +11310,11 @@
                  * of the plot area. When the axis' `max` option is set or a max extreme
                  * is set using `axis.setExtremes()`, the maxPadding will be ignored.
                  * 
-                 * @type {Number}
-                 * @sample {highcharts} highcharts/yaxis/maxpadding-02/ Max padding of 0.2
-                 * @sample {highstock} stock/xaxis/minpadding-maxpadding/ Greater min- and maxPadding
-                 * @default 0.05
-                 * @since 1.2.0
+                 * @sample  {highcharts} highcharts/yaxis/maxpadding-02/
+                 *          Max padding of 0.2
+                 * @sample  {highstock} stock/xaxis/minpadding-maxpadding/
+                 *          Greater min- and maxPadding
+                 * @since   1.2.0
                  * @product highcharts highstock
                  */
                 maxPadding: 0.05,
@@ -9335,11 +11326,11 @@
                  * of the plot area. When the axis' `min` option is set or a max extreme
                  * is set using `axis.setExtremes()`, the maxPadding will be ignored.
                  * 
-                 * @type {Number}
-                 * @sample {highcharts} highcharts/yaxis/minpadding/ Min padding of 0.2
-                 * @sample {highstock} stock/xaxis/minpadding-maxpadding/ Greater min- and maxPadding
-                 * @default 0.05
-                 * @since 1.2.0
+                 * @sample  {highcharts} highcharts/yaxis/minpadding/
+                 *          Min padding of 0.2
+                 * @sample  {highstock} stock/xaxis/minpadding-maxpadding/
+                 *          Greater min- and maxPadding
+                 * @since   1.2.0
                  * @product highcharts highstock
                  */
                 minPadding: 0.05,
@@ -9348,30 +11339,28 @@
                  * Whether to force the axis to start on a tick. Use this option with
                  * the `maxPadding` option to control the axis start.
                  * 
-                 * @type {Boolean}
-                 * @sample {highcharts} highcharts/xaxis/startontick-false/ False by default
-                 * @sample {highcharts} highcharts/xaxis/startontick-true/ True
-                 * @sample {highstock} stock/xaxis/endontick/ False for Y axis
-                 * @default true
-                 * @since 1.2.0
+                 * @sample  {highcharts} highcharts/xaxis/startontick-false/
+                 *          False by default
+                 * @sample  {highcharts} highcharts/xaxis/startontick-true/
+                 *          True
+                 * @sample  {highstock} stock/xaxis/endontick/
+                 *          False for Y axis
+                 * @since   1.2.0
                  * @product highcharts highstock
                  */
                 startOnTick: true,
 
                 /**
                  * @extends xAxis.title
-                 * @product highcharts highstock highmaps
                  */
                 title: {
 
                     /**
-                     * The rotation of the text in degrees. 0 is horizontal, 270 is vertical
-                     * reading from bottom to top.
+                     * The rotation of the text in degrees. 0 is horizontal, 270 is
+                     * vertical reading from bottom to top.
                      * 
-                     * @type {Number}
-                     * @sample {highcharts} highcharts/yaxis/title-offset/ Horizontal
-                     * @default 270
-                     * @product highcharts highstock highmaps
+                     * @sample {highcharts} highcharts/yaxis/title-offset/
+                     *         Horizontal
                      */
                     rotation: 270,
 
@@ -9381,10 +11370,11 @@
                      * must be clean text. The Y axis title is disabled by setting the
                      * `text` option to `null`.
                      * 
-                     * @type {String}
-                     * @sample {highcharts} highcharts/xaxis/title-text/ Custom HTML
-                     * @default Values
-                     * @product highcharts
+                     * @sample  {highcharts} highcharts/xaxis/title-text/
+                     *          Custom HTML
+                     * @default {highcharts} Values
+                     * @default {highstock} null
+                     * @product highcharts highstock
                      */
                     text: 'Values'
                 },
@@ -9403,10 +11393,10 @@
                     /**
                      * Allow the stack labels to overlap.
                      * 
-                     * @type {Boolean}
-                     * @sample {highcharts} highcharts/yaxis/stacklabels-allowoverlap-false/
-                     *         Default false
-                     * @since 5.0.13
+                     * @sample  {highcharts}
+                     *          highcharts/yaxis/stacklabels-allowoverlap-false/
+                     *          Default false
+                     * @since   5.0.13
                      * @product highcharts
                      */
                     allowOverlap: false,
@@ -9414,30 +11404,23 @@
                     /**
                      * Enable or disable the stack total labels.
                      * 
-                     * @type {Boolean}
-                     * @sample {highcharts} highcharts/yaxis/stacklabels-enabled/ Enabled stack total labels
-                     * @since 2.1.5
+                     * @sample  {highcharts} highcharts/yaxis/stacklabels-enabled/
+                     *          Enabled stack total labels
+                     * @since   2.1.5
                      * @product highcharts
                      */
                     enabled: false,
-                    //align: dynamic,
-                    //y: dynamic,
-                    //x: dynamic,
-                    //verticalAlign: dynamic,
-                    //textAlign: dynamic,
-                    //rotation: 0,
 
                     /**
                      * Callback JavaScript function to format the label. The value is
-                     * given by `this.total`. Defaults to:
+                     * given by `this.total`.
+                     *
+                     * @default function() { return this.total; }
                      * 
-                     * <pre>function() {
-                     * return this.total;
-                     * }</pre>
-                     * 
-                     * @type {Function}
-                     * @sample {highcharts} highcharts/yaxis/stacklabels-formatter/ Added units to stack total value
-                     * @since 2.1.5
+                     * @type    {Function}
+                     * @sample  {highcharts} highcharts/yaxis/stacklabels-formatter/
+                     *          Added units to stack total value
+                     * @since   2.1.5
                      * @product highcharts
                      */
                     formatter: function() {
@@ -9528,18 +11511,18 @@
                 /**
                  * The Chart that the axis belongs to.
                  *
-                 * @name chart
+                 * @name     chart
                  * @memberOf Axis
-                 * @type {Chart}
+                 * @type     {Chart}
                  */
                 axis.chart = chart;
 
                 /**
                  * Whether the axis is horizontal.
                  *
-                 * @name horiz
+                 * @name     horiz
                  * @memberOf Axis
-                 * @type {Boolean}
+                 * @type     {Boolean}
                  */
                 axis.horiz = chart.inverted && !axis.isZAxis ? !isXAxis : isXAxis;
 
@@ -9551,9 +11534,9 @@
                  * or `colorAxis`. Corresponds to properties on Chart, for example
                  * {@link Chart.xAxis}.
                  *
-                 * @name coll
+                 * @name     coll
                  * @memberOf Axis
-                 * @type {String}
+                 * @type     {String}
                  */
                 axis.coll = axis.coll || (isXAxis ? 'xAxis' : 'yAxis');
 
@@ -9564,9 +11547,9 @@
                  * The side on which the axis is rendered. 0 is top, 1 is right, 2 is
                  * bottom and 3 is left.
                  *
-                 * @name side
+                 * @name     side
                  * @memberOf Axis
-                 * @type {Number}
+                 * @type     {Number}
                  */
                 axis.side = userOptions.side || (axis.horiz ?
                     (axis.opposite ? 0 : 2) : // top : bottom
@@ -9586,7 +11569,6 @@
                 // Flag, stagger lines or not
                 axis.userOptions = userOptions;
 
-                //axis.axisTitleMargin = undefined,// = options.title.margin,
                 axis.minPixelPadding = 0;
 
 
@@ -9594,9 +11576,9 @@
                  * Whether the axis is reversed. Based on the `axis.reversed`,
                  * option, but inverted charts have reversed xAxis by default.
                  *
-                 * @name reversed
+                 * @name     reversed
                  * @memberOf Axis
-                 * @type {Boolean}
+                 * @type     {Boolean}
                  */
                 axis.reversed = options.reversed;
                 axis.visible = options.visible !== false;
@@ -9606,12 +11588,6 @@
                 axis.hasNames = type === 'category' || options.categories === true;
                 axis.categories = options.categories || axis.hasNames;
                 axis.names = axis.names || []; // Preserve on update (#3830)
-
-                // Elements
-                //axis.axisGroup = undefined;
-                //axis.gridGroup = undefined;
-                //axis.axisTitle = undefined;
-                //axis.axisLine = undefined;
 
                 // Placeholder for plotlines and plotbands groups
                 axis.plotLinesAndBandsGroups = {};
@@ -9623,8 +11599,6 @@
 
                 // Flag, if axis is linked to another axis
                 axis.isLinked = defined(options.linkedTo);
-                // Linked axis.
-                //axis.linkedParent = undefined;
 
                 // Major ticks
                 axis.ticks = {};
@@ -9639,21 +11613,7 @@
                 axis.alternateBands = {};
 
                 // Axis metrics
-                //axis.left = undefined;
-                //axis.top = undefined;
-                //axis.width = undefined;
-                //axis.height = undefined;
-                //axis.bottom = undefined;
-                //axis.right = undefined;
-                //axis.transA = undefined;
-                //axis.transB = undefined;
-                //axis.oldTransA = undefined;
                 axis.len = 0;
-                //axis.oldMin = undefined;
-                //axis.oldMax = undefined;
-                //axis.oldUserMin = undefined;
-                //axis.oldUserMax = undefined;
-                //axis.oldAxisLength = undefined;
                 axis.minRange = axis.userMinRange = options.minRange || options.maxZoom;
                 axis.range = options.range;
                 axis.offset = options.offset || 0;
@@ -9664,18 +11624,15 @@
                 axis.oldStacks = {};
                 axis.stacksTouched = 0;
 
-                // Min and max in the data
-                //axis.dataMin = undefined,
-                //axis.dataMax = undefined,
 
                 /**
                  * The maximum value of the axis. In a logarithmic axis, this is the
                  * logarithm of the real value, and the real value can be obtained from
                  * {@link Axis#getExtremes}.
                  *
-                 * @name max
+                 * @name     max
                  * @memberOf Axis
-                 * @type {Number}
+                 * @type     {Number}
                  */
                 axis.max = null;
                 /**
@@ -9683,22 +11640,19 @@
                  * logarithm of the real value, and the real value can be obtained from
                  * {@link Axis#getExtremes}.
                  *
-                 * @name min
+                 * @name     min
                  * @memberOf Axis
-                 * @type {Number}
+                 * @type     {Number}
                  */
                 axis.min = null;
 
-                // User set min and max
-                //axis.userMin = undefined,
-                //axis.userMax = undefined,
 
                 /**
                  * The processed crosshair options.
                  *
-                 * @name crosshair
+                 * @name     crosshair
                  * @memberOf Axis
-                 * @type {AxisCrosshairOptions}
+                 * @type     {AxisCrosshairOptions}
                  */
                 axis.crosshair = pick(
                     options.crosshair,
@@ -9722,9 +11676,9 @@
                 /**
                  * All series associated to the axis.
                  *
-                 * @name series
+                 * @name     series
                  * @memberOf Axis
-                 * @type {Array.<Series>}
+                 * @type     {Array.<Series>}
                  */
                 axis.series = axis.series || []; // populated by Series
 
@@ -9816,7 +11770,12 @@
                     while (i-- && ret === undefined) {
                         multi = Math.pow(numSymMagnitude, i + 1);
                         if (
+                            // Only accept a numeric symbol when the distance is more 
+                            // than a full unit. So for example if the symbol is k, we
+                            // don't accept numbers like 0.5k.
                             numericSymbolDetector >= multi &&
+                            // Accept one decimal before the symbol. Accepts 0.5k but
+                            // not 0.25k. How does this work with the previous?
                             (value * 10) % multi === 0 &&
                             numericSymbols[i] !== null &&
                             value !== 0
@@ -9883,24 +11842,24 @@
                                 // do this after we have already found seriesDataMin
                                 // because in most cases all data is valid. #5234.
                                 seriesDataMin = arrayMin(xData);
+                                seriesDataMax = arrayMax(xData);
+
                                 if (!isNumber(seriesDataMin) &&
                                     !(seriesDataMin instanceof Date) // #5010
                                 ) {
-                                    xData = grep(xData, function(x) {
-                                        return isNumber(x);
-                                    });
-                                    seriesDataMin = arrayMin(xData); // Do it again with valid data
+                                    xData = grep(xData, isNumber);
+                                    // Do it again with valid data
+                                    seriesDataMin = arrayMin(xData);
                                 }
 
                                 axis.dataMin = Math.min(
-                                    pick(axis.dataMin, xData[0]),
+                                    pick(axis.dataMin, xData[0], seriesDataMin),
                                     seriesDataMin
                                 );
                                 axis.dataMax = Math.max(
-                                    pick(axis.dataMax, xData[0]),
-                                    arrayMax(xData)
+                                    pick(axis.dataMax, xData[0], seriesDataMax),
+                                    seriesDataMax
                                 );
-
                             }
 
                             // Get dataMin and dataMax for Y axes, as well as handle
@@ -9948,7 +11907,14 @@
              *
              * @private
              */
-            translate: function(val, backwards, cvsCoord, old, handleLog, pointPlacement) {
+            translate: function(
+                val,
+                backwards,
+                cvsCoord,
+                old,
+                handleLog,
+                pointPlacement
+            ) {
                 var axis = this.linkedParent || this, // #1417
                     sign = 1,
                     cvsOffset = 0,
@@ -9956,14 +11922,18 @@
                     localMin = old ? axis.oldMin : axis.min,
                     returnValue,
                     minPixelPadding = axis.minPixelPadding,
-                    doPostTranslate = (axis.isOrdinal || axis.isBroken || (axis.isLog && handleLog)) && axis.lin2val;
+                    doPostTranslate = (
+                        axis.isOrdinal ||
+                        axis.isBroken ||
+                        (axis.isLog && handleLog)
+                    ) && axis.lin2val;
 
                 if (!localA) {
                     localA = axis.transA;
                 }
 
-                // In vertical axes, the canvas coordinates start from 0 at the top like in
-                // SVG.
+                // In vertical axes, the canvas coordinates start from 0 at the top like
+                // in SVG.
                 if (cvsCoord) {
                     sign *= -1; // canvas coordinates inverts the value
                     cvsOffset = axis.len;
@@ -9990,9 +11960,14 @@
                     if (doPostTranslate) { // log and ordinal axes
                         val = axis.val2lin(val);
                     }
-                    returnValue = sign * (val - localMin) * localA + cvsOffset +
-                        (sign * minPixelPadding) +
-                        (isNumber(pointPlacement) ? localA * pointPlacement : 0);
+                    returnValue = isNumber(localMin) ?
+                        (
+                            sign * (val - localMin) * localA +
+                            cvsOffset +
+                            (sign * minPixelPadding) +
+                            (isNumber(pointPlacement) ? localA * pointPlacement : 0)
+                        ) :
+                        undefined;
                 }
 
                 return returnValue;
@@ -10067,8 +12042,8 @@
                     skip,
                     transB = axis.transB,
                     /**
-                     * Check if x is between a and b. If not, either move to a/b or skip,
-                     * depending on the force parameter.
+                     * Check if x is between a and b. If not, either move to a/b
+                     * or skip, depending on the force parameter.
                      */
                     between = function(x, a, b) {
                         if (x < a || x > b) {
@@ -10081,12 +12056,15 @@
                         return x;
                     };
 
-                translatedValue = pick(translatedValue, axis.translate(value, null, null, old));
+                translatedValue = pick(
+                    translatedValue,
+                    axis.translate(value, null, null, old)
+                );
                 x1 = x2 = Math.round(translatedValue + transB);
                 y1 = y2 = Math.round(cHeight - translatedValue - transB);
                 if (!isNumber(translatedValue)) { // no min or max
                     skip = true;
-
+                    force = false; // #7175, don't force it when path is invalid
                 } else if (axis.horiz) {
                     y1 = axisTop;
                     y2 = cHeight - axis.bottom;
@@ -10098,7 +12076,10 @@
                 }
                 return skip && !force ?
                     null :
-                    chart.renderer.crispLine(['M', x1, y1, 'L', x2, y2], lineWidth || 1);
+                    chart.renderer.crispLine(
+                        ['M', x1, y1, 'L', x2, y2],
+                        lineWidth || 1
+                    );
             },
 
             /**
@@ -10118,9 +12099,18 @@
             getLinearTickPositions: function(tickInterval, min, max) {
                 var pos,
                     lastPos,
-                    roundedMin = correctFloat(Math.floor(min / tickInterval) * tickInterval),
-                    roundedMax = correctFloat(Math.ceil(max / tickInterval) * tickInterval),
-                    tickPositions = [];
+                    roundedMin =
+                    correctFloat(Math.floor(min / tickInterval) * tickInterval),
+                    roundedMax =
+                    correctFloat(Math.ceil(max / tickInterval) * tickInterval),
+                    tickPositions = [],
+                    precision;
+
+                // When the precision is higher than what we filter out in
+                // correctFloat, skip it (#6183).			
+                if (correctFloat(roundedMin + tickInterval) === roundedMin) {
+                    precision = 20;
+                }
 
                 // For single points, add a tick regardless of the relative position
                 // (#2662, #6274)
@@ -10136,10 +12126,14 @@
                     tickPositions.push(pos);
 
                     // Always add the raw tickInterval, not the corrected one.
-                    pos = correctFloat(pos + tickInterval);
+                    pos = correctFloat(
+                        pos + tickInterval,
+                        precision
+                    );
 
-                    // If the interval is not big enough in the current min - max range to actually increase
-                    // the loop variable, we need to break out to prevent endless loop. Issue #619
+                    // If the interval is not big enough in the current min - max range
+                    // to actually increase the loop variable, we need to break out to
+                    // prevent endless loop. Issue #619
                     if (pos === lastPos) {
                         break;
                     }
@@ -10148,6 +12142,22 @@
                     lastPos = pos;
                 }
                 return tickPositions;
+            },
+
+            /**
+             * Resolve the new minorTicks/minorTickInterval options into the legacy
+             * loosely typed minorTickInterval option.
+             */
+            getMinorTickInterval: function() {
+                var options = this.options;
+
+                if (options.minorTicks === true) {
+                    return pick(options.minorTickInterval, 'auto');
+                }
+                if (options.minorTicks === false) {
+                    return null;
+                }
+                return options.minorTickInterval;
             },
 
             /**
@@ -10169,7 +12179,8 @@
                     max = axis.max + pointRangePadding, // #1498
                     range = max - min;
 
-                // If minor ticks get too dense, they are hard to read, and may cause long running script. So we don't draw them.
+                // If minor ticks get too dense, they are hard to read, and may cause
+                // long running script. So we don't draw them.
                 if (range && range / minorTickInterval < axis.len / 3) { // #3875
 
                     if (axis.isLog) {
@@ -10189,7 +12200,10 @@
                             }
                         });
 
-                    } else if (axis.isDatetimeAxis && options.minorTickInterval === 'auto') { // #1314
+                    } else if (
+                        axis.isDatetimeAxis &&
+                        this.getMinorTickInterval() === 'auto'
+                    ) { // #1314
                         minorTickPositions = minorTickPositions.concat(
                             axis.getTimeTicks(
                                 axis.normalizeTimeTickInterval(minorTickInterval),
@@ -10218,10 +12232,11 @@
             },
 
             /**
-             * Adjust the min and max for the minimum range. Keep in mind that the series data is
-             * not yet processed, so we don't have information on data cropping and grouping, or
-             * updated axis.pointRange or series.pointRange. The data can't be processed until
-             * we have finally established min and max.
+             * Adjust the min and max for the minimum range. Keep in mind that the
+             * series data is not yet processed, so we don't have information on data
+             * cropping and grouping, or updated axis.pointRange or series.pointRange.
+             * The data can't be processed until we have finally established min and
+             * max.
              *
              * @private
              */
@@ -10249,19 +12264,26 @@
 
                     } else {
 
-                        // Find the closest distance between raw data points, as opposed to
-                        // closestPointRange that applies to processed points (cropped and grouped)
+                        // Find the closest distance between raw data points, as opposed
+                        // to closestPointRange that applies to processed points
+                        // (cropped and grouped)
                         each(axis.series, function(series) {
                             xData = series.xData;
                             loopLength = series.xIncrement ? 1 : xData.length - 1;
                             for (i = loopLength; i > 0; i--) {
                                 distance = xData[i] - xData[i - 1];
-                                if (closestDataRange === undefined || distance < closestDataRange) {
+                                if (
+                                    closestDataRange === undefined ||
+                                    distance < closestDataRange
+                                ) {
                                     closestDataRange = distance;
                                 }
                             }
                         });
-                        axis.minRange = Math.min(closestDataRange * 5, axis.dataMax - axis.dataMin);
+                        axis.minRange = Math.min(
+                            closestDataRange * 5,
+                            axis.dataMax - axis.dataMin
+                        );
                     }
                 }
 
@@ -10274,14 +12296,20 @@
 
                     // if min and max options have been set, don't go beyond it
                     minArgs = [min - zoomOffset, pick(options.min, min - zoomOffset)];
-                    if (spaceAvailable) { // if space is available, stay within the data range
-                        minArgs[2] = axis.isLog ? axis.log2lin(axis.dataMin) : axis.dataMin;
+                    // If space is available, stay within the data range
+                    if (spaceAvailable) {
+                        minArgs[2] = axis.isLog ?
+                            axis.log2lin(axis.dataMin) :
+                            axis.dataMin;
                     }
                     min = arrayMax(minArgs);
 
                     maxArgs = [min + minRange, pick(options.max, min + minRange)];
-                    if (spaceAvailable) { // if space is availabe, stay within the data range
-                        maxArgs[2] = axis.isLog ? axis.log2lin(axis.dataMax) : axis.dataMax;
+                    // If space is availabe, stay within the data range
+                    if (spaceAvailable) {
+                        maxArgs[2] = axis.isLog ?
+                            axis.log2lin(axis.dataMax) :
+                            axis.dataMax;
                     }
 
                     max = arrayMin(maxArgs);
@@ -10424,7 +12452,8 @@
                     transA = axis.transA,
                     isXAxis = axis.isXAxis;
 
-                // Adjust translation for padding. Y axis with categories need to go through the same (#1784).
+                // Adjust translation for padding. Y axis with categories need to go
+                // through the same (#1784).
                 if (isXAxis || hasCategories || pointRange) {
 
                     // Get the closest points
@@ -10437,24 +12466,33 @@
                         each(axis.series, function(series) {
                             var seriesPointRange = hasCategories ?
                                 1 :
-                                (isXAxis ?
-                                    pick(series.options.pointRange, closestPointRange, 0) :
-                                    (axis.axisPointRange || 0)), // #2806
+                                (
+                                    isXAxis ?
+                                    pick(
+                                        series.options.pointRange,
+                                        closestPointRange,
+                                        0
+                                    ) :
+                                    (axis.axisPointRange || 0)
+                                ), // #2806
                                 pointPlacement = series.options.pointPlacement;
 
                             pointRange = Math.max(pointRange, seriesPointRange);
 
                             if (!axis.single) {
-                                // minPointOffset is the value padding to the left of the axis in order to make
-                                // room for points with a pointRange, typically columns. When the pointPlacement option
-                                // is 'between' or 'on', this padding does not apply.
+                                // minPointOffset is the value padding to the left of
+                                // the axis in order to make room for points with a
+                                // pointRange, typically columns. When the
+                                // pointPlacement option is 'between' or 'on', this
+                                // padding does not apply.
                                 minPointOffset = Math.max(
                                     minPointOffset,
                                     isString(pointPlacement) ? 0 : seriesPointRange / 2
                                 );
 
-                                // Determine the total padding needed to the length of the axis to make room for the
-                                // pointRange. If the series' pointPlacement is 'on', no padding is added.
+                                // Determine the total padding needed to the length of
+                                // the axis to make room for the pointRange. If the
+                                // series' pointPlacement is 'on', no padding is added.
                                 pointRangePadding = Math.max(
                                     pointRangePadding,
                                     pointPlacement === 'on' ? 0 : seriesPointRange
@@ -10464,16 +12502,21 @@
                     }
 
                     // Record minPointOffset and pointRangePadding
-                    ordinalCorrection = axis.ordinalSlope && closestPointRange ? axis.ordinalSlope / closestPointRange : 1; // #988, #1853
-                    axis.minPointOffset = minPointOffset = minPointOffset * ordinalCorrection;
-                    axis.pointRangePadding = pointRangePadding = pointRangePadding * ordinalCorrection;
+                    ordinalCorrection = axis.ordinalSlope && closestPointRange ?
+                        axis.ordinalSlope / closestPointRange :
+                        1; // #988, #1853
+                    axis.minPointOffset = minPointOffset =
+                        minPointOffset * ordinalCorrection;
+                    axis.pointRangePadding =
+                        pointRangePadding = pointRangePadding * ordinalCorrection;
 
-                    // pointRange means the width reserved for each point, like in a column chart
+                    // pointRange means the width reserved for each point, like in a
+                    // column chart
                     axis.pointRange = Math.min(pointRange, range);
 
-                    // closestPointRange means the closest distance between points. In columns
-                    // it is mostly equal to pointRange, but in lines pointRange is 0 while closestPointRange
-                    // is some other value
+                    // closestPointRange means the closest distance between points. In
+                    // columns it is mostly equal to pointRange, but in lines pointRange
+                    // is 0 while closestPointRange is some other value
                     if (isXAxis) {
                         axis.closestPointRange = closestPointRange;
                     }
@@ -10486,7 +12529,9 @@
                 axis.translationSlope = axis.transA = transA =
                     axis.options.staticScale ||
                     axis.len / ((range + pointRangePadding) || 1);
-                axis.transB = axis.horiz ? axis.left : axis.bottom; // translation addend
+
+                // Translation addend
+                axis.transB = axis.horiz ? axis.left : axis.bottom;
                 axis.minPixelPadding = transA * minPointOffset;
             },
 
@@ -10536,8 +12581,14 @@
                 if (isLinked) {
                     axis.linkedParent = chart[axis.coll][options.linkedTo];
                     linkedParentExtremes = axis.linkedParent.getExtremes();
-                    axis.min = pick(linkedParentExtremes.min, linkedParentExtremes.dataMin);
-                    axis.max = pick(linkedParentExtremes.max, linkedParentExtremes.dataMax);
+                    axis.min = pick(
+                        linkedParentExtremes.min,
+                        linkedParentExtremes.dataMin
+                    );
+                    axis.max = pick(
+                        linkedParentExtremes.max,
+                        linkedParentExtremes.dataMax
+                    );
                     if (options.type !== axis.linkedParent.options.type) {
                         H.error(11, 1); // Can't link axes of different type
                     }
@@ -10578,7 +12629,8 @@
 
                 // handle zoomed range
                 if (axis.range && defined(axis.max)) {
-                    axis.userMin = axis.min = hardMin = Math.max(axis.dataMin, axis.minFromRange()); // #618, #6773
+                    axis.userMin = axis.min = hardMin =
+                        Math.max(axis.dataMin, axis.minFromRange()); // #618, #6773
                     axis.userMax = hardMax = axis.max;
 
                     axis.range = null; // don't use it when running setExtremes
@@ -10595,9 +12647,16 @@
                 // adjust min and max for the minimum range
                 axis.adjustForMinRange();
 
-                // Pad the values to get clear of the chart's edges. To avoid tickInterval taking the padding
-                // into account, we do this after computing tick interval (#1337).
-                if (!categories && !axis.axisPointRange && !axis.usePercentage && !isLinked && defined(axis.min) && defined(axis.max)) {
+                // Pad the values to get clear of the chart's edges. To avoid
+                // tickInterval taking the padding into account, we do this after
+                // computing tick interval (#1337).
+                if (!categories &&
+                    !axis.axisPointRange &&
+                    !axis.usePercentage &&
+                    !isLinked &&
+                    defined(axis.min) &&
+                    defined(axis.max)
+                ) {
                     length = axis.max - axis.min;
                     if (length) {
                         if (!defined(hardMin) && minPadding) {
@@ -10610,10 +12669,10 @@
                 }
 
                 // Handle options for floor, ceiling, softMin and softMax (#6359)
-                if (isNumber(options.softMin)) {
+                if (isNumber(options.softMin) && !isNumber(axis.userMin)) {
                     axis.min = Math.min(axis.min, options.softMin);
                 }
-                if (isNumber(options.softMax)) {
+                if (isNumber(options.softMax) && !isNumber(axis.userMax)) {
                     axis.max = Math.max(axis.max, options.softMax);
                 }
                 if (isNumber(options.floor)) {
@@ -10624,43 +12683,71 @@
                 }
 
 
-                // When the threshold is soft, adjust the extreme value only if
-                // the data extreme and the padded extreme land on either side of the threshold. For example,
-                // a series of [0, 1, 2, 3] would make the yAxis add a tick for -1 because of the
-                // default minPadding and startOnTick options. This is prevented by the softThreshold
-                // option.
+                // When the threshold is soft, adjust the extreme value only if the data
+                // extreme and the padded extreme land on either side of the threshold.
+                // For example, a series of [0, 1, 2, 3] would make the yAxis add a tick
+                // for -1 because of the default minPadding and startOnTick options.
+                // This is prevented by the softThreshold option.
                 if (softThreshold && defined(axis.dataMin)) {
                     threshold = threshold || 0;
-                    if (!defined(hardMin) && axis.min < threshold && axis.dataMin >= threshold) {
+                    if (!defined(hardMin) &&
+                        axis.min < threshold &&
+                        axis.dataMin >= threshold
+                    ) {
                         axis.min = threshold;
-                    } else if (!defined(hardMax) && axis.max > threshold && axis.dataMax <= threshold) {
+
+                    } else if (!defined(hardMax) &&
+                        axis.max > threshold &&
+                        axis.dataMax <= threshold
+                    ) {
                         axis.max = threshold;
                     }
                 }
 
 
                 // get tickInterval
-                if (axis.min === axis.max || axis.min === undefined || axis.max === undefined) {
+                if (
+                    axis.min === axis.max ||
+                    axis.min === undefined ||
+                    axis.max === undefined
+                ) {
                     axis.tickInterval = 1;
-                } else if (isLinked && !tickIntervalOption &&
-                    tickPixelIntervalOption === axis.linkedParent.options.tickPixelInterval) {
-                    axis.tickInterval = tickIntervalOption = axis.linkedParent.tickInterval;
+
+                } else if (
+                    isLinked &&
+                    !tickIntervalOption &&
+                    tickPixelIntervalOption ===
+                    axis.linkedParent.options.tickPixelInterval
+                ) {
+                    axis.tickInterval = tickIntervalOption =
+                        axis.linkedParent.tickInterval;
+
                 } else {
                     axis.tickInterval = pick(
                         tickIntervalOption,
-                        this.tickAmount ? ((axis.max - axis.min) / Math.max(this.tickAmount - 1, 1)) : undefined,
-                        categories ? // for categoried axis, 1 is default, for linear axis use tickPix
+                        this.tickAmount ?
+                        ((axis.max - axis.min) / Math.max(this.tickAmount - 1, 1)) :
+                        undefined,
+                        // For categoried axis, 1 is default, for linear axis use
+                        // tickPix
+                        categories ?
                         1 :
                         // don't let it be more than the data range
-                        (axis.max - axis.min) * tickPixelIntervalOption / Math.max(axis.len, tickPixelIntervalOption)
+                        (axis.max - axis.min) * tickPixelIntervalOption /
+                        Math.max(axis.len, tickPixelIntervalOption)
                     );
                 }
 
-                // Now we're finished detecting min and max, crop and group series data. This
-                // is in turn needed in order to find tick positions in ordinal axes.
+                /**
+                 * Now we're finished detecting min and max, crop and group series data.
+                 * This is in turn needed in order to find tick positions in
+                 * ordinal axes.
+                 */
                 if (isXAxis && !secondPass) {
                     each(axis.series, function(series) {
-                        series.processData(axis.min !== axis.oldMin || axis.max !== axis.oldMax);
+                        series.processData(
+                            axis.min !== axis.oldMin || axis.max !== axis.oldMax
+                        );
                     });
                 }
 
@@ -10677,13 +12764,18 @@
                     axis.tickInterval = axis.postProcessTickInterval(axis.tickInterval);
                 }
 
-                // In column-like charts, don't cramp in more ticks than there are points (#1943, #4184)
+                // In column-like charts, don't cramp in more ticks than there are
+                // points (#1943, #4184)
                 if (axis.pointRange && !tickIntervalOption) {
                     axis.tickInterval = Math.max(axis.pointRange, axis.tickInterval);
                 }
 
-                // Before normalizing the tick interval, handle minimum tick interval. This applies only if tickInterval is not defined.
-                minTickInterval = pick(options.minTickInterval, axis.isDatetimeAxis && axis.closestPointRange);
+                // Before normalizing the tick interval, handle minimum tick interval.
+                // This applies only if tickInterval is not defined.
+                minTickInterval = pick(
+                    options.minTickInterval,
+                    axis.isDatetimeAxis && axis.closestPointRange
+                );
                 if (!tickIntervalOption && axis.tickInterval < minTickInterval) {
                     axis.tickInterval = minTickInterval;
                 }
@@ -10694,9 +12786,17 @@
                         axis.tickInterval,
                         null,
                         getMagnitude(axis.tickInterval),
-                        // If the tick interval is between 0.5 and 5 and the axis max is in the order of
-                        // thousands, chances are we are dealing with years. Don't allow decimals. #3363.
-                        pick(options.allowDecimals, !(axis.tickInterval > 0.5 && axis.tickInterval < 5 && axis.max > 1000 && axis.max < 9999)), !!this.tickAmount
+                        // If the tick interval is between 0.5 and 5 and the axis max is
+                        // in the order of thousands, chances are we are dealing with
+                        // years. Don't allow decimals. #3363.
+                        pick(
+                            options.allowDecimals, !(
+                                axis.tickInterval > 0.5 &&
+                                axis.tickInterval < 5 &&
+                                axis.max > 1000 &&
+                                axis.max < 9999
+                            )
+                        ), !!this.tickAmount
                     );
                 }
 
@@ -10716,18 +12816,25 @@
                 var options = this.options,
                     tickPositions,
                     tickPositionsOption = options.tickPositions,
+                    minorTickIntervalOption = this.getMinorTickInterval(),
                     tickPositioner = options.tickPositioner,
                     startOnTick = options.startOnTick,
                     endOnTick = options.endOnTick;
 
                 // Set the tickmarkOffset
-                this.tickmarkOffset = (this.categories && options.tickmarkPlacement === 'between' &&
-                    this.tickInterval === 1) ? 0.5 : 0; // #3202
+                this.tickmarkOffset = (
+                    this.categories &&
+                    options.tickmarkPlacement === 'between' &&
+                    this.tickInterval === 1
+                ) ? 0.5 : 0; // #3202
 
 
                 // get minorTickInterval
-                this.minorTickInterval = options.minorTickInterval === 'auto' && this.tickInterval ?
-                    this.tickInterval / 5 : options.minorTickInterval;
+                this.minorTickInterval =
+                    minorTickIntervalOption === 'auto' &&
+                    this.tickInterval ?
+                    this.tickInterval / 5 :
+                    minorTickIntervalOption;
 
                 // When there is only one point, or all points have the same value on
                 // this axis, then min and max are equal and tickPositions.length is 0
@@ -10745,8 +12852,9 @@
                         options.allowDecimals !== false
                     );
 
-                // Find the tick positions
-                this.tickPositions = tickPositions = tickPositionsOption && tickPositionsOption.slice(); // Work on a copy (#1565)
+                // Find the tick positions. Work on a copy (#1565)
+                this.tickPositions = tickPositions =
+                    tickPositionsOption && tickPositionsOption.slice();
                 if (!tickPositions) {
 
                     if (this.isDatetimeAxis) {
@@ -10779,13 +12887,20 @@
                     // Too dense ticks, keep only the first and last (#4477)
                     if (tickPositions.length > this.len) {
                         tickPositions = [tickPositions[0], tickPositions.pop()];
+                        // Reduce doubled value (#7339)
+                        if (tickPositions[0] === tickPositions[1]) {
+                            tickPositions.length = 1;
+                        }
                     }
 
                     this.tickPositions = tickPositions;
 
-                    // Run the tick positioner callback, that allows modifying auto tick positions.
+                    // Run the tick positioner callback, that allows modifying auto tick
+                    // positions.
                     if (tickPositioner) {
-                        tickPositioner = tickPositioner.apply(this, [this.min, this.max]);
+                        tickPositioner = tickPositioner.apply(
+                            this, [this.min, this.max]
+                        );
                         if (tickPositioner) {
                             this.tickPositions = tickPositions = tickPositioner;
                         }
@@ -10833,13 +12948,18 @@
                     if (endOnTick) {
                         this.max = roundedMax;
                     } else {
-                        while (this.max + minPointOffset < tickPositions[tickPositions.length - 1]) {
+                        while (this.max + minPointOffset <
+                            tickPositions[tickPositions.length - 1]) {
                             tickPositions.pop();
                         }
                     }
 
                     // If no tick are left, set one tick in the middle (#3195)
-                    if (tickPositions.length === 0 && defined(roundedMin)) {
+                    if (
+                        tickPositions.length === 0 &&
+                        defined(roundedMin) &&
+                        !this.options.tickPositions
+                    ) {
                         tickPositions.push((roundedMax + roundedMin) / 2);
                     }
                 }
@@ -10900,18 +13020,25 @@
                     tickAmount = options.tickAmount,
                     tickPixelInterval = options.tickPixelInterval;
 
-                if (!defined(options.tickInterval) && this.len < tickPixelInterval && !this.isRadial &&
-                    !this.isLog && options.startOnTick && options.endOnTick) {
+                if (!defined(options.tickInterval) &&
+                    this.len < tickPixelInterval &&
+                    !this.isRadial &&
+                    !this.isLog &&
+                    options.startOnTick &&
+                    options.endOnTick
+                ) {
                     tickAmount = 2;
                 }
 
                 if (!tickAmount && this.alignToOthers()) {
-                    // Add 1 because 4 tick intervals require 5 ticks (including first and last)
+                    // Add 1 because 4 tick intervals require 5 ticks (including first
+                    // and last)
                     tickAmount = Math.ceil(this.len / tickPixelInterval) + 1;
                 }
 
-                // For tick amounts of 2 and 3, compute five ticks and remove the intermediate ones. This
-                // prevents the axis from adding ticks that are too far away from the data extremes.
+                // For tick amounts of 2 and 3, compute five ticks and remove the
+                // intermediate ones. This prevents the axis from adding ticks that are
+                // too far away from the data extremes.
                 if (tickAmount < 4) {
                     this.finalTickAmt = tickAmount;
                     tickAmount = 5;
@@ -10932,36 +13059,57 @@
                     tickAmount = this.tickAmount,
                     finalTickAmt = this.finalTickAmt,
                     currentTickAmount = tickPositions && tickPositions.length,
+                    threshold = pick(this.threshold, this.softThreshold ? 0 : null),
                     i,
                     len;
 
-                if (currentTickAmount < tickAmount) {
-                    while (tickPositions.length < tickAmount) {
-                        tickPositions.push(correctFloat(
-                            tickPositions[tickPositions.length - 1] + tickInterval
-                        ));
-                    }
-                    this.transA *= (currentTickAmount - 1) / (tickAmount - 1);
-                    this.max = tickPositions[tickPositions.length - 1];
+                if (this.hasData()) {
+                    if (currentTickAmount < tickAmount) {
+                        while (tickPositions.length < tickAmount) {
 
-                    // We have too many ticks, run second pass to try to reduce ticks
-                } else if (currentTickAmount > tickAmount) {
-                    this.tickInterval *= 2;
-                    this.setTickPositions();
-                }
-
-                // The finalTickAmt property is set in getTickAmount
-                if (defined(finalTickAmt)) {
-                    i = len = tickPositions.length;
-                    while (i--) {
-                        if (
-                            (finalTickAmt === 3 && i % 2 === 1) || // Remove every other tick
-                            (finalTickAmt <= 2 && i > 0 && i < len - 1) // Remove all but first and last
-                        ) {
-                            tickPositions.splice(i, 1);
+                            // Extend evenly for both sides unless we're on the
+                            // threshold (#3965)
+                            if (
+                                tickPositions.length % 2 ||
+                                this.min === threshold
+                            ) {
+                                // to the end
+                                tickPositions.push(correctFloat(
+                                    tickPositions[tickPositions.length - 1] +
+                                    tickInterval
+                                ));
+                            } else {
+                                // to the start
+                                tickPositions.unshift(correctFloat(
+                                    tickPositions[0] - tickInterval
+                                ));
+                            }
                         }
+                        this.transA *= (currentTickAmount - 1) / (tickAmount - 1);
+                        this.min = tickPositions[0];
+                        this.max = tickPositions[tickPositions.length - 1];
+
+                        // We have too many ticks, run second pass to try to reduce ticks
+                    } else if (currentTickAmount > tickAmount) {
+                        this.tickInterval *= 2;
+                        this.setTickPositions();
                     }
-                    this.finalTickAmt = undefined;
+
+                    // The finalTickAmt property is set in getTickAmount
+                    if (defined(finalTickAmt)) {
+                        i = len = tickPositions.length;
+                        while (i--) {
+                            if (
+                                // Remove every other tick
+                                (finalTickAmt === 3 && i % 2 === 1) ||
+                                // Remove all but first and last
+                                (finalTickAmt <= 2 && i > 0 && i < len - 1)
+                            ) {
+                                tickPositions.splice(i, 1);
+                            }
+                        }
+                        this.finalTickAmt = undefined;
+                    }
                 }
             },
 
@@ -10981,20 +13129,30 @@
 
                 // set the new axisLength
                 axis.setAxisSize();
-                //axisLength = horiz ? axisWidth : axisHeight;
                 isDirtyAxisLength = axis.len !== axis.oldAxisLength;
 
                 // is there new data?
                 each(axis.series, function(series) {
-                    if (series.isDirtyData || series.isDirty ||
-                        series.xAxis.isDirty) { // when x axis is dirty, we need new data extremes for y as well
+                    if (
+                        series.isDirtyData ||
+                        series.isDirty ||
+                        // When x axis is dirty, we need new data extremes for y as well
+                        series.xAxis.isDirty
+                    ) {
                         isDirtyData = true;
                     }
                 });
 
                 // do we really need to go through all this?
-                if (isDirtyAxisLength || isDirtyData || axis.isLinked || axis.forceRedraw ||
-                    axis.userMin !== axis.oldUserMin || axis.userMax !== axis.oldUserMax || axis.alignToOthers()) {
+                if (
+                    isDirtyAxisLength ||
+                    isDirtyData ||
+                    axis.isLinked ||
+                    axis.forceRedraw ||
+                    axis.userMin !== axis.oldUserMin ||
+                    axis.userMax !== axis.oldUserMax ||
+                    axis.alignToOthers()
+                ) {
 
                     if (axis.resetStacks) {
                         axis.resetStacks();
@@ -11008,13 +13166,18 @@
                     // get fixed positions based on tickInterval
                     axis.setTickInterval();
 
-                    // record old values to decide whether a rescale is necessary later on (#540)
+                    // record old values to decide whether a rescale is necessary later
+                    // on (#540)
                     axis.oldUserMin = axis.userMin;
                     axis.oldUserMax = axis.userMax;
 
-                    // Mark as dirty if it is not already set to dirty and extremes have changed. #595.
+                    // Mark as dirty if it is not already set to dirty and extremes have
+                    // changed. #595.
                     if (!axis.isDirty) {
-                        axis.isDirty = isDirtyAxisLength || axis.min !== axis.oldMin || axis.max !== axis.oldMax;
+                        axis.isDirty =
+                            isDirtyAxisLength ||
+                            axis.min !== axis.oldMin ||
+                            axis.max !== axis.oldMax;
                     }
                 } else if (axis.cleanStacks) {
                     axis.cleanStacks();
@@ -11069,7 +13232,7 @@
                 });
 
                 // Fire the event
-                fireEvent(axis, 'setExtremes', eventArguments, function() { // the default event handler
+                fireEvent(axis, 'setExtremes', eventArguments, function() {
 
                     axis.userMin = newMin;
                     axis.userMax = newMax;
@@ -11096,9 +13259,11 @@
 
                 if (newMin !== this.min || newMax !== this.max) { // #5790
 
-                    // Prevent pinch zooming out of range. Check for defined is for #1946. #1734.
+                    // Prevent pinch zooming out of range. Check for defined is for
+                    // #1946. #1734.
                     if (!this.allowZoomOutside) {
-                        // #6014, sometimes newMax will be smaller than min (or newMin will be larger than max).
+                        // #6014, sometimes newMax will be smaller than min (or newMin
+                        // will be larger than max).
                         if (defined(dataMin)) {
                             if (newMin < min) {
                                 newMin = min;
@@ -11142,7 +13307,8 @@
             setAxisSize: function() {
                 var chart = this.chart,
                     options = this.options,
-                    offsets = options.offsets || [0, 0, 0, 0], // top / right / bottom / left
+                    // [top, right, bottom, left]
+                    offsets = options.offsets || [0, 0, 0, 0],
                     horiz = this.horiz,
 
                     // Check for percentage based input values. Rounding fixes problems
@@ -11183,28 +13349,30 @@
 
             /**
              * The returned object literal from the {@link Highcharts.Axis#getExtremes}
-             * function. 
-             * @typedef {Object} Extremes
+             * function.
+             *
+             * @typedef  {Object} Extremes
              * @property {Number} dataMax
-             *         The maximum value of the axis' associated series.
+             *           The maximum value of the axis' associated series.
              * @property {Number} dataMin
-             *         The minimum value of the axis' associated series.
+             *           The minimum value of the axis' associated series.
              * @property {Number} max
-             *         The maximum axis value, either automatic or set manually. If the
-             *         `max` option is not set, `maxPadding` is 0 and `endOnTick` is
-             *         false, this value will be the same as `dataMax`.
+             *           The maximum axis value, either automatic or set manually. If
+             *           the `max` option is not set, `maxPadding` is 0 and `endOnTick`
+             *           is false, this value will be the same as `dataMax`.
              * @property {Number} min
-             *         The minimum axis value, either automatic or set manually. If the
-             *         `min` option is not set, `minPadding` is 0 and `startOnTick` is
-             *         false, this value will be the same as `dataMin`.
+             *           The minimum axis value, either automatic or set manually. If
+             *           the `min` option is not set, `minPadding` is 0 and
+             *           `startOnTick` is false, this value will be the same
+             *           as `dataMin`.
              */
             /**
              * Get the current extremes for the axis.
              *
              * @returns {Extremes}
-             * An object containing extremes information.
+             *          An object containing extremes information.
              * 
-             * @sample  members/axis-getextremes/
+             * @sample  highcharts/members/axis-getextremes/
              *          Report extremes by click on a button
              * @sample  maps/members/axis-getextremes/
              *          Get extremes in Highmaps
@@ -11289,7 +13457,10 @@
             tickSize: function(prefix) {
                 var options = this.options,
                     tickLength = options[prefix + 'Length'],
-                    tickWidth = pick(options[prefix + 'Width'], prefix === 'tick' && this.isXAxis ? 1 : 0); // X axis defaults to 1
+                    tickWidth = pick(
+                        options[prefix + 'Width'],
+                        prefix === 'tick' && this.isXAxis ? 1 : 0 // X axis default 1
+                    );
 
                 if (tickWidth && tickLength) {
                     // Negate the length
@@ -11326,14 +13497,17 @@
                     horiz = this.horiz,
                     tickInterval = this.tickInterval,
                     newTickInterval = tickInterval,
-                    slotSize = this.len / (((this.categories ? 1 : 0) + this.max - this.min) / tickInterval),
+                    slotSize = this.len / (
+                        ((this.categories ? 1 : 0) + this.max - this.min) / tickInterval
+                    ),
                     rotation,
                     rotationOption = labelOptions.rotation,
                     labelMetrics = this.labelMetrics(),
                     step,
                     bestScore = Number.MAX_VALUE,
                     autoRotation,
-                    // Return the multiple of tickInterval that is needed to avoid collision
+                    // Return the multiple of tickInterval that is needed to avoid
+                    // collision
                     getStep = function(spaceNeeded) {
                         var step = spaceNeeded / (slotSize || 1);
                         step = step > 1 ? Math.ceil(step) : 1;
@@ -11341,21 +13515,31 @@
                     };
 
                 if (horiz) {
-                    autoRotation = !labelOptions.staggerLines && !labelOptions.step && ( // #3971
-                        defined(rotationOption) ? [rotationOption] :
-                        slotSize < pick(labelOptions.autoRotationLimit, 80) && labelOptions.autoRotation
-                    );
+                    autoRotation = !labelOptions.staggerLines &&
+                        !labelOptions.step &&
+                        ( // #3971
+                            defined(rotationOption) ? [rotationOption] :
+                            slotSize < pick(labelOptions.autoRotationLimit, 80) &&
+                            labelOptions.autoRotation
+                        );
 
                     if (autoRotation) {
 
-                        // Loop over the given autoRotation options, and determine which gives the best score. The
-                        // best score is that with the lowest number of steps and a rotation closest to horizontal.
+                        // Loop over the given autoRotation options, and determine 
+                        // which gives the best score. The best score is that with
+                        // the lowest number of steps and a rotation closest
+                        // to horizontal.
                         each(autoRotation, function(rot) {
                             var score;
 
-                            if (rot === rotationOption || (rot && rot >= -90 && rot <= 90)) { // #3891
+                            if (
+                                rot === rotationOption ||
+                                (rot && rot >= -90 && rot <= 90)
+                            ) { // #3891
 
-                                step = getStep(Math.abs(labelMetrics.h / Math.sin(deg2rad * rot)));
+                                step = getStep(
+                                    Math.abs(labelMetrics.h / Math.sin(deg2rad * rot))
+                                );
 
                                 score = step + Math.abs(rot / 360);
 
@@ -11392,7 +13576,10 @@
                 var chart = this.chart,
                     horiz = this.horiz,
                     labelOptions = this.options.labels,
-                    slotCount = Math.max(this.tickPositions.length - (this.categories ? 0 : 1), 1),
+                    slotCount = Math.max(
+                        this.tickPositions.length - (this.categories ? 0 : 1),
+                        1
+                    ),
                     marginLeft = chart.margin[3];
 
                 return (
@@ -11401,7 +13588,15 @@
                     !labelOptions.rotation && // #4415
                     ((this.staggerLines || 1) * this.len) / slotCount
                 ) || (!horiz && (
-                    (marginLeft && (marginLeft - chart.spacing[3])) ||
+                    // #7028
+                    (
+                        labelOptions.style &&
+                        parseInt(labelOptions.style.width, 10)
+                    ) ||
+                    (
+                        marginLeft &&
+                        (marginLeft - chart.spacing[3])
+                    ) ||
                     chart.chartWidth * 0.33
                 ));
 
@@ -11421,10 +13616,14 @@
                     labelOptions = this.options.labels,
                     horiz = this.horiz,
                     slotWidth = this.getSlotWidth(),
-                    innerWidth = Math.max(1, Math.round(slotWidth - 2 * (labelOptions.padding || 5))),
+                    innerWidth = Math.max(
+                        1,
+                        Math.round(slotWidth - 2 * (labelOptions.padding || 5))
+                    ),
                     attr = {},
                     labelMetrics = this.labelMetrics(),
-                    textOverflowOption = labelOptions.style && labelOptions.style.textOverflow,
+                    textOverflowOption = labelOptions.style &&
+                    labelOptions.style.textOverflow,
                     css,
                     maxLabelLength = 0,
                     label,
@@ -11451,7 +13650,10 @@
 
                     // Apply rotation only if the label is too wide for the slot, and
                     // the label is wider than its height.
-                    if (maxLabelLength > innerWidth && maxLabelLength > labelMetrics.h) {
+                    if (
+                        maxLabelLength > innerWidth &&
+                        maxLabelLength > labelMetrics.h
+                    ) {
                         attr.rotation = this.labelRotation;
                     } else {
                         this.labelRotation = 0;
@@ -11467,26 +13669,37 @@
                     if (!textOverflowOption) {
                         css.textOverflow = 'clip';
 
-                        // On vertical axis, only allow word wrap if there is room for more lines.
+                        // On vertical axis, only allow word wrap if there is room
+                        // for more lines.
                         i = tickPositions.length;
                         while (!horiz && i--) {
                             pos = tickPositions[i];
                             label = ticks[pos].label;
                             if (label) {
-                                // Reset ellipsis in order to get the correct bounding box (#4070)
-                                if (label.styles && label.styles.textOverflow === 'ellipsis') {
+                                // Reset ellipsis in order to get the correct
+                                // bounding box (#4070)
+                                if (
+                                    label.styles &&
+                                    label.styles.textOverflow === 'ellipsis'
+                                ) {
                                     label.css({
                                         textOverflow: 'clip'
                                     });
 
-                                    // Set the correct width in order to read the bounding box height (#4678, #5034)
+                                    // Set the correct width in order to read
+                                    // the bounding box height (#4678, #5034)
                                 } else if (ticks[pos].labelLength > slotWidth) {
                                     label.css({
                                         width: slotWidth + 'px'
                                     });
                                 }
 
-                                if (label.getBBox().height > this.len / tickPositions.length - (labelMetrics.h - labelMetrics.f)) {
+                                if (
+                                    label.getBBox().height > (
+                                        this.len / tickPositions.length -
+                                        (labelMetrics.h - labelMetrics.f)
+                                    )
+                                ) {
                                     label.specCss = {
                                         textOverflow: 'ellipsis'
                                     };
@@ -11500,7 +13713,11 @@
                 // Add ellipsis if the label length is significantly longer than ideal
                 if (attr.rotation) {
                     css = {
-                        width: (maxLabelLength > chart.chartHeight * 0.5 ? chart.chartHeight * 0.33 : chart.chartHeight) + 'px'
+                        width: (
+                            maxLabelLength > chart.chartHeight * 0.5 ?
+                            chart.chartHeight * 0.33 :
+                            chart.chartHeight
+                        ) + 'px'
                     };
                     if (!textOverflowOption) {
                         css.textOverflow = 'ellipsis';
@@ -11508,7 +13725,8 @@
                 }
 
                 // Set the explicit or automatic label alignment
-                this.labelAlign = labelOptions.align || this.autoLabelAlign(this.labelRotation);
+                this.labelAlign = labelOptions.align ||
+                    this.autoLabelAlign(this.labelRotation);
                 if (this.labelAlign) {
                     attr.align = this.labelAlign;
                 }
@@ -11518,7 +13736,9 @@
                     var tick = ticks[pos],
                         label = tick && tick.label;
                     if (label) {
-                        label.attr(attr); // This needs to go before the CSS in old IE (#4502)
+                        // This needs to go before the CSS in old IE (#4502)
+                        label.attr(attr);
+
                         if (css) {
                             label.css(merge(css, label.specCss));
                         }
@@ -11528,7 +13748,11 @@
                 });
 
                 // Note: Why is this not part of getLabelPosition?
-                this.tickRotCorr = renderer.rotCorr(labelMetrics.b, this.labelRotation || 0, this.side !== 0);
+                this.tickRotCorr = renderer.rotCorr(
+                    labelMetrics.b,
+                    this.labelRotation || 0,
+                    this.side !== 0
+                );
             },
 
             /**
@@ -11542,7 +13766,12 @@
             hasData: function() {
                 return (
                     this.hasVisibleSeries ||
-                    (defined(this.min) && defined(this.max) && !!this.tickPositions)
+                    (
+                        defined(this.min) &&
+                        defined(this.max) &&
+                        this.tickPositions &&
+                        this.tickPositions.length > 0
+                    )
                 );
             },
 
@@ -11605,10 +13834,10 @@
              * Generates a tick for initial positioning.
              *
              * @private
-             * @param  {number} pos
-             *         The tick position in axis values.
-             * @param  {number} i
-             *         The index of the tick in {@link Axis.tickPositions}.
+             * @param {number} pos
+             *        The tick position in axis values.
+             * @param {number} i
+             *        The index of the tick in {@link Axis.tickPositions}.
              */
             generateTick: function(pos) {
                 var ticks = this.ticks;
@@ -11634,7 +13863,8 @@
                     ticks = axis.ticks,
                     horiz = axis.horiz,
                     side = axis.side,
-                    invertedSide = chart.inverted && !axis.isZAxis ? [1, 0, 3, 2][side] : side,
+                    invertedSide = chart.inverted &&
+                    !axis.isZAxis ? [1, 0, 3, 2][side] : side,
                     hasData,
                     showAxis,
                     titleOffset = 0,
@@ -11666,19 +13896,28 @@
                         .attr({
                             zIndex: options.gridZIndex || 1
                         })
-                        .addClass('highcharts-' + this.coll.toLowerCase() + '-grid ' + (className || ''))
+                        .addClass(
+                            'highcharts-' + this.coll.toLowerCase() + '-grid ' +
+                            (className || '')
+                        )
                         .add(axisParent);
                     axis.axisGroup = renderer.g('axis')
                         .attr({
                             zIndex: options.zIndex || 2
                         })
-                        .addClass('highcharts-' + this.coll.toLowerCase() + ' ' + (className || ''))
+                        .addClass(
+                            'highcharts-' + this.coll.toLowerCase() + ' ' +
+                            (className || '')
+                        )
                         .add(axisParent);
                     axis.labelGroup = renderer.g('axis-labels')
                         .attr({
                             zIndex: labelOptions.zIndex || 7
                         })
-                        .addClass('highcharts-' + axis.coll.toLowerCase() + '-labels ' + (className || ''))
+                        .addClass(
+                            'highcharts-' + axis.coll.toLowerCase() + '-labels ' +
+                            (className || '')
+                        )
                         .add(axisParent);
                 }
 
@@ -11693,13 +13932,20 @@
                     axis.renderUnsquish();
 
 
-                    // Left side must be align: right and right side must have align: left for labels
-                    if (labelOptions.reserveSpace !== false && (side === 0 || side === 2 || {
+                    // Left side must be align: right and right side must
+                    // have align: left for labels
+                    axis.reserveSpaceDefault = (
+                        side === 0 ||
+                        side === 2 || {
                             1: 'left',
                             3: 'right'
-                        }[side] === axis.labelAlign || axis.labelAlign === 'center')) {
+                        }[side] === axis.labelAlign
+                    );
+                    if (pick(
+                            labelOptions.reserveSpace,
+                            axis.labelAlign === 'center' ? true : null,
+                            axis.reserveSpaceDefault)) {
                         each(tickPositions, function(pos) {
-
                             // get the highest offset
                             labelOffset = Math.max(
                                 ticks[pos].getLabelSize(),
@@ -11710,9 +13956,8 @@
 
                     if (axis.staggerLines) {
                         labelOffset *= axis.staggerLines;
-                        axis.labelOffset = labelOffset * (axis.opposite ? -1 : 1);
                     }
-
+                    axis.labelOffset = labelOffset * (axis.opposite ? -1 : 1);
 
                 } else { // doesn't have data
                     objectEach(ticks, function(tick, n) {
@@ -11721,14 +13966,20 @@
                     });
                 }
 
-                if (axisTitleOptions && axisTitleOptions.text && axisTitleOptions.enabled !== false) {
+                if (
+                    axisTitleOptions &&
+                    axisTitleOptions.text &&
+                    axisTitleOptions.enabled !== false
+                ) {
                     axis.addTitle(showAxis);
 
                     if (showAxis && axisTitleOptions.reserveSpace !== false) {
                         axis.titleOffset = titleOffset =
                             axis.axisTitle.getBBox()[horiz ? 'height' : 'width'];
                         titleOffsetOption = axisTitleOptions.offset;
-                        titleMargin = defined(titleOffsetOption) ? 0 : pick(axisTitleOptions.margin, horiz ? 5 : 10);
+                        titleMargin = defined(titleOffsetOption) ?
+                            0 :
+                            pick(axisTitleOptions.margin, horiz ? 5 : 10);
                     }
                 }
 
@@ -11754,8 +14005,16 @@
                 labelOffsetPadded = Math.abs(labelOffset) + titleMargin;
                 if (labelOffset) {
                     labelOffsetPadded -= lineHeightCorrection;
-                    labelOffsetPadded += directionFactor * (horiz ? pick(labelOptions.y, axis.tickRotCorr.y + directionFactor * 8) : labelOptions.x);
+                    labelOffsetPadded += directionFactor * (
+                        horiz ?
+                        pick(
+                            labelOptions.y,
+                            axis.tickRotCorr.y + directionFactor * 8
+                        ) :
+                        labelOptions.x
+                    );
                 }
+
                 axis.axisTitleMargin = pick(titleOffsetOption, labelOffsetPadded);
 
                 axisOffset[side] = Math.max(
@@ -11767,16 +14026,12 @@
                     0 // #4866
                 );
 
-                // Decide the clipping needed to keep the graph inside the plot area and
-                // axis lines
-                clip = Math.floor(axis.axisLine.strokeWidth() / 2) * 2; // #4308, #4371
-                if (options.offset > 0) {
-                    clip -= options.offset * 2;
-                }
-                clipOffset[invertedSide] = Math.max(
-                    clipOffset[invertedSide] || clip,
-                    clip
-                );
+                // Decide the clipping needed to keep the graph inside
+                // the plot area and axis lines
+                clip = options.offset ?
+                    0 :
+                    Math.floor(axis.axisLine.strokeWidth() / 2) * 2; // #4308, #4371
+                clipOffset[invertedSide] = Math.max(clipOffset[invertedSide], clip);
             },
 
             /**
@@ -11975,7 +14230,6 @@
 
                 // Reset
                 axis.labelEdge.length = 0;
-                //axis.justifyToPlot = overflow === 'justify';
                 axis.overlap = false;
 
                 // Mark all elements inActive before we go over and mark the active ones
@@ -12001,8 +14255,9 @@
                         each(tickPositions, function(pos, i) {
                             axis.renderTick(pos, i);
                         });
-                        // In a categorized axis, the tick marks are displayed between labels. So
-                        // we need to add a tick mark and grid line at the left edge of the X axis.
+                        // In a categorized axis, the tick marks are displayed
+                        // between labels. So we need to add a tick mark and
+                        // grid line at the left edge of the X axis.
                         if (tickmarkOffset && (axis.min === 0 || axis.single)) {
                             if (!ticks[-1]) {
                                 ticks[-1] = new Tick(axis, -1, null, true);
@@ -12015,8 +14270,19 @@
                     // alternate grid color
                     if (alternateGridColor) {
                         each(tickPositions, function(pos, i) {
-                            to = tickPositions[i + 1] !== undefined ? tickPositions[i + 1] + tickmarkOffset : axis.max - tickmarkOffset;
-                            if (i % 2 === 0 && pos < axis.max && to <= axis.max + (chart.polar ? -tickmarkOffset : tickmarkOffset)) { // #2248, #4660
+                            to = tickPositions[i + 1] !== undefined ?
+                                tickPositions[i + 1] + tickmarkOffset :
+                                axis.max - tickmarkOffset;
+
+                            if (
+                                i % 2 === 0 &&
+                                pos < axis.max &&
+                                to <= axis.max + (
+                                    chart.polar ?
+                                    -tickmarkOffset :
+                                    tickmarkOffset
+                                )
+                            ) { // #2248, #4660
                                 if (!alternateBands[pos]) {
                                     alternateBands[pos] = new H.PlotLineOrBand(axis);
                                 }
@@ -12034,9 +14300,12 @@
 
                     // custom plot lines and bands
                     if (!axis._addedPlotLB) { // only first time
-                        each((options.plotLines || []).concat(options.plotBands || []), function(plotLineOptions) {
-                            axis.addPlotBandOrLine(plotLineOptions);
-                        });
+                        each(
+                            (options.plotLines || []).concat(options.plotBands || []),
+                            function(plotLineOptions) {
+                                axis.addPlotBandOrLine(plotLineOptions);
+                            }
+                        );
                         axis._addedPlotLB = true;
                     }
 
@@ -12050,9 +14319,13 @@
                         destroyInactiveItems = function() {
                             i = forDestruction.length;
                             while (i--) {
-                                // When resizing rapidly, the same items may be destroyed in different timeouts,
+                                // When resizing rapidly, the same items
+                                // may be destroyed in different timeouts,
                                 // or the may be reactivated
-                                if (coll[forDestruction[i]] && !coll[forDestruction[i]].isActive) {
+                                if (
+                                    coll[forDestruction[i]] &&
+                                    !coll[forDestruction[i]].isActive
+                                ) {
                                     coll[forDestruction[i]].destroy();
                                     delete coll[forDestruction[i]];
                                 }
@@ -12072,7 +14345,11 @@
                     // When the objects are finished fading out, destroy them
                     syncTimeout(
                         destroyInactiveItems,
-                        coll === alternateBands || !chart.hasRendered || !delay ? 0 : delay
+                        coll === alternateBands ||
+                        !chart.hasRendered ||
+                        !delay ?
+                        0 :
+                        delay
                     );
                 });
 
@@ -12164,9 +14441,12 @@
                 });
 
                 // Destroy collections
-                each([axis.ticks, axis.minorTicks, axis.alternateBands], function(coll) {
-                    destroyObjectProperties(coll);
-                });
+                each(
+                    [axis.ticks, axis.minorTicks, axis.alternateBands],
+                    function(coll) {
+                        destroyObjectProperties(coll);
+                    }
+                );
                 if (plotLinesAndBands) {
                     i = plotLinesAndBands.length;
                     while (i--) { // #1975
@@ -12175,15 +14455,21 @@
                 }
 
                 // Destroy local variables
-                each(['stackTotalGroup', 'axisLine', 'axisTitle', 'axisGroup', 'gridGroup', 'labelGroup', 'cross'], function(prop) {
-                    if (axis[prop]) {
-                        axis[prop] = axis[prop].destroy();
+                each(
+                    ['stackTotalGroup', 'axisLine', 'axisTitle', 'axisGroup',
+                        'gridGroup', 'labelGroup', 'cross'
+                    ],
+                    function(prop) {
+                        if (axis[prop]) {
+                            axis[prop] = axis[prop].destroy();
+                        }
                     }
-                });
+                );
 
                 // Destroy each generated group for plotlines and plotbands
                 for (plotGroup in axis.plotLinesAndBandsGroups) {
-                    axis.plotLinesAndBandsGroups[plotGroup] = axis.plotLinesAndBandsGroups[plotGroup].destroy();
+                    axis.plotLinesAndBandsGroups[plotGroup] =
+                        axis.plotLinesAndBandsGroups[plotGroup].destroy();
                 }
 
                 // Delete all properties and fall back to the prototype.
@@ -12229,15 +14515,24 @@
 
                     // Get the path
                     if (!snap) {
-                        pos = e && (this.horiz ? e.chartX - this.pos : this.len - e.chartY + this.pos);
+                        pos = e &&
+                            (
+                                this.horiz ?
+                                e.chartX - this.pos :
+                                this.len - e.chartY + this.pos
+                            );
                     } else if (defined(point)) {
-                        pos = this.isXAxis ? point.plotX : this.len - point.plotY; // #3834
+                        // #3834
+                        pos = this.isXAxis ? point.plotX : this.len - point.plotY;
                     }
 
                     if (defined(pos)) {
                         path = this.getPlotLinePath(
                             // First argument, value, only used on radial
-                            point && (this.isXAxis ? point.x : pick(point.stackY, point.y)),
+                            point && (this.isXAxis ?
+                                point.x :
+                                pick(point.stackY, point.y)
+                            ),
                             null,
                             null,
                             null,
@@ -12256,8 +14551,11 @@
                     if (!graphic) {
                         this.cross = graphic = this.chart.renderer
                             .path()
-                            .addClass('highcharts-crosshair highcharts-crosshair-' +
-                                (categorized ? 'category ' : 'thin ') + options.className)
+                            .addClass(
+                                'highcharts-crosshair highcharts-crosshair-' +
+                                (categorized ? 'category ' : 'thin ') +
+                                options.className
+                            )
                             .attr({
                                 zIndex: pick(options.zIndex, 2)
                             })
@@ -12385,15 +14683,17 @@
                     minDateDate = minDate[Date.hcGetDate](),
                     minHours = minDate[Date.hcGetHours]();
 
+                // Redefine min to the floored/rounded minimum time (#7432)
+                min = minDate.getTime();
 
                 // Handle local timezone offset
-                if (Date.hcTimezoneOffset || Date.hcGetTimezoneOffset) {
+                if (Date.hcHasTimeZone) {
 
                     // Detect whether we need to take the DST crossover into
                     // consideration. If we're crossing over DST, the day length may be
                     // 23h or 25h and we need to compute the exact clock time for each
                     // tick instead of just adding hours. This comes at a cost, so first
-                    // we found out if it is needed. #4951.
+                    // we find out if it is needed (#4951).
                     variableDayLength =
                         (!useUTC || !!Date.hcGetTimezoneOffset) &&
                         (
@@ -12405,9 +14705,8 @@
                         );
 
                     // Adjust minDate to the offset date
-                    minDate = minDate.getTime();
                     baseOffset = getTZOffset(minDate);
-                    minDate = new Date(minDate + baseOffset);
+                    minDate = new Date(min + baseOffset);
                 }
 
 
@@ -12641,7 +14940,9 @@
             } else {
                 var realMin = lin2log(min),
                     realMax = lin2log(max),
-                    tickIntervalOption = options[minor ? 'minorTickInterval' : 'tickInterval'],
+                    tickIntervalOption = minor ?
+                    this.getMinorTickInterval() :
+                    options.tickInterval,
                     filteredTickIntervalOption = tickIntervalOption === 'auto' ? null : tickIntervalOption,
                     tickPixelIntervalOption = options.tickPixelInterval / (minor ? 5 : 1),
                     totalPixelLength = minor ? axisLength / axis.tickPositions.length : axisLength;
@@ -12737,7 +15038,8 @@
                     zIndex = pick(options.zIndex, 0),
                     events = options.events,
                     attribs = {
-                        'class': 'highcharts-plot-' + (isBand ? 'band ' : 'line ') + (options.className || '')
+                        'class': 'highcharts-plot-' + (isBand ? 'band ' : 'line ') +
+                            (options.className || '')
                     },
                     groupAttribs = {},
                     renderer = axis.chart.renderer,
@@ -12760,7 +15062,8 @@
 
                 group = axis.plotLinesAndBandsGroups[groupName];
                 if (!group) {
-                    axis.plotLinesAndBandsGroups[groupName] = group = renderer.g('plot-' + groupName)
+                    axis.plotLinesAndBandsGroups[groupName] = group =
+                        renderer.g('plot-' + groupName)
                         .attr(groupAttribs).add();
                 }
 
@@ -12812,8 +15115,15 @@
                 }
 
                 // the plot band/line label
-                if (optionsLabel && defined(optionsLabel.text) && path && path.length &&
-                    axis.width > 0 && axis.height > 0 && !path.flat) {
+                if (
+                    optionsLabel &&
+                    defined(optionsLabel.text) &&
+                    path &&
+                    path.length &&
+                    axis.width > 0 &&
+                    axis.height > 0 &&
+                    !path.flat
+                ) {
                     // apply defaults
                     optionsLabel = merge({
                         align: horiz && isBand && 'center',
@@ -12841,8 +15151,8 @@
                     label = plotLine.label,
                     renderer = plotLine.axis.chart.renderer,
                     attribs,
-                    xs,
-                    ys,
+                    xBounds,
+                    yBounds,
                     x,
                     y;
 
@@ -12851,7 +15161,8 @@
                     attribs = {
                         align: optionsLabel.textAlign || optionsLabel.align,
                         rotation: optionsLabel.rotation,
-                        'class': 'highcharts-plot-' + (isBand ? 'band' : 'line') + '-label ' + (optionsLabel.className || '')
+                        'class': 'highcharts-plot-' + (isBand ? 'band' : 'line') +
+                            '-label ' + (optionsLabel.className || '')
                     };
 
                     attribs.zIndex = zIndex;
@@ -12870,16 +15181,17 @@
 
                 // get the bounding box and align the label
                 // #3000 changed to better handle choice between plotband or plotline
-                xs = [path[1], path[4], (isBand ? path[6] : path[1])];
-                ys = [path[2], path[5], (isBand ? path[7] : path[2])];
-                x = arrayMin(xs);
-                y = arrayMin(ys);
+                xBounds = path.xBounds || [path[1], path[4], (isBand ? path[6] : path[1])];
+                yBounds = path.yBounds || [path[2], path[5], (isBand ? path[7] : path[2])];
+
+                x = arrayMin(xBounds);
+                y = arrayMin(yBounds);
 
                 label.align(optionsLabel, false, {
                     x: x,
                     y: y,
-                    width: arrayMax(xs) - x,
-                    height: arrayMax(ys) - y
+                    width: arrayMax(xBounds) - x,
+                    height: arrayMax(yBounds) - y
                 });
                 label.show();
             },
@@ -12917,9 +15229,12 @@
             getPlotBandPath: function(from, to) {
                 var toPath = this.getPlotLinePath(to, null, null, true),
                     path = this.getPlotLinePath(from, null, null, true),
+                    result = [],
+                    i,
                     // #4964 check if chart is inverted or plotband is on yAxis 
                     horiz = this.horiz,
                     plus = 1,
+                    flat,
                     outside =
                     (from < this.min && to < this.min) ||
                     (from > this.max && to > this.max);
@@ -12928,20 +15243,43 @@
 
                     // Flat paths don't need labels (#3836)
                     if (outside) {
-                        path.flat = path.toString() === toPath.toString();
+                        flat = path.toString() === toPath.toString();
                         plus = 0;
                     }
 
-                    // Add 1 pixel, when coordinates are the same
-                    path.push(
-                        horiz && toPath[4] === path[4] ? toPath[4] + plus : toPath[4], !horiz && toPath[5] === path[5] ? toPath[5] + plus : toPath[5],
-                        horiz && toPath[1] === path[1] ? toPath[1] + plus : toPath[1], !horiz && toPath[2] === path[2] ? toPath[2] + plus : toPath[2]
-                    );
+                    // Go over each subpath - for panes in Highstock
+                    for (i = 0; i < path.length; i += 6) {
+
+                        // Add 1 pixel when coordinates are the same
+                        if (horiz && toPath[i + 1] === path[i + 1]) {
+                            toPath[i + 1] += plus;
+                            toPath[i + 4] += plus;
+                        } else if (!horiz && toPath[i + 2] === path[i + 2]) {
+                            toPath[i + 2] += plus;
+                            toPath[i + 5] += plus;
+                        }
+
+                        result.push(
+                            'M',
+                            path[i + 1],
+                            path[i + 2],
+                            'L',
+                            path[i + 4],
+                            path[i + 5],
+                            toPath[i + 4],
+                            toPath[i + 5],
+                            toPath[i + 1],
+                            toPath[i + 2],
+                            'z'
+                        );
+                        result.flat = flat;
+                    }
+
                 } else { // outside the axis area
                     path = null;
                 }
 
-                return path;
+                return result;
             },
 
             /**
@@ -13096,9 +15434,6 @@
                 // Save the chart and options
                 this.chart = chart;
                 this.options = options;
-
-                // Keep track of the current series
-                //this.currentSeries = undefined;
 
                 // List of crosshairs
                 this.crosshairs = [];
@@ -13269,8 +15604,10 @@
             move: function(x, y, anchorX, anchorY) {
                 var tooltip = this,
                     now = tooltip.now,
-                    animate = tooltip.options.animation !== false && !tooltip.isHidden &&
-                    // When we get close to the target position, abort animation and land on the right place (#3056)
+                    animate = tooltip.options.animation !== false &&
+                    !tooltip.isHidden &&
+                    // When we get close to the target position, abort animation and
+                    // land on the right place (#3056)
                     (Math.abs(x - now.x) > 1 || Math.abs(y - now.y) > 1),
                     skipAnchor = tooltip.followPointer || tooltip.len > 1;
 
@@ -13278,8 +15615,10 @@
                 extend(now, {
                     x: animate ? (2 * now.x + x) / 3 : x,
                     y: animate ? (now.y + y) / 2 : y,
-                    anchorX: skipAnchor ? undefined : animate ? (2 * now.anchorX + anchorX) / 3 : anchorX,
-                    anchorY: skipAnchor ? undefined : animate ? (now.anchorY + anchorY) / 2 : anchorY
+                    anchorX: skipAnchor ?
+                        undefined : animate ? (2 * now.anchorX + anchorX) / 3 : anchorX,
+                    anchorY: skipAnchor ?
+                        undefined : animate ? (now.anchorY + anchorY) / 2 : anchorY
                 });
 
                 // Move to the intermediate value
@@ -13309,7 +15648,8 @@
              */
             hide: function(delay) {
                 var tooltip = this;
-                clearTimeout(this.hideTimer); // disallow duplicate timers (#1728, #1766)
+                // disallow duplicate timers (#1728, #1766)
+                clearTimeout(this.hideTimer);
                 delay = pick(delay, this.options.hideDelay, 500);
                 if (!this.isHidden) {
                     this.hideTimer = syncTimeout(function() {
@@ -13354,8 +15694,14 @@
                     each(points, function(point) {
                         yAxis = point.series.yAxis;
                         xAxis = point.series.xAxis;
-                        plotX += point.plotX + (!inverted && xAxis ? xAxis.left - plotLeft : 0);
-                        plotY += (point.plotLow ? (point.plotLow + point.plotHigh) / 2 : point.plotY) +
+                        plotX += point.plotX +
+                            (!inverted && xAxis ? xAxis.left - plotLeft : 0);
+                        plotY +=
+                            (
+                                point.plotLow ?
+                                (point.plotLow + point.plotHigh) / 2 :
+                                point.plotY
+                            ) +
                             (!inverted && yAxis ? yAxis.top - plotTop : 0); // #1151
                     });
 
@@ -13365,7 +15711,8 @@
                     ret = [
                         inverted ? chart.plotWidth - plotY : plotX,
                         this.shared && !inverted && points.length > 1 && mouseEvent ?
-                        mouseEvent.chartY - plotTop : // place shared tooltip next to the mouse (#424)
+                        // place shared tooltip next to the mouse (#424)
+                        mouseEvent.chartY - plotTop :
                         inverted ? chart.plotHeight - plotX : plotY
                     ];
                 }
@@ -13382,7 +15729,8 @@
                 var chart = this.chart,
                     distance = this.distance,
                     ret = {},
-                    h = point.h || 0, // #4117
+                    // Don't use h if chart isn't inverted (#7242)
+                    h = (chart.inverted && point.h) || 0, // #4117
                     swapped,
                     first = ['y', chart.chartHeight, boxHeight,
                         point.plotY + chart.plotTop, chart.plotTop,
@@ -13393,12 +15741,23 @@
                         chart.plotLeft + chart.plotWidth
                     ],
                     // The far side is right or bottom
-                    preferFarSide = !this.followPointer && pick(point.ttBelow, !chart.inverted === !!point.negative), // #4984
+                    preferFarSide = !this.followPointer && pick(
+                        point.ttBelow, !chart.inverted === !!point.negative
+                    ), // #4984
+
                     /**
-                     * Handle the preferred dimension. When the preferred dimension is tooltip
-                     * on top or bottom of the point, it will look for space there.
+                     * Handle the preferred dimension. When the preferred dimension is
+                     * tooltip on top or bottom of the point, it will look for space
+                     * there.
                      */
-                    firstDimension = function(dim, outerSize, innerSize, point, min, max) {
+                    firstDimension = function(
+                        dim,
+                        outerSize,
+                        innerSize,
+                        point,
+                        min,
+                        max
+                    ) {
                         var roomLeft = innerSize < point - distance,
                             roomRight = point + distance + innerSize < outerSize,
                             alignedLeft = point - distance - innerSize,
@@ -13409,7 +15768,10 @@
                         } else if (!preferFarSide && roomLeft) {
                             ret[dim] = alignedLeft;
                         } else if (roomLeft) {
-                            ret[dim] = Math.min(max - innerSize, alignedLeft - h < 0 ? alignedLeft : alignedLeft - h);
+                            ret[dim] = Math.min(
+                                max - innerSize,
+                                alignedLeft - h < 0 ? alignedLeft : alignedLeft - h
+                            );
                         } else if (roomRight) {
                             ret[dim] = Math.max(
                                 min,
@@ -13422,10 +15784,10 @@
                         }
                     },
                     /**
-                     * Handle the secondary dimension. If the preferred dimension is tooltip
-                     * on top or bottom of the point, the second dimension is to align the tooltip
-                     * above the point, trying to align center but allowing left or right
-                     * align within the chart box.
+                     * Handle the secondary dimension. If the preferred dimension is
+                     * tooltip on top or bottom of the point, the second dimension is to
+                     * align the tooltip above the point, trying to align center but
+                     * allowing left or right align within the chart box.
                      */
                     secondDimension = function(dim, outerSize, innerSize, point) {
                         var retVal;
@@ -13456,7 +15818,10 @@
                     },
                     run = function() {
                         if (firstDimension.apply(0, first) !== false) {
-                            if (secondDimension.apply(0, second) === false && !swapped) {
+                            if (
+                                secondDimension.apply(0, second) === false &&
+                                !swapped
+                            ) {
                                 swap(true);
                                 run();
                             }
@@ -13479,8 +15844,8 @@
             },
 
             /**
-             * In case no user defined formatter is given, this will be used. Note that the context
-             * here is an object holding point, series, x, y etc.
+             * In case no user defined formatter is given, this will be used. Note that
+             * the context here is an object holding point, series, x, y etc.
              *
              * @returns {String|Array<String>}
              */
@@ -13526,7 +15891,8 @@
                 clearTimeout(this.hideTimer);
 
                 // get the reference point coordinates (pie charts use tooltipPos)
-                tooltip.followPointer = splat(point)[0].series.tooltipOptions.followPointer;
+                tooltip.followPointer = splat(point)[0].series.tooltipOptions
+                    .followPointer;
                 anchor = tooltip.getAnchor(point, mouseEvent);
                 x = anchor[0];
                 y = anchor[1];
@@ -13573,7 +15939,7 @@
 
                     // update text
                     if (tooltip.split) {
-                        this.renderSplit(text, pointOrPoints);
+                        this.renderSplit(text, splat(pointOrPoints));
                     } else {
 
                         // Prevent the tooltip from flowing over the chart box (#6659)
@@ -13589,7 +15955,10 @@
 
                         // Set the stroke color of the box to reflect the point
                         label.removeClass(/highcharts-color-[\d]+/g)
-                            .addClass('highcharts-color-' + pick(point.colorIndex, currentSeries.colorIndex));
+                            .addClass(
+                                'highcharts-color-' +
+                                pick(point.colorIndex, currentSeries.colorIndex)
+                            );
 
 
 
@@ -13621,6 +15990,10 @@
                     headerHeight = 0,
                     tooltipLabel = this.getLabel();
 
+                // Graceful degradation for legacy formatters
+                if (H.isString(labels)) {
+                    labels = [false, labels];
+                }
                 // Create the individual labels for header and points, ignore footer
                 each(labels.slice(0, points.length + 1), function(str, i) {
                     if (str !== false) {
@@ -13646,7 +16019,15 @@
 
                         // Store the tooltip referance on the series
                         if (!tt) {
-                            owner.tt = tt = ren.label(null, null, null, 'callout')
+                            owner.tt = tt = ren.label(
+                                    null,
+                                    null,
+                                    null,
+                                    'callout',
+                                    null,
+                                    null,
+                                    options.useHTML
+                                )
                                 .addClass('highcharts-tooltip-box ' + colorClass)
                                 .attr({
                                     'padding': options.padding,
@@ -13773,9 +16154,13 @@
                     lastN = 'millisecond'; // for sub-millisecond data, #4223
                 for (n in timeUnits) {
 
-                    // If the range is exactly one week and we're looking at a Sunday/Monday, go for the week format
-                    if (range === timeUnits.week && +dateFormat('%w', date) === startOfWeek &&
-                        dateStr.substr(6) === blank.substr(6)) {
+                    // If the range is exactly one week and we're looking at a
+                    // Sunday/Monday, go for the week format
+                    if (
+                        range === timeUnits.week &&
+                        +dateFormat('%w', date) === startOfWeek &&
+                        dateStr.substr(6) === blank.substr(6)
+                    ) {
                         n = 'week';
                         break;
                     }
@@ -13788,11 +16173,15 @@
 
                     // If the point is placed every day at 23:59, we need to show
                     // the minutes as well. #2637.
-                    if (strpos[n] && dateStr.substr(strpos[n]) !== blank.substr(strpos[n])) {
+                    if (
+                        strpos[n] &&
+                        dateStr.substr(strpos[n]) !== blank.substr(strpos[n])
+                    ) {
                         break;
                     }
 
-                    // Weeks are outside the hierarchy, only apply them on Mondays/Sundays like in the first condition
+                    // Weeks are outside the hierarchy, only apply them on
+                    // Mondays/Sundays like in the first condition
                     if (n !== 'week') {
                         lastN = n;
                     }
@@ -13837,17 +16226,34 @@
                     tooltipOptions = series.tooltipOptions,
                     xDateFormat = tooltipOptions.xDateFormat,
                     xAxis = series.xAxis,
-                    isDateTime = xAxis && xAxis.options.type === 'datetime' && isNumber(labelConfig.key),
+                    isDateTime = (
+                        xAxis &&
+                        xAxis.options.type === 'datetime' &&
+                        isNumber(labelConfig.key)
+                    ),
                     formatString = tooltipOptions[footOrHead + 'Format'];
 
-                // Guess the best date format based on the closest point distance (#568, #3418)
+                // Guess the best date format based on the closest point distance (#568,
+                // #3418)
                 if (isDateTime && !xDateFormat) {
-                    xDateFormat = this.getXDateFormat(labelConfig, tooltipOptions, xAxis);
+                    xDateFormat = this.getXDateFormat(
+                        labelConfig,
+                        tooltipOptions,
+                        xAxis
+                    );
                 }
 
                 // Insert the footer date format if any
                 if (isDateTime && xDateFormat) {
-                    formatString = formatString.replace('{point.key}', '{point.key:' + xDateFormat + '}');
+                    each(
+                        (labelConfig.point && labelConfig.point.tooltipDateKeys) || ['key'],
+                        function(key) {
+                            formatString = formatString.replace(
+                                '{point.' + key + '}',
+                                '{point.' + key + ':' + xDateFormat + '}'
+                            );
+                        }
+                    );
                 }
 
                 return format(formatString, {
@@ -13857,14 +16263,22 @@
             },
 
             /**
-             * Build the body (lines) of the tooltip by iterating over the items and returning one entry for each item,
-             * abstracting this functionality allows to easily overwrite and extend it.
+             * Build the body (lines) of the tooltip by iterating over the items and
+             * returning one entry for each item, abstracting this functionality allows
+             * to easily overwrite and extend it.
              */
             bodyFormatter: function(items) {
                 return map(items, function(item) {
                     var tooltipOptions = item.series.tooltipOptions;
-                    return (tooltipOptions.pointFormatter || item.point.tooltipFormatter)
-                        .call(item.point, tooltipOptions.pointFormat);
+                    return (
+                        tooltipOptions[
+                            (item.point.formatPrefix || 'point') + 'Formatter'
+                        ] ||
+                        item.point.tooltipFormatter
+                    ).call(
+                        item.point,
+                        tooltipOptions[(item.point.formatPrefix || 'point') + 'Format']
+                    );
                 });
             }
 
@@ -13891,10 +16305,8 @@
             isObject = H.isObject,
             offset = H.offset,
             pick = H.pick,
-            removeEvent = H.removeEvent,
             splat = H.splat,
-            Tooltip = H.Tooltip,
-            win = H.win;
+            Tooltip = H.Tooltip;
 
         /**
          * The mouse and touch tracker object. Each {@link Chart} item has one
@@ -13988,15 +16400,7 @@
              *         A browser event with extended properties `chartX` and `chartY`.
              */
             normalize: function(e, chartPosition) {
-                var chartX,
-                    chartY,
-                    ePos;
-
-                // IE normalizing
-                e = e || win.event;
-                if (!e.target) {
-                    e.target = e.srcElement;
-                }
+                var ePos;
 
                 // iOS (#2757)
                 ePos = e.touches ? (e.touches.length ? e.touches.item(0) : e.changedTouches[0]) : e;
@@ -14006,19 +16410,9 @@
                     this.chartPosition = chartPosition = offset(this.chart.container);
                 }
 
-                // chartX and chartY
-                if (ePos.pageX === undefined) { // IE < 9. #886.
-                    chartX = Math.max(e.x, e.clientX - chartPosition.left); // #2005, #2129: the second case is 
-                    // for IE10 quirks mode within framesets
-                    chartY = e.y;
-                } else {
-                    chartX = ePos.pageX - chartPosition.left;
-                    chartY = ePos.pageY - chartPosition.top;
-                }
-
                 return extend(e, {
-                    chartX: Math.round(chartX),
-                    chartY: Math.round(chartY)
+                    chartX: Math.round(ePos.pageX - chartPosition.left),
+                    chartY: Math.round(ePos.pageY - chartPosition.top)
                 });
             },
 
@@ -14118,14 +16512,15 @@
             getChartCoordinatesFromPoint: function(point, inverted) {
                 var series = point.series,
                     xAxis = series.xAxis,
-                    yAxis = series.yAxis;
+                    yAxis = series.yAxis,
+                    plotX = pick(point.clientX, point.plotX);
 
                 if (xAxis && yAxis) {
                     return inverted ? {
-                        chartX: xAxis.len + xAxis.pos - point.clientX,
+                        chartX: xAxis.len + xAxis.pos - plotX,
                         chartY: yAxis.len + yAxis.pos - point.plotY
                     } : {
-                        chartX: point.clientX + xAxis.pos,
+                        chartX: plotX + xAxis.pos,
                         chartY: point.plotY + yAxis.pos
                     };
                 }
@@ -14160,11 +16555,13 @@
                 series,
                 isDirectTouch,
                 shared,
-                coordinates
+                coordinates,
+                params
             ) {
                 var hoverPoint,
                     hoverPoints = [],
                     hoverSeries = existingHoverSeries,
+                    isBoosting = params && params.isBoosting,
                     useExisting = !!(isDirectTouch && existingHoverPoint),
                     notSticky = hoverSeries && !hoverSeries.stickyTracking,
                     filter = function(s) {
@@ -14202,9 +16599,16 @@
                         // Get all points with the same x value as the hoverPoint
                         each(searchSeries, function(s) {
                             var point = find(s.points, function(p) {
-                                return p.x === hoverPoint.x;
+                                return p.x === hoverPoint.x && !p.isNull;
                             });
-                            if (isObject(point) && !point.isNull) {
+                            if (isObject(point)) {
+                                /*
+                                 * Boost returns a minimal point. Convert it to a usable
+                                 * point for tooltip and states.
+                                 */
+                                if (isBoosting) {
+                                    point = s.getPoint(point);
+                                }
                                 hoverPoints.push(point);
                             }
                         });
@@ -14212,7 +16616,6 @@
                         hoverPoints.push(hoverPoint);
                     }
                 }
-
                 return {
                     hoverPoint: hoverPoint,
                     hoverSeries: hoverSeries,
@@ -14229,7 +16632,9 @@
                 var pointer = this,
                     chart = pointer.chart,
                     series = chart.series,
-                    tooltip = chart.tooltip,
+                    tooltip = chart.tooltip && chart.tooltip.options.enabled ?
+                    chart.tooltip :
+                    undefined,
                     shared = tooltip ? tooltip.shared : false,
                     hoverPoint = p || chart.hoverPoint,
                     hoverSeries = hoverPoint && hoverPoint.series || chart.hoverSeries,
@@ -14244,12 +16649,15 @@
                         series,
                         isDirectTouch,
                         shared,
-                        e
+                        e, {
+                            isBoosting: chart.isBoosting
+                        }
                     ),
                     useSharedTooltip,
                     followPointer,
                     anchor,
                     points;
+
                 // Update variables from hoverData.
                 hoverPoint = hoverData.hoverPoint;
                 points = hoverData.hoverPoints;
@@ -14283,6 +16691,12 @@
                     if (chart.hoverPoint) {
                         chart.hoverPoint.firePointEvent('mouseOut');
                     }
+
+                    // Hover point may have been destroyed in the event handlers (#7127)
+                    if (!hoverPoint.series) {
+                        return;
+                    }
+
                     hoverPoint.firePointEvent('mouseOver');
                     chart.hoverPoints = points;
                     chart.hoverPoint = hoverPoint;
@@ -14623,16 +17037,19 @@
 
             onContainerMouseDown: function(e) {
 
-                e = this.normalize(e);
+                if (e.button !== 2) {
 
-                this.zoomOption(e);
+                    e = this.normalize(e);
 
-                // issue #295, dragging not always working in Firefox
-                if (e.preventDefault) {
-                    e.preventDefault();
+                    this.zoomOption(e);
+
+                    // issue #295, dragging not always working in Firefox
+                    if (e.preventDefault) {
+                        e.preventDefault();
+                    }
+
+                    this.dragStart(e);
                 }
-
-                this.dragStart(e);
             },
 
 
@@ -14732,10 +17149,18 @@
             onTrackerMouseOut: function(e) {
                 var series = this.chart.hoverSeries,
                     relatedTarget = e.relatedTarget || e.toElement;
+
                 this.isDirectTouch = false;
-                if (series && relatedTarget && !series.stickyTracking &&
+
+                if (
+                    series &&
+                    relatedTarget &&
+                    !series.stickyTracking &&
                     !this.inClass(relatedTarget, 'highcharts-tooltip') &&
-                    (!this.inClass(relatedTarget, 'highcharts-series-' + series.index) || // #2499, #4465
+                    (!this.inClass(
+                            relatedTarget,
+                            'highcharts-series-' + series.index
+                        ) || // #2499, #4465
                         !this.inClass(relatedTarget, 'highcharts-tracker') // #5553
                     )
                 ) {
@@ -14802,9 +17227,13 @@
                 container.onclick = function(e) {
                     pointer.onContainerClick(e);
                 };
-                addEvent(container, 'mouseleave', pointer.onContainerMouseLeave);
-                if (H.chartCount === 1) {
-                    addEvent(
+                this.unbindContainerMouseLeave = addEvent(
+                    container,
+                    'mouseleave',
+                    pointer.onContainerMouseLeave
+                );
+                if (!H.unbindDocumentMouseUp) {
+                    H.unbindDocumentMouseUp = addEvent(
                         ownerDoc,
                         'mouseup',
                         pointer.onDocumentMouseUp
@@ -14817,8 +17246,8 @@
                     container.ontouchmove = function(e) {
                         pointer.onContainerTouchMove(e);
                     };
-                    if (H.chartCount === 1) {
-                        addEvent(
+                    if (!H.unbindDocumentTouchEnd) {
+                        H.unbindDocumentTouchEnd = addEvent(
                             ownerDoc,
                             'touchend',
                             pointer.onDocumentTouchEnd
@@ -14832,22 +17261,20 @@
              * Destroys the Pointer object and disconnects DOM events.
              */
             destroy: function() {
-                var pointer = this,
-                    ownerDoc = this.chart.container.ownerDocument;
+                var pointer = this;
 
                 if (pointer.unDocMouseMove) {
                     pointer.unDocMouseMove();
                 }
 
-                removeEvent(
-                    pointer.chart.container,
-                    'mouseleave',
-                    pointer.onContainerMouseLeave
-                );
+                this.unbindContainerMouseLeave();
+
                 if (!H.chartCount) {
-                    removeEvent(ownerDoc, 'mouseup', pointer.onDocumentMouseUp);
-                    if (H.hasTouch) {
-                        removeEvent(ownerDoc, 'touchend', pointer.onDocumentTouchEnd);
+                    if (H.unbindDocumentMouseUp) {
+                        H.unbindDocumentMouseUp = H.unbindDocumentMouseUp();
+                    }
+                    if (H.unbindDocumentTouchEnd) {
+                        H.unbindDocumentTouchEnd = H.unbindDocumentTouchEnd();
                     }
                 }
 
@@ -14881,17 +17308,41 @@
             /**
              * Run translation operations
              */
-            pinchTranslate: function(pinchDown, touches, transform, selectionMarker, clip, lastValidTouch) {
+            pinchTranslate: function(
+                pinchDown,
+                touches,
+                transform,
+                selectionMarker,
+                clip,
+                lastValidTouch
+            ) {
                 if (this.zoomHor) {
-                    this.pinchTranslateDirection(true, pinchDown, touches, transform, selectionMarker, clip, lastValidTouch);
+                    this.pinchTranslateDirection(
+                        true,
+                        pinchDown,
+                        touches,
+                        transform,
+                        selectionMarker,
+                        clip,
+                        lastValidTouch
+                    );
                 }
                 if (this.zoomVert) {
-                    this.pinchTranslateDirection(false, pinchDown, touches, transform, selectionMarker, clip, lastValidTouch);
+                    this.pinchTranslateDirection(
+                        false,
+                        pinchDown,
+                        touches,
+                        transform,
+                        selectionMarker,
+                        clip,
+                        lastValidTouch
+                    );
                 }
             },
 
             /**
-             * Run translation operations for each direction (horizontal and vertical) independently
+             * Run translation operations for each direction (horizontal and vertical)
+             * independently
              */
             pinchTranslateDirection: function(horiz, pinchDown, touches, transform,
                 selectionMarker, clip, lastValidTouch, forcedScale) {
@@ -14918,17 +17369,22 @@
                     setScale = function() {
                         // Don't zoom if fingers are too close on this axis
                         if (!singleTouch && Math.abs(touch0Start - touch1Start) > 20) {
-                            scale = forcedScale || Math.abs(touch0Now - touch1Now) / Math.abs(touch0Start - touch1Start);
+                            scale = forcedScale ||
+                                Math.abs(touch0Now - touch1Now) /
+                                Math.abs(touch0Start - touch1Start);
                         }
 
                         clipXY = ((plotLeftTop - touch0Now) / scale) + touch0Start;
-                        selectionWH = chart['plot' + (horiz ? 'Width' : 'Height')] / scale;
+                        selectionWH = chart['plot' + (horiz ? 'Width' : 'Height')] /
+                            scale;
                     };
 
                 // Set the scale, first pass
                 setScale();
 
-                selectionXY = clipXY; // the clip position (x or y) is altered if out of bounds, the selection position is not
+                // The clip position (x or y) is altered if out of bounds, the selection
+                // position is not
+                selectionXY = clipXY;
 
                 // Out of bounds
                 if (selectionXY < bounds.min) {
@@ -14939,17 +17395,20 @@
                     outOfBounds = true;
                 }
 
-                // Is the chart dragged off its bounds, determined by dataMin and dataMax?
+                // Is the chart dragged off its bounds, determined by dataMin and
+                // dataMax?
                 if (outOfBounds) {
 
-                    // Modify the touchNow position in order to create an elastic drag movement. This indicates
-                    // to the user that the chart is responsive but can't be dragged further.
+                    // Modify the touchNow position in order to create an elastic drag
+                    // movement. This indicates to the user that the chart is responsive
+                    // but can't be dragged further.
                     touch0Now -= 0.8 * (touch0Now - lastValidTouch[xy][0]);
                     if (!singleTouch) {
                         touch1Now -= 0.8 * (touch1Now - lastValidTouch[xy][1]);
                     }
 
-                    // Set the scale, second pass to adapt to the modified touchNow positions
+                    // Set the scale, second pass to adapt to the modified touchNow
+                    // positions
                     setScale();
 
                 } else {
@@ -14967,7 +17426,8 @@
                 selectionMarker[wh] = selectionWH;
                 selectionMarker[xy] = selectionXY;
                 transform[scaleKey] = scale;
-                transform['translate' + XY] = (transformScale * plotLeftTop) + (touch0Now - (transformScale * touch0Start));
+                transform['translate' + XY] = (transformScale * plotLeftTop) +
+                    (touch0Now - (transformScale * touch0Start));
             },
 
             /**
@@ -14984,17 +17444,20 @@
                     hasZoom = self.hasZoom,
                     selectionMarker = self.selectionMarker,
                     transform = {},
-                    fireClickEvent = touchesLength === 1 && ((self.inClass(e.target, 'highcharts-tracker') &&
+                    fireClickEvent = touchesLength === 1 &&
+                    ((self.inClass(e.target, 'highcharts-tracker') &&
                         chart.runTrackerClick) || self.runChartClick),
                     clip = {};
 
-                // Don't initiate panning until the user has pinched. This prevents us from
-                // blocking page scrolling as users scroll down a long page (#4210).
+                // Don't initiate panning until the user has pinched. This prevents us
+                // from blocking page scrolling as users scroll down a long page
+                // (#4210).
                 if (touchesLength > 1) {
                     self.initiated = true;
                 }
 
-                // On touch devices, only proceed to trigger click if a handler is defined
+                // On touch devices, only proceed to trigger click if a handler is
+                // defined
                 if (hasZoom && self.initiated && !fireClickEvent) {
                     e.preventDefault();
                 }
@@ -15012,22 +17475,33 @@
                             chartY: e.chartY
                         };
                     });
-                    lastValidTouch.x = [pinchDown[0].chartX, pinchDown[1] && pinchDown[1].chartX];
-                    lastValidTouch.y = [pinchDown[0].chartY, pinchDown[1] && pinchDown[1].chartY];
+                    lastValidTouch.x = [pinchDown[0].chartX, pinchDown[1] &&
+                        pinchDown[1].chartX
+                    ];
+                    lastValidTouch.y = [pinchDown[0].chartY, pinchDown[1] &&
+                        pinchDown[1].chartY
+                    ];
 
                     // Identify the data bounds in pixels
                     each(chart.axes, function(axis) {
                         if (axis.zoomEnabled) {
                             var bounds = chart.bounds[axis.horiz ? 'h' : 'v'],
                                 minPixelPadding = axis.minPixelPadding,
-                                min = axis.toPixels(pick(axis.options.min, axis.dataMin)),
-                                max = axis.toPixels(pick(axis.options.max, axis.dataMax)),
+                                min = axis.toPixels(
+                                    pick(axis.options.min, axis.dataMin)
+                                ),
+                                max = axis.toPixels(
+                                    pick(axis.options.max, axis.dataMax)
+                                ),
                                 absMin = Math.min(min, max),
                                 absMax = Math.max(min, max);
 
                             // Store the bounds for use in the touchmove handler
                             bounds.min = Math.min(axis.pos, absMin - minPixelPadding);
-                            bounds.max = Math.max(axis.pos + axis.len, absMax + minPixelPadding);
+                            bounds.max = Math.max(
+                                axis.pos + axis.len,
+                                absMax + minPixelPadding
+                            );
                         }
                     });
                     self.res = true; // reset on next move
@@ -15037,7 +17511,8 @@
                     this.runPointActions(self.normalize(e));
 
                     // Event type is touchmove, handle panning and pinching
-                } else if (pinchDown.length) { // can be 0 when releasing, if touchend fires first
+                } else if (pinchDown.length) { // can be 0 when releasing, if touchend
+                    // fires first
 
 
                     // Set the marker
@@ -15048,11 +17523,19 @@
                         }, chart.plotBox);
                     }
 
-                    self.pinchTranslate(pinchDown, touches, transform, selectionMarker, clip, lastValidTouch);
+                    self.pinchTranslate(
+                        pinchDown,
+                        touches,
+                        transform,
+                        selectionMarker,
+                        clip,
+                        lastValidTouch
+                    );
 
                     self.hasPinched = hasZoom;
 
-                    // Scale and translate the groups to provide visual feedback during pinching
+                    // Scale and translate the groups to provide visual feedback during
+                    // pinching
                     self.scaleGroups(transform, clip);
 
                     if (self.res) {
@@ -15093,11 +17576,12 @@
                             this.runPointActions(e);
                         }
 
-                        // Android fires touchmove events after the touchstart even if the
-                        // finger hasn't moved, or moved only a pixel or two. In iOS however,
-                        // the touchmove doesn't fire unless the finger moves more than ~4px.
-                        // So we emulate this behaviour in Android by checking how much it
-                        // moved, and cancelling on small distances. #3450.
+                        // Android fires touchmove events after the touchstart even if
+                        // the finger hasn't moved, or moved only a pixel or two. In iOS
+                        // however, the touchmove doesn't fire unless the finger moves
+                        // more than ~4px. So we emulate this behaviour in Android by
+                        // checking how much it moved, and cancelling on small
+                        // distances. #3450.
                         if (e.type === 'touchmove') {
                             pinchDown = this.pinchDown;
                             hasMoved = pinchDown[0] ? Math.sqrt( // #5266
@@ -15461,7 +17945,7 @@
              *
              * @private
              */
-            positionCheckboxes: function(scrollOffset) {
+            positionCheckboxes: function() {
                 var alignAttr = this.group && this.group.alignAttr,
                     translateY,
                     clipHeight = this.clipHeight || this.legendHeight,
@@ -15475,7 +17959,7 @@
 
                         if (checkbox) {
                             top = translateY + titleHeight + checkbox.y +
-                                (scrollOffset || 0) + 3;
+                                (this.scrollOffset || 0) + 3;
                             css(checkbox, {
                                 left: (alignAttr.translateX + item.checkboxOffset +
                                     checkbox.x - 20) + 'px',
@@ -15484,7 +17968,7 @@
                                     clipHeight - 6 ? '' : 'none'
                             });
                         }
-                    });
+                    }, this);
                 }
             },
 
@@ -15685,12 +18169,14 @@
                 }
 
                 // If the item exceeds the height, start a new column
-                /*if (!horizontal && legend.itemY + options.y +
+                /*
+                if (!horizontal && legend.itemY + options.y +
                 		itemHeight > chart.chartHeight - spacingTop - spacingBottom) {
                 	legend.itemY = legend.initialItemY;
                 	legend.itemX += legend.maxItemWidth;
                 	legend.maxItemWidth = 0;
-                }*/
+                }
+                */
 
                 // Set the edge positions
                 legend.maxItemWidth = Math.max(legend.maxItemWidth, itemWidth);
@@ -15759,6 +18245,24 @@
             },
 
             /**
+             * Get a short, three letter string reflecting the alignment and layout.
+             *
+             * @private
+             * @return {String} The alignment, empty string if floating
+             */
+            getAlignment: function() {
+                var options = this.options;
+
+                // Use the first letter of each alignment option in order to detect
+                // the side. (#4189 - use charAt(x) notation instead of [x] for IE7)
+                return options.floating ? '' : (
+                    options.align.charAt(0) +
+                    options.verticalAlign.charAt(0) +
+                    options.layout.charAt(0)
+                );
+            },
+
+            /**
              * Adjust the chart margins by reserving space for the legend on only one
              * side of the chart. If the position is set to a corner, top or bottom is
              * reserved for horizontal legends and left or right for vertical ones.
@@ -15768,13 +18272,9 @@
             adjustMargins: function(margin, spacing) {
                 var chart = this.chart,
                     options = this.options,
-                    // Use the first letter of each alignment option in order to detect
-                    // the side. (#4189 - use charAt(x) notation instead of [x] for IE7)
-                    alignment = options.align.charAt(0) +
-                    options.verticalAlign.charAt(0) +
-                    options.layout.charAt(0);
+                    alignment = this.getAlignment();
 
-                if (!options.floating) {
+                if (alignment) {
 
                     each([
                         /(lth|ct|rth)/,
@@ -15783,6 +18283,7 @@
                         /(lbv|lm|ltv)/
                     ], function(alignments, side) {
                         if (alignments.test(alignment) && !defined(margin[side])) {
+
                             // Now we have detected on which side of the chart we should
                             // reserve space for the legend
                             chart[marginNames[side]] = Math.max(
@@ -15794,7 +18295,13 @@
                                         (side % 2) ? 'x' : 'y'
                                     ] +
                                     pick(options.margin, 12) +
-                                    spacing[side]
+                                    spacing[side] +
+                                    (
+                                        side === 0 ?
+                                        chart.titleOffset +
+                                        chart.options.title.margin :
+                                        0
+                                    ) // #7428
                                 )
                             );
                         }
@@ -15819,7 +18326,8 @@
                     legendHeight,
                     box = legend.box,
                     options = legend.options,
-                    padding = legend.padding;
+                    padding = legend.padding,
+                    alignTo;
 
                 legend.itemX = padding;
                 legend.itemY = legend.initialItemY;
@@ -15888,7 +18396,7 @@
 
                 if (legendWidth > 0 && legendHeight > 0) {
                     box[box.isNew ? 'attr' : 'animate'](
-                        box.crisp({
+                        box.crisp.call({}, { // #7260
                             x: 0,
                             y: 0,
                             width: legendWidth,
@@ -15917,24 +18425,21 @@
                     legend.positionItem(item);
                 });
 
-                // 1.x compatibility: positioning based on style
-                /*var props = ['left', 'right', 'top', 'bottom'],
-                	prop,
-                	i = 4;
-                while (i--) {
-                	prop = props[i];
-                	if (options.style[prop] && options.style[prop] !== 'auto') {
-                		options[i < 2 ? 'align' : 'verticalAlign'] = prop;
-                		options[i < 2 ? 'x' : 'y'] = 
-                			pInt(options.style[prop]) * (i % 2 ? -1 : 1);
-                	}
-                }*/
-
                 if (display) {
+                    // If aligning to the top and the layout is horizontal, adjust for
+                    // the title (#7428)
+                    alignTo = chart.spacingBox;
+                    if (/(lth|ct|rth)/.test(legend.getAlignment())) {
+                        alignTo = merge(alignTo, {
+                            y: alignTo.y + chart.titleOffset +
+                                chart.options.title.margin
+                        });
+                    }
+
                     legendGroup.align(merge(options, {
                         width: legendWidth,
                         height: legendHeight
-                    }), true, 'spacingBox');
+                    }), true, alignTo);
                 }
 
                 if (!chart.isResizing) {
@@ -16022,9 +18527,16 @@
                             len++;
                         }
 
+                        // Keep track of which page each item is on
+                        item.pageIx = len - 1;
+                        if (lastY) {
+                            allItems[i - 1].pageIx = len - 1;
+                        }
+
                         if (i === allItems.length - 1 &&
                             y + h - pages[len - 1] > clipHeight) {
                             pages.push(y);
+                            item.pageIx = len;
                         }
                         if (y !== lastY) {
                             lastY = y;
@@ -16113,8 +18625,7 @@
                     clipHeight = this.clipHeight,
                     navOptions = this.options.navigation,
                     pager = this.pager,
-                    padding = this.padding,
-                    scrollOffset;
+                    padding = this.padding;
 
                 // When resizing while looking at the last page
                 if (currentPage > pageCount) {
@@ -16147,14 +18658,14 @@
 
 
 
-                    scrollOffset = -pages[currentPage - 1] + this.initialItemY;
+                    this.scrollOffset = -pages[currentPage - 1] + this.initialItemY;
 
                     this.scrollGroup.animate({
-                        translateY: scrollOffset
+                        translateY: this.scrollOffset
                     });
 
                     this.currentPage = currentPage;
-                    this.positionCheckboxes(scrollOffset);
+                    this.positionCheckboxes();
                 }
 
             }
@@ -16309,7 +18820,6 @@
             extend = H.extend,
             find = H.find,
             fireEvent = H.fireEvent,
-            getStyle = H.getStyle,
             grep = H.grep,
             isNumber = H.isNumber,
             isObject = H.isObject,
@@ -16326,8 +18836,7 @@
             splat = H.splat,
             svg = H.svg,
             syncTimeout = H.syncTimeout,
-            win = H.win,
-            Renderer = H.Renderer;
+            win = H.win;
         /**
          * The Chart class. The recommended constructor is {@link Highcharts#chart}.
          * @class Highcharts.Chart
@@ -16445,11 +18954,14 @@
                 this.margin = [];
                 this.spacing = [];
 
-                //this.runChartClick = chartEvents && !!chartEvents.click;
                 this.bounds = {
                     h: {},
                     v: {}
                 }; // Pixel data bounds for touch zoom
+
+                // An array of functions that returns labels that should be considered
+                // for anti-collision
+                this.labelCollectors = [];
 
                 this.callback = callback;
                 this.isResizing = 0;
@@ -16507,32 +19019,6 @@
 
 
                 this.hasCartesianSeries = optionsChart.showAxes;
-                //this.axisOffset = undefined;
-                //this.inverted = undefined;
-                //this.loadingShown = undefined;
-                //this.container = undefined;
-                //this.chartWidth = undefined;
-                //this.chartHeight = undefined;
-                //this.marginRight = undefined;
-                //this.marginBottom = undefined;
-                //this.containerWidth = undefined;
-                //this.containerHeight = undefined;
-                //this.oldChartWidth = undefined;
-                //this.oldChartHeight = undefined;
-
-                //this.renderTo = undefined;
-
-                //this.spacingBox = undefined
-
-                //this.legend = undefined;
-
-                // Elements
-                //this.chartBackground = undefined;
-                //this.plotBackground = undefined;
-                //this.plotBGImage = undefined;
-                //this.plotBorder = undefined;
-                //this.loadingDiv = undefined;
-                //this.loadingSpan = undefined;
 
                 var chart = this;
 
@@ -16963,7 +19449,7 @@
                         chart[name] = title = title.destroy(); // remove old
                     }
 
-                    if (chartTitleOptions && chartTitleOptions.text && !title) {
+                    if (chartTitleOptions && !title) {
                         chart[name] = chart.renderer.text(
                                 chartTitleOptions.text,
                                 0,
@@ -17060,10 +19546,10 @@
 
                 // Get inner width and height
                 if (!defined(widthOption)) {
-                    chart.containerWidth = getStyle(renderTo, 'width');
+                    chart.containerWidth = H.getStyle(renderTo, 'width');
                 }
                 if (!defined(heightOption)) {
-                    chart.containerHeight = getStyle(renderTo, 'height');
+                    chart.containerHeight = H.getStyle(renderTo, 'height');
                 }
 
                 /**
@@ -17089,7 +19575,8 @@
                     H.relativeLength(
                         heightOption,
                         chart.chartWidth
-                    ) || chart.containerHeight || 400
+                    ) ||
+                    (chart.containerHeight > 1 ? chart.containerHeight : 400)
                 );
             },
 
@@ -17111,13 +19598,14 @@
                     while (node && node.style) {
 
                         // When rendering to a detached node, it needs to be temporarily
-                        // attached in order to read styling and bounding boxes (#5783).
-                        if (!doc.body.contains(node)) {
+                        // attached in order to read styling and bounding boxes (#5783,
+                        // #7024).
+                        if (!doc.body.contains(node) && !node.parentNode) {
                             node.hcOrigDetached = true;
                             doc.body.appendChild(node);
                         }
                         if (
-                            getStyle(node, 'display', false) === 'none' ||
+                            H.getStyle(node, 'display', false) === 'none' ||
                             node.hcOricDetached
                         ) {
                             node.hcOrigStyle = {
@@ -17263,7 +19751,8 @@
                 chart._cursor = container.style.cursor;
 
                 // Initialize the renderer
-                Ren = H[optionsChart.renderer] || Renderer;
+                Ren = H[optionsChart.renderer] || H.Renderer;
+
                 /**
                  * The renderer instance of the chart. Each chart instance has only one
                  * associated renderer.
@@ -17317,7 +19806,7 @@
                 }
 
                 // Adjust for legend
-                if (chart.legend.display) {
+                if (chart.legend && chart.legend.display) {
                     chart.legend.adjustMargins(margin, spacing);
                 }
 
@@ -17326,9 +19815,12 @@
                     chart[chart.extraMargin.type] =
                         (chart[chart.extraMargin.type] || 0) + chart.extraMargin.value;
                 }
-                if (chart.extraTopMargin) {
-                    chart.plotTop += chart.extraTopMargin;
+
+                // adjust for rangeSelector 
+                if (chart.adjustPlotArea) {
+                    chart.adjustPlotArea();
                 }
+
                 if (!skipAxes) {
                     this.getAxisMargins();
                 }
@@ -17386,8 +19878,8 @@
                         defined(optionsChart.width) &&
                         defined(optionsChart.height)
                     ),
-                    width = optionsChart.width || getStyle(renderTo, 'width'),
-                    height = optionsChart.height || getStyle(renderTo, 'height'),
+                    width = optionsChart.width || H.getStyle(renderTo, 'width'),
+                    height = optionsChart.height || H.getStyle(renderTo, 'height'),
                     target = e ? e.target : win;
 
                 // Width and height checks for display:none. Target is doc in IE8 and
@@ -17548,11 +20040,6 @@
                     plotHeight,
                     plotBorderWidth;
 
-                function clipOffsetSide(side) {
-                    var offset = clipOffset[side] || 0;
-                    return Math.max(plotBorderWidth || offset, offset) / 2;
-                }
-
                 /**
                  * The current left position of the plot area in pixels.
                  *
@@ -17615,21 +20102,21 @@
                 };
 
                 plotBorderWidth = 2 * Math.floor(chart.plotBorderWidth / 2);
-                clipX = Math.ceil(clipOffsetSide(3));
-                clipY = Math.ceil(clipOffsetSide(0));
+                clipX = Math.ceil(Math.max(plotBorderWidth, clipOffset[3]) / 2);
+                clipY = Math.ceil(Math.max(plotBorderWidth, clipOffset[0]) / 2);
                 chart.clipBox = {
                     x: clipX,
                     y: clipY,
                     width: Math.floor(
                         chart.plotSizeX -
-                        clipOffsetSide(1) -
+                        Math.max(plotBorderWidth, clipOffset[1]) / 2 -
                         clipX
                     ),
                     height: Math.max(
                         0,
                         Math.floor(
                             chart.plotSizeY -
-                            clipOffsetSide(2) -
+                            Math.max(plotBorderWidth, clipOffset[2]) / 2 -
                             clipY
                         )
                     )
@@ -17671,7 +20158,7 @@
                     chart[m] = pick(chart.margin[side], chart.spacing[side]);
                 });
                 chart.axisOffset = [0, 0, 0, 0]; // top, right, bottom, left
-                chart.clipOffset = [];
+                chart.clipOffset = [0, 0, 0, 0];
             },
 
             /**
@@ -17762,7 +20249,7 @@
                     y: plotTop,
                     width: plotWidth,
                     height: plotHeight
-                }, -plotBorder.strokeWidth())); //#3282 plotBorder should be negative;
+                }, -plotBorder.strokeWidth())); // #3282 plotBorder should be negative;
 
                 // reset
                 chart.isDirtyBox = false;
@@ -17928,7 +20415,9 @@
 
                 // Record preliminary dimensions for later comparison
                 tempWidth = chart.plotWidth;
-                tempHeight = chart.plotHeight = chart.plotHeight - 21; // 21 is the most common correction for X axis labels
+                // 21 is the most common correction for X axis labels
+                // use Math.max to prevent negative plotHeight
+                tempHeight = chart.plotHeight = Math.max(chart.plotHeight - 21, 0);
 
                 // Get margins by pre-rendering axes
                 each(axes, function(axis) {
@@ -18314,6 +20803,14 @@
                 } else {
                     colorIndex = series.colorIndex;
                 }
+
+                /**
+                 * The point's current color index, used in styled mode instead of 
+                 * `color`. The color index is inserted in class names used for styling.
+                 * @name colorIndex
+                 * @memberof Highcharts.Point
+                 * @type {Number}
+                 */
                 point.colorIndex = pick(point.colorIndex, colorIndex);
 
                 series.chart.pointCount++;
@@ -18643,6 +21140,32 @@
          */
 
         /**
+         * The name of the point. The name can be given as the first position of the 
+         * point configuration array, or as a `name` property in the configuration:
+         *
+         * @example
+         * // Array config
+         * data: [
+         *     ['John', 1],
+         *     ['Jane', 2]
+         * ]
+         *
+         * // Object config
+         * data: [{
+         * 	   name: 'John',
+         * 	   y: 1
+         * }, {
+         *     name: 'Jane',
+         *     y: 2
+         * }]
+         *
+         * @name name
+         * @memberOf Highcharts.Point
+         * @type {String}
+         */
+
+
+        /**
          * The percentage for points in a stacked series or pies.
          *
          * @name percentage
@@ -18712,9 +21235,10 @@
 
         /**
          * This is the base series prototype that all other series types inherit from.
-         * A new series is initialized either through the {@link https://api.highcharts.com/highcharts/series|
-         * series} option structure, or after the chart is initialized, through {@link
-         * Highcharts.Chart#addSeries}.
+         * A new series is initialized either through the
+         * {@link https://api.highcharts.com/highcharts/series|series} option structure,
+         * or after the chart is initialized, through
+         * {@link Highcharts.Chart#addSeries}.
          *
          * The object can be accessed in a number of ways. All series and point event
          * handlers give a reference to the `series` object. The chart object has a
@@ -18727,7 +21251,8 @@
          * Highcharts.Chart#get}.
          *
          * Configuration options for the series are given in three levels. Options for
-         * all series in a chart are given in the {@link https://api.highcharts.com/highcharts/plotOptions.series|
+         * all series in a chart are given in the
+         * {@link https://api.highcharts.com/highcharts/plotOptions.series|
          * plotOptions.series} object. Then options for all series of a specific type
          * are given in the plotOptions of that type, for example `plotOptions.line`.
          * Next, options for one single series are given in the series array, or as
@@ -18738,18 +21263,18 @@
          * - First, `series.options.data` contains all the original config options for
          * each point whether added by options or methods like `series.addPoint`.
          * - Next, `series.data` contains those values converted to points, but in case
-         * the series data length exceeds the `cropThreshold`, or if the data is grouped,
-         * `series.data` doesn't contain all the points. It only contains the points that
-         * have been created on demand.
+         * the series data length exceeds the `cropThreshold`, or if the data is
+         * grouped, `series.data` doesn't contain all the points. It only contains the
+         * points that have been created on demand.
          * - Then there's `series.points` that contains all currently visible point
          * objects. In case of cropping, the cropped-away points are not part of this
          * array. The `series.points` array starts at `series.cropStart` compared to
-         * `series.data` and `series.options.data`. If however the series data is grouped,
-         * these can't be correlated one to one.
-         * - `series.xData` and `series.processedXData` contain clean x values, equivalent
-         * to `series.data` and `series.points`.
-         * - `series.yData` and `series.processedYData` contain clean y values, equivalent
-         * to `series.data` and `series.points`.
+         * `series.data` and `series.options.data`. If however the series data is
+         * grouped, these can't be correlated one to one.
+         * - `series.xData` and `series.processedXData` contain clean x values,
+         * equivalent to `series.data` and `series.points`.
+         * - `series.yData` and `series.processedYData` contain clean y values,
+         * equivalent to `series.data` and `series.points`.
          *
          * @class Highcharts.Series
          * @param  {Highcharts.Chart} chart
@@ -18781,12 +21306,14 @@
              * Allow this series' points to be selected by clicking on the graphic 
              * (columns, point markers, pie slices, map areas etc).
              *
-             * @see [Chart#getSelectedPoints](../class-reference/Highcharts.Chart#getSelectedPoints).
+             * @see [Chart#getSelectedPoints]
+             *      (../class-reference/Highcharts.Chart#getSelectedPoints).
              * 
              * @type {Boolean}
              * @sample {highcharts} highcharts/plotoptions/series-allowpointselect-line/
              *         Line
-             * @sample {highcharts} highcharts/plotoptions/series-allowpointselect-column/
+             * @sample {highcharts}
+             *         highcharts/plotoptions/series-allowpointselect-column/
              *         Column
              * @sample {highcharts} highcharts/plotoptions/series-allowpointselect-pie/
              *         Pie
@@ -18796,7 +21323,6 @@
              *         Map bubble
              * @default false
              * @since 1.2.0
-             * @product highcharts highstock highmaps
              */
             allowPointSelect: false,
 
@@ -18838,8 +21364,7 @@
              * <dt>easing</dt>
              * 
              * <dd>A string reference to an easing function set on the `Math` object.
-             * See [the easing demo](http://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/plotoptions/series-
-             * animation-easing/).</dd>
+             * See the _Custom easing function_ demo below.</dd>
              * 
              * </dl>
              * 
@@ -18866,10 +21391,6 @@
              * @default {highmaps} false
              */
             animation: {
-
-
-                /**
-                 */
                 duration: 1000
             },
 
@@ -18887,12 +21408,11 @@
              * series it applies to the bars unless a color is specified per point.
              * The default value is pulled from the `options.colors` array.
              * 
-             * In [styled mode](http://www.highcharts.com/docs/chart-design-and-
-             * style/style-by-css), the color can be defined by the [colorIndex](#plotOptions.
-             * series.colorIndex) option. Also, the series color can be set with
-             * the `.highcharts-series`, `.highcharts-color-{n}`, `.highcharts-{type}-
-             * series` or `.highcharts-series-{n}` class, or individual classes
-             * given by the `className` option.
+             * In styled mode, the color can be defined by the
+             * [colorIndex](#plotOptions.series.colorIndex) option. Also, the series
+             * color can be set with the `.highcharts-series`, `.highcharts-color-{n}`,
+             * `.highcharts-{type}-series` or `.highcharts-series-{n}` class, or
+             * individual classes given by the `className` option.
              *
              * @productdesc {highmaps}
              * In maps, the series color is rarely used, as most choropleth maps use the
@@ -18912,8 +21432,7 @@
              */
 
             /**
-             * [Styled mode](http://www.highcharts.com/docs/chart-design-and-style/style-
-             * by-css) only. A specific color index to use for the series, so its
+             * Styled mode only. A specific color index to use for the series, so its
              * graphic representations are given the class name `highcharts-color-
              * {n}`.
              * 
@@ -18944,8 +21463,7 @@
              * 
              * @validvalue [null, "default", "none", "help", "pointer", "crosshair"]
              * @type {String}
-             * @see In [styled mode](http://www.highcharts.com/docs/chart-design-and-
-             * style/style-by-css), the series cursor can be set with the same classes
+             * @see In styled mode, the series cursor can be set with the same classes
              * as listed under [series.color](#plotOptions.series.color).
              * @sample {highcharts} highcharts/plotoptions/series-cursor-line/
              *         On line graph
@@ -18983,10 +21501,11 @@
              *             "ShortDashDotDot", "Dot", "Dash" ,"LongDash", "DashDot",
              *             "LongDashDot", "LongDashDotDot"]
              * @type {String}
-             * @see In [styled mode](http://www.highcharts.com/docs/chart-design-and-
-             * style/style-by-css), the [stroke dash-array](http://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/css/series-
-             * dashstyle/) can be set with the same classes as listed under [series.
-             * color](#plotOptions.series.color).
+             * @see In styled mode, the [stroke dash-array](http://jsfiddle.net/gh/get/
+             * library/pure/highcharts/highcharts/tree/master/samples/highcharts/css/
+             * series-dashstyle/) can be set with the same classes as listed under
+             * [series.color](#plotOptions.series.color).
+             * 
              * @sample {highcharts} highcharts/plotoptions/series-dashstyle-all/
              *         Possible values demonstrated
              * @sample {highcharts} highcharts/plotoptions/series-dashstyle/
@@ -19024,8 +21543,12 @@
              * large datasets it improves performance.
              * 
              * @type {Boolean}
-             * @sample {highcharts} highcharts/plotoptions/series-enablemousetracking-false/ No mouse tracking
-             * @sample {highmaps} maps/plotoptions/series-enablemousetracking-false/ No mouse tracking
+             * @sample {highcharts}
+             *         highcharts/plotoptions/series-enablemousetracking-false/
+             *         No mouse tracking
+             * @sample {highmaps}
+             *         maps/plotoptions/series-enablemousetracking-false/
+             *         No mouse tracking
              * @default true
              * @apioption plotOptions.series.enableMouseTracking
              */
@@ -19040,9 +21563,8 @@
              * Requires the Accessibility module.
              * 
              * @type {Boolean}
-             * @sample {highcharts} highcharts/accessibility/art-grants/ Accessible data visualization
-             * @sample {highstock} highcharts/accessibility/art-grants/ Accessible data visualization
-             * @sample {highmaps} highcharts/accessibility/art-grants/ Accessible data visualization
+             * @sample highcharts/accessibility/art-grants/
+             *         Accessible data visualization
              * @default undefined
              * @since 5.0.12
              * @apioption plotOptions.series.exposeElementToA11y
@@ -19062,17 +21584,49 @@
              */
 
             /**
+             * An id for the series. This can be used after render time to get a
+             * pointer to the series object through `chart.get()`.
+             * 
+             * @type {String}
+             * @sample {highcharts} highcharts/plotoptions/series-id/ Get series by id
+             * @since 1.2.0
+             * @apioption series.id
+             */
+
+            /**
+             * The index of the series in the chart, affecting the internal index
+             * in the `chart.series` array, the visible Z index as well as the order
+             * in the legend.
+             * 
+             * @type {Number}
+             * @default undefined
+             * @since 2.3.0
+             * @apioption series.index
+             */
+
+            /**
              * An array specifying which option maps to which key in the data point
              * array. This makes it convenient to work with unstructured data arrays
              * from different sources.
              * 
              * @type {Array<String>}
-             * @see [series.data](#series<line>.data)
-             * @sample {highcharts} highcharts/series/data-keys/ An extended data array with keys
-             * @sample {highstock} highcharts/series/data-keys/ An extended data array with keys
+             * @see [series.data](#series.line.data)
+             * @sample {highcharts|highstock} highcharts/series/data-keys/
+             *         An extended data array with keys
              * @since 4.1.6
              * @product highcharts highstock
              * @apioption plotOptions.series.keys
+             */
+
+            /**
+             * The sequential index of the series in the legend.
+             * 
+             * @sample {highcharts|highstock} highcharts/series/legendindex/
+             *         Legend in opposite order
+             * @type {Number}
+             * @see [legend.reversed](#legend.reversed), [yAxis.reversedStacks](#yAxis.
+             * reversedStacks)
+             * @apioption series.legendIndex
              */
 
             /**
@@ -19100,21 +21654,36 @@
              */
 
             /**
+             * The name of the series as shown in the legend, tooltip etc.
+             * 
+             * @type {String}
+             * @sample {highcharts} highcharts/series/name/ Series name
+             * @sample {highmaps} maps/demo/category-map/ Series name
+             * @apioption series.name
+             */
+
+            /**
              * The color for the parts of the graph or points that are below the
              * [threshold](#plotOptions.series.threshold).
              * 
              * @type {Color}
-             * @see In [styled mode](http://www.highcharts.com/docs/chart-design-and-
-             * style/style-by-css), a negative color is applied by setting this
-             * option to `true` combined with the `.highcharts-negative` class name
-             * ([view live demo](http://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/css/series-
-             * negative-color/)).
-             * @sample {highcharts} highcharts/plotoptions/series-negative-color/ Spline, area and column
-             * @sample {highcharts} highcharts/plotoptions/arearange-negativecolor/ Arearange
-             * @sample {highstock} highcharts/plotoptions/series-negative-color/ Spline, area and column
-             * @sample {highstock} highcharts/plotoptions/arearange-negativecolor/ Arearange
-             * @sample {highmaps} highcharts/plotoptions/series-negative-color/ Spline, area and column
-             * @sample {highmaps} highcharts/plotoptions/arearange-negativecolor/ Arearange
+             * @see In styled mode, a negative color is applied by setting this
+             * option to `true` combined with the `.highcharts-negative` class name.
+             * 
+             * @sample {highcharts} highcharts/plotoptions/series-negative-color/
+             *         Spline, area and column
+             * @sample {highcharts} highcharts/plotoptions/arearange-negativecolor/
+             *         Arearange
+             * @sample {highcharts} highcharts/css/series-negative-color/
+             *         Styled mode
+             * @sample {highstock} highcharts/plotoptions/series-negative-color/
+             *         Spline, area and column
+             * @sample {highstock} highcharts/plotoptions/arearange-negativecolor/
+             *         Arearange
+             * @sample {highmaps} highcharts/plotoptions/series-negative-color/
+             *         Spline, area and column
+             * @sample {highmaps} highcharts/plotoptions/arearange-negativecolor/
+             *         Arearange
              * @default null
              * @since 3.0
              * @apioption plotOptions.series.negativeColor
@@ -19134,7 +21703,8 @@
              * If no x values are given for the points in a series, `pointInterval`
              * defines the interval of the x values. For example, if a series contains
              * one value every decade starting from year 0, set `pointInterval` to
-             * 10. In true `datetime` axes, the `pointInterval` is set in milliseconds.
+             * `10`. In true `datetime` axes, the `pointInterval` is set in
+             * milliseconds.
              * 
              * It can be also be combined with `pointIntervalUnit` to draw irregular
              * time intervals.
@@ -19150,17 +21720,19 @@
              */
 
             /**
-             * On datetime series, this allows for setting the [pointInterval](#plotOptions.
-             * series.pointInterval) to irregular time units, `day`, `month` and
-             * `year`. A day is usually the same as 24 hours, but pointIntervalUnit
-             * also takes the DST crossover into consideration when dealing with
-             * local time. Combine this option with `pointInterval` to draw weeks,
-             *  quarters, 6 months, 10 years etc.
+             * On datetime series, this allows for setting the
+             * [pointInterval](#plotOptions.series.pointInterval) to irregular time 
+             * units, `day`, `month` and `year`. A day is usually the same as 24 hours,
+             * but `pointIntervalUnit` also takes the DST crossover into consideration
+             * when dealing with local time. Combine this option with `pointInterval`
+             * to draw weeks, quarters, 6 months, 10 years etc.
              * 
              * @validvalue [null, "day", "month", "year"]
              * @type {String}
-             * @sample {highcharts} highcharts/plotoptions/series-pointintervalunit/ One point a month
-             * @sample {highstock} highcharts/plotoptions/series-pointintervalunit/ One point a month
+             * @sample {highcharts} highcharts/plotoptions/series-pointintervalunit/
+             *         One point a month
+             * @sample {highstock} highcharts/plotoptions/series-pointintervalunit/
+             *         One point a month
              * @since 4.1.0
              * @product highcharts highstock
              * @apioption plotOptions.series.pointIntervalUnit
@@ -19191,10 +21763,12 @@
              * @validvalue [null, "on", "between"]
              * @type {String|Number}
              * @see [xAxis.tickmarkPlacement](#xAxis.tickmarkPlacement)
-             * @sample {highcharts} highcharts/plotoptions/series-pointplacement-between/ Between in a column chart
-             * @sample {highcharts} highcharts/plotoptions/series-pointplacement-numeric/ Numeric placement for custom layout
-             * @sample {highstock} highcharts/plotoptions/series-pointplacement-between/ Between in a column chart
-             * @sample {highstock} highcharts/plotoptions/series-pointplacement-numeric/ Numeric placement for custom layout
+             * @sample {highcharts|highstock}
+             *         highcharts/plotoptions/series-pointplacement-between/
+             *         Between in a column chart
+             * @sample {highcharts|highstock}
+             *         highcharts/plotoptions/series-pointplacement-numeric/
+             *         Numeric placement for custom layout
              * @default null
              * @since 2.3.0
              * @product highcharts highstock
@@ -19207,9 +21781,12 @@
              * value starting from 1945, set pointStart to 1945.
              * 
              * @type {Number}
-             * @sample {highcharts} highcharts/plotoptions/series-pointstart-linear/ Linear
-             * @sample {highcharts} highcharts/plotoptions/series-pointstart-datetime/ Datetime
-             * @sample {highstock} stock/plotoptions/pointinterval-pointstart/ Using pointStart and pointInterval
+             * @sample {highcharts} highcharts/plotoptions/series-pointstart-linear/
+             *         Linear
+             * @sample {highcharts} highcharts/plotoptions/series-pointstart-datetime/
+             *         Datetime
+             * @sample {highstock} stock/plotoptions/pointinterval-pointstart/
+             *         Using pointStart and pointInterval
              * @default 0
              * @product highcharts highstock
              * @apioption plotOptions.series.pointStart
@@ -19245,7 +21822,8 @@
              * series.
              * 
              * @type {Boolean}
-             * @sample {highcharts} highcharts/plotoptions/series-showinlegend/ One series in the legend, one hidden
+             * @sample {highcharts} highcharts/plotoptions/series-showinlegend/
+             *         One series in the legend, one hidden
              * @default true
              * @apioption plotOptions.series.showInLegend
              */
@@ -19260,23 +21838,47 @@
              */
 
             /**
+             * This option allows grouping series in a stacked chart. The stack
+             * option can be a string or a number or anything else, as long as the
+             * grouped series' stack options match each other.
+             * 
+             * @type {String}
+             * @sample {highcharts} highcharts/series/stack/ Stacked and grouped columns
+             * @default null
+             * @since 2.1
+             * @product highcharts highstock
+             * @apioption series.stack
+             */
+
+            /**
              * Whether to stack the values of each series on top of each other.
-             * Possible values are null to disable, "normal" to stack by value or
-             * "percent". When stacking is enabled, data must be sorted in ascending
-             * X order.
+             * Possible values are `null` to disable, `"normal"` to stack by value or
+             * `"percent"`. When stacking is enabled, data must be sorted in ascending
+             * X order. A special stacking option is with the streamgraph series type,
+             * where the stacking option is set to `"stream"`.
              * 
              * @validvalue [null, "normal", "percent"]
              * @type {String}
              * @see [yAxis.reversedStacks](#yAxis.reversedStacks)
-             * @sample {highcharts} highcharts/plotoptions/series-stacking-line/ Line
-             * @sample {highcharts} highcharts/plotoptions/series-stacking-column/ Column
-             * @sample {highcharts} highcharts/plotoptions/series-stacking-bar/ Bar
-             * @sample {highcharts} highcharts/plotoptions/series-stacking-area/ Area
-             * @sample {highcharts} highcharts/plotoptions/series-stacking-percent-line/ Line
-             * @sample {highcharts} highcharts/plotoptions/series-stacking-percent-column/ Column
-             * @sample {highcharts} highcharts/plotoptions/series-stacking-percent-bar/ Bar
-             * @sample {highcharts} highcharts/plotoptions/series-stacking-percent-area/ Area
-             * @sample {highstock} stock/plotoptions/stacking/ Area
+             * @sample {highcharts} highcharts/plotoptions/series-stacking-line/
+             *         Line
+             * @sample {highcharts} highcharts/plotoptions/series-stacking-column/
+             *         Column
+             * @sample {highcharts} highcharts/plotoptions/series-stacking-bar/
+             *         Bar
+             * @sample {highcharts} highcharts/plotoptions/series-stacking-area/
+             *         Area
+             * @sample {highcharts} highcharts/plotoptions/series-stacking-percent-line/
+             *         Line
+             * @sample {highcharts}
+             *         highcharts/plotoptions/series-stacking-percent-column/
+             *         Column
+             * @sample {highcharts} highcharts/plotoptions/series-stacking-percent-bar/
+             *         Bar
+             * @sample {highcharts} highcharts/plotoptions/series-stacking-percent-area/
+             *         Area
+             * @sample {highstock} stock/plotoptions/stacking/
+             *         Area
              * @default null
              * @product highcharts highstock
              * @apioption plotOptions.series.stacking
@@ -19288,9 +21890,12 @@
              * 
              * @validvalue [null, "left", "center", "right"]
              * @type {String}
-             * @sample {highcharts} highcharts/plotoptions/line-step/ Different step line options
-             * @sample {highcharts} highcharts/plotoptions/area-step/ Stepped, stacked area
-             * @sample {highstock} stock/plotoptions/line-step/ Step line
+             * @sample {highcharts} highcharts/plotoptions/line-step/
+             *         Different step line options
+             * @sample {highcharts} highcharts/plotoptions/area-step/
+             *         Stepped, stacked area
+             * @sample {highstock} stock/plotoptions/line-step/
+             *         Step line
              * @default {highcharts} null
              * @default {highstock} false
              * @since 1.2.5
@@ -19300,8 +21905,8 @@
 
             /**
              * The threshold, also called zero level or base level. For line type
-             * series this is only used in conjunction with [negativeColor](#plotOptions.
-             * series.negativeColor).
+             * series this is only used in conjunction with
+             * [negativeColor](#plotOptions.series.negativeColor).
              * 
              * @type {Number}
              * @see [softThreshold](#plotOptions.series.softThreshold).
@@ -19312,22 +21917,67 @@
              */
 
             /**
+             * The type of series, for example `line` or `column`.
+             * 
+             * @validvalue [null, "line", "spline", "column", "area", "areaspline",
+             *       "pie", "arearange", "areasplinerange", "boxplot", "bubble",
+             *       "columnrange", "errorbar", "funnel", "gauge", "scatter",
+             *       "waterfall"]
+             * @type {String}
+             * @sample {highcharts} highcharts/series/type/
+             *         Line and column in the same chart
+             * @sample {highmaps} maps/demo/mapline-mappoint/
+             *         Multiple types in the same map
+             * @apioption series.type
+             */
+
+            /**
              * Set the initial visibility of the series.
              * 
              * @type {Boolean}
-             * @sample {highcharts} highcharts/plotoptions/series-visible/ Two series, one hidden and one visible
-             * @sample {highstock} stock/plotoptions/series-visibility/ Hidden series
+             * @sample {highcharts} highcharts/plotoptions/series-visible/
+             *         Two series, one hidden and one visible
+             * @sample {highstock} stock/plotoptions/series-visibility/
+             *         Hidden series
              * @default true
              * @apioption plotOptions.series.visible
+             */
+
+            /**
+             * When using dual or multiple x axes, this number defines which xAxis
+             * the particular series is connected to. It refers to either the [axis
+             * id](#xAxis.id) or the index of the axis in the xAxis array, with
+             * 0 being the first.
+             * 
+             * @type {Number|String}
+             * @default 0
+             * @product highcharts highstock
+             * @apioption series.xAxis
+             */
+
+            /**
+             * When using dual or multiple y axes, this number defines which yAxis
+             * the particular series is connected to. It refers to either the [axis
+             * id](#yAxis.id) or the index of the axis in the yAxis array, with
+             * 0 being the first.
+             * 
+             * @type {Number|String}
+             * @sample {highcharts} highcharts/series/yaxis/
+             *         Apply the column series to the secondary Y axis
+             * @default 0
+             * @product highcharts highstock
+             * @apioption series.yAxis
              */
 
             /**
              * Defines the Axis on which the zones are applied.
              * 
              * @type {String}
-             * @see [zones](#plotOption.series.zones)
-             * @sample {highcharts} highcharts/series/color-zones-zoneaxis-x/ Zones on the X-Axis
-             * @sample {highstock} highcharts/series/color-zones-zoneaxis-x/ Zones on the X-Axis
+             * @see [zones](#plotOptions.series.zones)
+             * @sample {highcharts} highcharts/series/color-zones-zoneaxis-x/
+             *         Zones on the X-Axis
+             * @sample {highstock} highcharts/series/color-zones-zoneaxis-x/
+             *         Zones on the X-Axis
              * @default y
              * @since 4.1.0
              * @product highcharts highstock
@@ -19335,9 +21985,149 @@
              */
 
             /**
-             * @product highcharts highstock highmaps
+             * Define the visual z index of the series.
+             * 
+             * @type {Number}
+             * @sample {highcharts} highcharts/plotoptions/series-zindex-default/
+             *         With no z index, the series defined last are on top
+             * @sample {highcharts} highcharts/plotoptions/series-zindex/
+             *         With a z index, the series with the highest z index is on top
+             * @sample {highstock} highcharts/plotoptions/series-zindex-default/
+             *         With no z index, the series defined last are on top
+             * @sample {highstock} highcharts/plotoptions/series-zindex/
+             *         With a z index, the series with the highest z index is on top
+             * @product highcharts highstock
+             * @apioption series.zIndex
              */
-            events: {},
+
+            /**
+             * General event handlers for the series items. These event hooks can also
+             * be attached to the series at run time using the `Highcharts.addEvent`
+             * function.
+             */
+            events: {
+
+                /**
+                 * Fires after the series has finished its initial animation, or in
+                 * case animation is disabled, immediately as the series is displayed.
+                 * 
+                 * @type {Function}
+                 * @context Series
+                 * @sample {highcharts}
+                 *         highcharts/plotoptions/series-events-afteranimate/
+                 *         Show label after animate
+                 * @sample {highstock}
+                 *         highcharts/plotoptions/series-events-afteranimate/
+                 *         Show label after animate
+                 * @since 4.0
+                 * @product highcharts highstock
+                 * @apioption plotOptions.series.events.afterAnimate
+                 */
+
+                /**
+                 * Fires when the checkbox next to the series' name in the legend is
+                 * clicked. One parameter, `event`, is passed to the function. The state
+                 * of the checkbox is found by `event.checked`. The checked item is
+                 * found by `event.item`. Return `false` to prevent the default action
+                 * which is to toggle the select state of the series.
+                 * 
+                 * @type {Function}
+                 * @context Series
+                 * @sample {highcharts}
+                 *         highcharts/plotoptions/series-events-checkboxclick/
+                 *         Alert checkbox status
+                 * @since 1.2.0
+                 * @apioption plotOptions.series.events.checkboxClick
+                 */
+
+                /**
+                 * Fires when the series is clicked. One parameter, `event`, is passed
+                 * to the function, containing common event information. Additionally,
+                 * `event.point` holds a pointer to the nearest point on the graph.
+                 * 
+                 * @type {Function}
+                 * @context Series
+                 * @sample {highcharts} highcharts/plotoptions/series-events-click/
+                 *         Alert click info
+                 * @sample {highstock} stock/plotoptions/series-events-click/
+                 *         Alert click info
+                 * @sample {highmaps} maps/plotoptions/series-events-click/
+                 *         Display click info in subtitle
+                 * @apioption plotOptions.series.events.click
+                 */
+
+                /**
+                 * Fires when the series is hidden after chart generation time, either
+                 * by clicking the legend item or by calling `.hide()`.
+                 * 
+                 * @type {Function}
+                 * @context Series
+                 * @sample {highcharts} highcharts/plotoptions/series-events-hide/
+                 *         Alert when the series is hidden by clicking the legend item
+                 * @since 1.2.0
+                 * @apioption plotOptions.series.events.hide
+                 */
+
+                /**
+                 * Fires when the legend item belonging to the series is clicked. One
+                 * parameter, `event`, is passed to the function. The default action
+                 * is to toggle the visibility of the series. This can be prevented
+                 * by returning `false` or calling `event.preventDefault()`.
+                 * 
+                 * @type {Function}
+                 * @context Series
+                 * @sample {highcharts}
+                 *         highcharts/plotoptions/series-events-legenditemclick/
+                 *         Confirm hiding and showing
+                 * @apioption plotOptions.series.events.legendItemClick
+                 */
+
+                /**
+                 * Fires when the mouse leaves the graph. One parameter, `event`, is
+                 * passed to the function, containing common event information. If the
+                 * [stickyTracking](#plotOptions.series) option is true, `mouseOut`
+                 * doesn't happen before the mouse enters another graph or leaves the
+                 * plot area.
+                 * 
+                 * @type {Function}
+                 * @context Series
+                 * @sample {highcharts}
+                 *         highcharts/plotoptions/series-events-mouseover-sticky/
+                 *         With sticky tracking    by default
+                 * @sample {highcharts}
+                 *         highcharts/plotoptions/series-events-mouseover-no-sticky/
+                 *         Without sticky tracking
+                 * @apioption plotOptions.series.events.mouseOut
+                 */
+
+                /**
+                 * Fires when the mouse enters the graph. One parameter, `event`, is
+                 * passed to the function, containing common event information.
+                 * 
+                 * @type {Function}
+                 * @context Series
+                 * @sample {highcharts}
+                 *         highcharts/plotoptions/series-events-mouseover-sticky/
+                 *         With sticky tracking by default
+                 * @sample {highcharts}
+                 *         highcharts/plotoptions/series-events-mouseover-no-sticky/
+                 *         Without sticky tracking
+                 * @apioption plotOptions.series.events.mouseOver
+                 */
+
+                /**
+                 * Fires when the series is shown after chart generation time, either
+                 * by clicking the legend item or by calling `.show()`.
+                 * 
+                 * @type {Function}
+                 * @context Series
+                 * @sample {highcharts} highcharts/plotoptions/series-events-show/
+                 *         Alert when the series is shown by clicking the legend item.
+                 * @since 1.2.0
+                 * @apioption plotOptions.series.events.show
+                 */
+
+            },
 
 
 
@@ -19347,67 +22137,179 @@
              * of the markers. Other series types, like column series, don't have
              * markers, but have visual options on the series level instead.
              * 
-             * In [styled mode](http://www.highcharts.com/docs/chart-design-and-
-             * style/style-by-css), the markers can be styled with the `.highcharts-
-             * point`, `.highcharts-point-hover` and `.highcharts-point-select`
+             * In styled mode, the markers can be styled with the `.highcharts-point`,
+             * `.highcharts-point-hover` and `.highcharts-point-select`
              * class names.
              * 
              * @product highcharts highstock
              */
             marker: {
 
-                //enabled: true,
-                //symbol: null,
 
+                /**
+                 * Enable or disable the point marker. If `null`, the markers are hidden
+                 * when the data is dense, and shown for more widespread data points.
+                 * 
+                 * @type {Boolean}
+                 * @sample {highcharts} highcharts/plotoptions/series-marker-enabled/
+                 *         Disabled markers
+                 * @sample {highcharts}
+                 *         highcharts/plotoptions/series-marker-enabled-false/
+                 *         Disabled in normal state but enabled on hover
+                 * @sample {highstock} stock/plotoptions/series-marker/
+                 *         Enabled markers
+                 * @default {highcharts} null
+                 * @default {highstock} false
+                 * @product highcharts highstock
+                 * @apioption plotOptions.series.marker.enabled
+                 */
+
+                /**
+                 * Image markers only. Set the image width explicitly. When using this
+                 * option, a `width` must also be set.
+                 * 
+                 * @type {Number}
+                 * @sample {highcharts}
+                 *         highcharts/plotoptions/series-marker-width-height/
+                 *         Fixed width and height
+                 * @sample {highstock}
+                 *         highcharts/plotoptions/series-marker-width-height/
+                 *         Fixed width and height
+                 * @default null
+                 * @since 4.0.4
+                 * @product highcharts highstock
+                 * @apioption plotOptions.series.marker.height
+                 */
+
+                /**
+                 * A predefined shape or symbol for the marker. When null, the symbol
+                 * is pulled from options.symbols. Other possible values are "circle",
+                 * "square", "diamond", "triangle" and "triangle-down".
+                 * 
+                 * Additionally, the URL to a graphic can be given on this form:
+                 * "url(graphic.png)". Note that for the image to be applied to exported
+                 * charts, its URL needs to be accessible by the export server.
+                 * 
+                 * Custom callbacks for symbol path generation can also be added to
+                 * `Highcharts.SVGRenderer.prototype.symbols`. The callback is then
+                 * used by its method name, as shown in the demo.
+                 * 
+                 * @validvalue [null, "circle", "square", "diamond", "triangle",
+                 *         "triangle-down"]
+                 * @type {String}
+                 * @sample {highcharts} highcharts/plotoptions/series-marker-symbol/
+                 *         Predefined, graphic and custom markers
+                 * @sample {highstock} highcharts/plotoptions/series-marker-symbol/
+                 *         Predefined, graphic and custom markers
+                 * @default null
+                 * @product highcharts highstock
+                 * @apioption plotOptions.series.marker.symbol
+                 */
 
                 /**
                  * The radius of the point marker.
                  * 
                  * @type {Number}
-                 * @sample {highcharts} highcharts/plotoptions/series-marker-radius/ Bigger markers
+                 * @sample {highcharts} highcharts/plotoptions/series-marker-radius/
+                 *         Bigger markers
                  * @default 4
                  * @product highcharts highstock
                  */
                 radius: 4,
 
+                /**
+                 * Image markers only. Set the image width explicitly. When using this
+                 * option, a `height` must also be set.
+                 * 
+                 * @type {Number}
+                 * @sample {highcharts}
+                 *         highcharts/plotoptions/series-marker-width-height/
+                 *         Fixed width and height
+                 * @sample {highstock}
+                 *         highcharts/plotoptions/series-marker-width-height/
+                 *         Fixed width and height
+                 * @default null
+                 * @since 4.0.4
+                 * @product highcharts highstock
+                 * @apioption plotOptions.series.marker.width
+                 */
+
 
                 /**
+                 * States for a single point marker.
                  * @product highcharts highstock
                  */
-                states: { // states for a single point
-
-
-
+                states: {
                     /**
+                     * The hover state for a single point marker.
                      * @product highcharts highstock
                      */
                     hover: {
 
-
-
                         /**
+                         * Animation when hovering over the marker.
+                         * @type {Boolean|Object}
                          */
                         animation: {
-
-
-                            /**
-                             */
                             duration: 50
                         },
-
-
 
                         /**
                          * Enable or disable the point marker.
                          * 
                          * @type {Boolean}
-                         * @sample {highcharts} highcharts/plotoptions/series-marker-states-hover-enabled/ Disabled hover state
+                         * @sample {highcharts}
+                         *         highcharts/plotoptions/series-marker-states-hover-enabled/
+                         *         Disabled hover state
                          * @default true
                          * @product highcharts highstock
                          */
                         enabled: true,
 
+                        /**
+                         * The fill color of the marker in hover state.
+                         * 
+                         * @type {Color}
+                         * @default null
+                         * @product highcharts highstock
+                         * @apioption plotOptions.series.marker.states.hover.fillColor
+                         */
 
+                        /**
+                         * The color of the point marker's outline. When `null`, the
+                         * series' or point's color is used.
+                         * 
+                         * @type {Color}
+                         * @sample {highcharts}
+                         *         highcharts/plotoptions/series-marker-states-hover-linecolor/
+                         *         White fill color, black line color
+                         * @default #ffffff
+                         * @product highcharts highstock
+                         * @apioption plotOptions.series.marker.states.hover.lineColor
+                         */
+
+                        /**
+                         * The width of the point marker's outline.
+                         * 
+                         * @type {Number}
+                         * @sample {highcharts}
+                         *         highcharts/plotoptions/series-marker-states-hover-linewidth/
+                         *         3px line width
+                         * @default 0
+                         * @product highcharts highstock
+                         * @apioption plotOptions.series.marker.states.hover.lineWidth
+                         */
+
+                        /**
+                         * The radius of the point marker. In hover state, it defaults to the
+                         * normal state's radius + 2 as per the [radiusPlus](#plotOptions.series.
+                         * marker.states.hover.radiusPlus) option.
+                         * 
+                         * @type {Number}
+                         * @sample {highcharts} highcharts/plotoptions/series-marker-states-hover-radius/ 10px radius
+                         * @product highcharts highstock
+                         * @apioption plotOptions.series.marker.states.hover.radius
+                         */
 
                         /**
                          * The number of pixels to increase the radius of the hovered point.
@@ -19421,6 +22323,7 @@
                          */
                         radiusPlus: 2
 
+
                     }
 
                 }
@@ -19429,19 +22332,106 @@
 
 
             /**
-             * Properties for each single point
-             * 
-             * @product highcharts highstock highmaps
+             * Properties for each single point.
              */
             point: {
 
 
                 /**
-                 * Events for each single point
-                 * 
-                 * @product highcharts highstock highmaps
+                 * Events for each single point.
                  */
-                events: {}
+                events: {
+
+                    /**
+                     * Fires when a point is clicked. One parameter, `event`, is passed
+                     * to the function, containing common event information.
+                     * 
+                     * If the `series.allowPointSelect` option is true, the default action
+                     * for the point's click event is to toggle the point's select state.
+                     *  Returning `false` cancels this action.
+                     * 
+                     * @type {Function}
+                     * @context Point
+                     * @sample {highcharts} highcharts/plotoptions/series-point-events-click/ Click marker to alert values
+                     * @sample {highcharts} highcharts/plotoptions/series-point-events-click-column/ Click column
+                     * @sample {highcharts} highcharts/plotoptions/series-point-events-click-url/ Go to URL
+                     * @sample {highmaps} maps/plotoptions/series-point-events-click/ Click marker to display values
+                     * @sample {highmaps} maps/plotoptions/series-point-events-click-url/ Go to URL
+                     * @apioption plotOptions.series.point.events.click
+                     */
+
+                    /**
+                     * Fires when the mouse leaves the area close to the point. One parameter,
+                     * `event`, is passed to the function, containing common event information.
+                     * 
+                     * @type {Function}
+                     * @context Point
+                     * @sample {highcharts} highcharts/plotoptions/series-point-events-mouseover/ Show values in the chart's corner on mouse over
+                     * @apioption plotOptions.series.point.events.mouseOut
+                     */
+
+                    /**
+                     * Fires when the mouse enters the area close to the point. One parameter,
+                     * `event`, is passed to the function, containing common event information.
+                     * 
+                     * @type {Function}
+                     * @context Point
+                     * @sample {highcharts} highcharts/plotoptions/series-point-events-mouseover/ Show values in the chart's corner on mouse over
+                     * @apioption plotOptions.series.point.events.mouseOver
+                     */
+
+                    /**
+                     * Fires when the point is removed using the `.remove()` method. One
+                     * parameter, `event`, is passed to the function. Returning `false`
+                     * cancels the operation.
+                     * 
+                     * @type {Function}
+                     * @context Point
+                     * @sample {highcharts} highcharts/plotoptions/series-point-events-remove/ Remove point and confirm
+                     * @since 1.2.0
+                     * @apioption plotOptions.series.point.events.remove
+                     */
+
+                    /**
+                     * Fires when the point is selected either programmatically or following
+                     * a click on the point. One parameter, `event`, is passed to the function.
+                     *  Returning `false` cancels the operation.
+                     * 
+                     * @type {Function}
+                     * @context Point
+                     * @sample {highcharts} highcharts/plotoptions/series-point-events-select/ Report the last selected point
+                     * @sample {highmaps} maps/plotoptions/series-allowpointselect/ Report select and unselect
+                     * @since 1.2.0
+                     * @apioption plotOptions.series.point.events.select
+                     */
+
+                    /**
+                     * Fires when the point is unselected either programmatically or following
+                     * a click on the point. One parameter, `event`, is passed to the function.
+                     *  Returning `false` cancels the operation.
+                     * 
+                     * @type {Function}
+                     * @context Point
+                     * @sample {highcharts} highcharts/plotoptions/series-point-events-unselect/ Report the last unselected point
+                     * @sample {highmaps} maps/plotoptions/series-allowpointselect/ Report select and unselect
+                     * @since 1.2.0
+                     * @apioption plotOptions.series.point.events.unselect
+                     */
+
+                    /**
+                     * Fires when the point is updated programmatically through the `.update()`
+                     * method. One parameter, `event`, is passed to the function. The new
+                     * point options can be accessed through `event.options`. Returning
+                     * `false` cancels the operation.
+                     * 
+                     * @type {Function}
+                     * @context Point
+                     * @sample {highcharts} highcharts/plotoptions/series-point-events-update/ Confirm point updating
+                     * @since 1.2.0
+                     * @apioption plotOptions.series.point.events.update
+                     */
+
+                }
             },
 
 
@@ -19450,9 +22440,7 @@
              * Options for the series data labels, appearing next to each data
              * point.
              * 
-             * In [styled mode](http://www.highcharts.com/docs/chart-design-and-
-             * style/style-by-css), the data labels can be styled wtih the `.highcharts-
-             * data-label-box` and `.highcharts-data-label` class names ([see example](http://jsfiddle.
+             * In styled mode, the data labels can be styled wtih the `.highcharts-data-label-box` and `.highcharts-data-label` class names ([see example](http://jsfiddle.
              * net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/css/series-
              * datalabels)).
              */
@@ -19515,8 +22503,7 @@
                  */
 
                 /**
-                 * A class name for the data label. Particularly in [styled mode](http://www.
-                 * highcharts.com/docs/chart-design-and-style/style-by-css), this can
+                 * A class name for the data label. Particularly in styled mode, this can
                  * be used to give each series' or point's data label unique styling.
                  * In addition to this option, a default color class name is added
                  * so that we can give the labels a [contrast text shadow](http://jsfiddle.
@@ -19662,7 +22649,6 @@
                  * 
                  * @type {Function}
                  * @sample {highmaps} maps/plotoptions/series-datalabels-format/ Formatted value
-                 * @product highcharts highstock highmaps
                  */
                 formatter: function() {
                     return this.y === null ? '' : H.numberFormat(this.y, -1);
@@ -19705,6 +22691,15 @@
                  */
 
                 /**
+                 * Whether to [use HTML](http://www.highcharts.com/docs/chart-concepts/labels-
+                 * and-string-formatting#html) to render the labels.
+                 *
+                 * @type {Boolean}
+                 * @default false
+                 * @apioption plotOptions.series.dataLabels.useHTML
+                 */
+
+                /**
                  * The vertical alignment of a data label. Can be one of `top`, `middle`
                  * or `bottom`. The default value depends on the data, for instance
                  * in a column chart, the label is above positive values and below
@@ -19713,7 +22708,6 @@
                  * @validvalue ["top", "middle", "bottom"]
                  * @type {String}
                  * @since 2.3.3
-                 * @product highcharts highstock highmaps
                  */
                 verticalAlign: 'bottom', // above singular point
 
@@ -19724,7 +22718,6 @@
                  * @type {Number}
                  * @sample {highcharts} highcharts/plotoptions/series-datalabels-rotation/ Vertical and positioned
                  * @default 0
-                 * @product highcharts highstock highmaps
                  */
                 x: 0,
 
@@ -19735,7 +22728,6 @@
                  * @type {Number}
                  * @sample {highcharts} highcharts/plotoptions/series-datalabels-rotation/ Vertical and positioned
                  * @default -6
-                 * @product highcharts highstock highmaps
                  */
                 y: 0,
 
@@ -19752,7 +22744,6 @@
                  * @default {highstock} 5
                  * @default {highmaps} 0
                  * @since 2.2.1
-                 * @product highcharts highstock highmaps
                  */
                 padding: 5
 
@@ -19777,6 +22768,55 @@
                  * @default 6
                  * @since 2.3.5
                  * @apioption plotOptions.series.dataLabels.zIndex
+                 */
+
+                /**
+                 * A declarative filter for which data labels to display. The
+                 * declarative filter is designed for use when callback functions are
+                 * not available, like when the chart options require a pure JSON
+                 * structure or for use with graphical editors. For programmatic
+                 * control, use the `formatter` instead, and return `false` to disable
+                 * a single data label.
+                 *
+                 * @example
+                 * filter: {
+                 *     property: 'percentage',
+                 *     operator: '>',
+                 *     value: 4
+                 * }
+                 *
+                 * @sample highcharts/demo/pie-monochrome
+                 *         Data labels filtered by percentage
+                 *
+                 * @type {Object}
+                 * @since 6.0.3
+                 * @apioption plotOptions.series.dataLabels.filter
+                 */
+
+                /**
+                 * The point property to filter by. Point options are passed directly to
+                 * properties, additionally there are `y` value, `percentage` and others
+                 * listed under [Point](https://api.highcharts.com/class-reference/Highcharts.Point)
+                 * members.
+                 *
+                 * @type {String}
+                 * @apioption plotOptions.series.dataLabels.filter.property
+                 */
+
+                /**
+                 * The operator to compare by. Can be one of `>`, `<`, `>=`, `<=`, `==`,
+                 * and `===`.
+                 *
+                 * @type {String}
+                 * @validvalue [">", "<", ">=", "<=", "==", "===""]
+                 * @apioption plotOptions.series.dataLabels.filter.operator
+                 */
+
+                /**
+                 * The value to compare against.
+                 *
+                 * @type {Mixed}
+                 * @apioption plotOptions.series.dataLabels.filter.value
                  */
             },
             // draw points outside the plot area when the number of points is less than
@@ -19814,11 +22854,6 @@
              * @product highstock
              */
             pointRange: 0,
-            //pointStart: 0,
-            //pointInterval: 1,
-            //showInLegend: null, // auto = false for linked series
-
-
 
             /**
              * When this is true, the series will not cause the Y axis to cross
@@ -19842,19 +22877,29 @@
              * A wrapper object for all the series options in specific states.
              * 
              * @type {plotOptions.series.states}
-             * @product highcharts highstock highmaps
              */
-            states: { // states for the entire series
+            states: {
 
 
                 /**
-                 * Options for the hovered series
-                 * 
-                 * @product highcharts highstock highmaps
+                 * Options for the hovered series. These settings override the normal
+                 * state options when a series is moused over or touched.
+                 *
                  */
                 hover: {
-                    //enabled: false,
 
+                    /**
+                     * Enable separate styles for the hovered series to visualize that the
+                     * user hovers either the series itself or the legend. .
+                     * 
+                     * @type {Boolean}
+                     * @sample {highcharts} highcharts/plotoptions/series-states-hover-enabled/ Line
+                     * @sample {highcharts} highcharts/plotoptions/series-states-hover-enabled-column/ Column
+                     * @sample {highcharts} highcharts/plotoptions/series-states-hover-enabled-pie/ Pie
+                     * @default true
+                     * @since 1.2
+                     * @apioption plotOptions.series.states.hover.enabled
+                     */
 
 
                     /**
@@ -19866,22 +22911,36 @@
                      * @product highcharts
                      */
                     animation: {
-
-
-
                         /**
+                         * The duration of the hover animation in milliseconds. By
+                         * default the hover state animates quickly in, and slowly back
+                         * to normal.
                          */
                         duration: 50
                     },
 
+                    /**
+                     * Pixel with of the graph line. By default this property is
+                     * undefined, and the `lineWidthPlus` property dictates how much
+                     * to increase the linewidth from normal state.
+                     * 
+                     * @type {Number}
+                     * @sample {highcharts} highcharts/plotoptions/series-states-hover-linewidth/
+                     *         5px line on hover
+                     * @default undefined
+                     * @product highcharts highstock
+                     * @apioption plotOptions.series.states.hover.lineWidth
+                     */
 
 
                     /**
                      * The additional line width for the graph of a hovered series.
                      * 
                      * @type {Number}
-                     * @sample {highcharts} highcharts/plotoptions/series-states-hover-linewidthplus/ 5 pixels wider
-                     * @sample {highstock} highcharts/plotoptions/series-states-hover-linewidthplus/ 5 pixels wider
+                     * @sample {highcharts} highcharts/plotoptions/series-states-hover-linewidthplus/
+                     *         5 pixels wider
+                     * @sample {highstock} highcharts/plotoptions/series-states-hover-linewidthplus/
+                     *         5 pixels wider
                      * @default 1
                      * @since 4.0.3
                      * @product highcharts highstock
@@ -19914,9 +22973,7 @@
                      * color with an opacity of 0.25\. The halo can be disabled by setting
                      * the `halo` option to `false`.
                      * 
-                     * In [styled mode](http://www.highcharts.com/docs/chart-design-and-
-                     * style/style-by-css), the halo is styled with the `.highcharts-
-                     * halo` class, with colors inherited from `.highcharts-color-{n}`.
+                     * In styled mode, the halo is styled with the `.highcharts-halo` class, with colors inherited from `.highcharts-color-{n}`.
                      * 
                      * @type {Object}
                      * @sample {highcharts} highcharts/plotoptions/halo/ Halo options
@@ -19926,6 +22983,15 @@
                      */
                     halo: {
 
+                        /**
+                         * A collection of SVG attributes to override the appearance of the
+                         * halo, for example `fill`, `stroke` and `stroke-width`.
+                         * 
+                         * @type {Object}
+                         * @since 4.0
+                         * @product highcharts highstock
+                         * @apioption plotOptions.series.states.hover.halo.attributes
+                         */
 
 
                         /**
@@ -19953,15 +23019,11 @@
                  * @type {Object}
                  * @extends plotOptions.series.states.hover
                  * @excluding brightness
-                 * @sample {highmaps} maps/plotoptions/series-allowpointselect/ Allow point select demo
+                 * @sample {highmaps} maps/plotoptions/series-allowpointselect/
+                 *         Allow point select demo
                  * @product highmaps
                  */
                 select: {
-
-
-
-                    /**
-                     */
                     marker: {}
                 }
             },
@@ -19987,19 +23049,20 @@
              * @default {highstock} true
              * @default {highmaps} false
              * @since 2.0
-             * @product highcharts highstock highmaps
              */
             stickyTracking: true,
-            //tooltip: {
-            //pointFormat: '<span style="color:{point.color}">\u25CF</span>' +
-            // '{series.name}: <b>{point.y}</b>'
-            //valueDecimals: null,
-            //xDateFormat: '%A, %b %e, %Y',
-            //valuePrefix: '',
-            //ySuffix: ''
-            //}
 
-
+            /**
+             * A configuration object for the tooltip rendering of each single series.
+             * Properties are inherited from [tooltip](#tooltip), but only the
+             * following properties can be defined on a series level.
+             * 
+             * @type {Object}
+             * @extends tooltip
+             * @excluding animation,backgroundColor,borderColor,borderRadius,borderWidth,crosshairs,enabled,formatter,positioner,shadow,shared,shape,snap,style,useHTML
+             * @since 2.3
+             * @apioption plotOptions.series.tooltip
+             */
 
             /**
              * When a series contains a data array that is longer than this, only
@@ -20014,7 +23077,81 @@
              * @product highcharts highstock
              */
             turboThreshold: 1000,
-            // zIndex: null
+
+            /**
+             * An array defining zones within a series. Zones can be applied to
+             * the X axis, Y axis or Z axis for bubbles, according to the `zoneAxis`
+             * option.
+             * 
+             * In styled mode, the color zones are styled with the `.highcharts-
+             * zone-{n}` class, or custom classed from the `className` option ([view
+             * live demo](http://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/css/color-
+             * zones/)).
+             * 
+             * @type {Array}
+             * @see [zoneAxis](#plotOptions.series.zoneAxis)
+             * @sample {highcharts} highcharts/series/color-zones-simple/ Color zones
+             * @sample {highstock} highcharts/series/color-zones-simple/ Color zones
+             * @since 4.1.0
+             * @product highcharts highstock
+             * @apioption plotOptions.series.zones
+             */
+
+            /**
+             * Styled mode only. A custom class name for the zone.
+             * 
+             * @type {String}
+             * @sample {highcharts} highcharts/css/color-zones/ Zones styled by class name
+             * @sample {highstock} highcharts/css/color-zones/ Zones styled by class name
+             * @sample {highmaps} highcharts/css/color-zones/ Zones styled by class name
+             * @since 5.0.0
+             * @apioption plotOptions.series.zones.className
+             */
+
+            /**
+             * Defines the color of the series.
+             * 
+             * @type {Color}
+             * @see [series color](#plotOptions.series.color)
+             * @since 4.1.0
+             * @product highcharts highstock
+             * @apioption plotOptions.series.zones.color
+             */
+
+            /**
+             * A name for the dash style to use for the graph.
+             * 
+             * @type {String}
+             * @see [series.dashStyle](#plotOptions.series.dashStyle)
+             * @sample {highcharts} highcharts/series/color-zones-dashstyle-dot/
+             *         Dashed line indicates prognosis
+             * @sample {highstock} highcharts/series/color-zones-dashstyle-dot/
+             *         Dashed line indicates prognosis
+             * @since 4.1.0
+             * @product highcharts highstock
+             * @apioption plotOptions.series.zones.dashStyle
+             */
+
+            /**
+             * Defines the fill color for the series (in area type series)
+             * 
+             * @type {Color}
+             * @see [fillColor](#plotOptions.area.fillColor)
+             * @since 4.1.0
+             * @product highcharts highstock
+             * @apioption plotOptions.series.zones.fillColor
+             */
+
+            /**
+             * The value up to where the zone extends, if undefined the zones stretches
+             * to the last value in the series.
+             * 
+             * @type {Number}
+             * @default undefined
+             * @since 4.1.0
+             * @product highcharts highstock
+             * @apioption plotOptions.series.zones.value
+             */
 
 
 
@@ -20030,11 +23167,13 @@
              * 
              * @validvalue ['x', 'xy']
              * @type {String}
-             * @sample {highcharts} highcharts/series/findnearestpointby/ Different hover behaviors
-             * @sample {highstock} highcharts/series/findnearestpointby/ Different hover behaviors
-             * @sample {highmaps} highcharts/series/findnearestpointby/ Different hover behaviors
+             * @sample {highcharts} highcharts/series/findnearestpointby/
+             *         Different hover behaviors
+             * @sample {highstock} highcharts/series/findnearestpointby/
+             *         Different hover behaviors
+             * @sample {highmaps} highcharts/series/findnearestpointby/
+             *         Different hover behaviors
              * @since 5.0.10
-             * @product highcharts highstock highmaps
              */
             findNearestPointBy: 'x'
 
@@ -20314,7 +23453,8 @@
                     xIncrement = this.xIncrement,
                     date,
                     pointInterval,
-                    pointIntervalUnit = options.pointIntervalUnit;
+                    pointIntervalUnit = options.pointIntervalUnit,
+                    dstCrossover = 0;
 
                 xIncrement = pick(xIncrement, options.pointStart, 0);
 
@@ -20341,7 +23481,11 @@
                             date[Date.hcGetFullYear]() + pointInterval
                         );
                     }
-                    pointInterval = date - xIncrement;
+
+                    if (Date.hcHasTimeZone) {
+                        dstCrossover = H.getTZOffset(date) - H.getTZOffset(xIncrement);
+                    }
+                    pointInterval = date - xIncrement + dstCrossover;
 
                 }
 
@@ -20519,7 +23663,7 @@
              *
              * @param  {SeriesDataOptions} data
              *         Takes an array of data in the same format as described under
-             *         `series<type>data` for the given series type.
+             *         `series.typedata` for the given series type.
              * @param  {Boolean} [redraw=true]
              *         Whether to redraw the chart after the series is altered. If doing
              *         more operations on the chart, it is a good idea to set redraw to
@@ -20651,7 +23795,7 @@
 
                     // Forgetting to cast strings to numbers is a common caveat when
                     // handling CSV or JSON
-                    if (isString(yData[0])) {
+                    if (yData && isString(yData[0])) {
                         H.error(14, true);
                     }
 
@@ -20720,6 +23864,7 @@
                     xExtremes,
                     val2lin = xAxis && xAxis.val2lin,
                     isLog = xAxis && xAxis.isLog,
+                    throwOnUnsorted = series.requireSorting,
                     min,
                     max;
 
@@ -20796,8 +23941,9 @@
                         // Unsorted data is not supported by the line tooltip, as well as
                         // data grouping and navigation in Stock charts (#725) and width
                         // calculation of columns (#1900)
-                    } else if (distance < 0 && series.requireSorting) {
+                    } else if (distance < 0 && throwOnUnsorted) {
                         H.error(15);
+                        throwOnUnsorted = false; // Only once
                     }
                 }
 
@@ -20953,12 +24099,16 @@
                 }
 
                 /**
-                 * Read only. An array containing the series' data point objects. To
+                 * Read only. An array containing those values converted to points, but
+                 * in case the series data length exceeds the `cropThreshold`, or if the
+                 * data is grouped, `series.data` doesn't contain all the points. It
+                 * only contains the points that have been created on demand. To
                  * modify the data, use {@link Highcharts.Series#setData} or {@link
                  * Highcharts.Point#update}.
                  *
                  * @name data
                  * @memberOf Highcharts.Series
+                 * @see  Series.points
                  * @type {Array.<Highcharts.Point>}
                  */
                 series.data = data;
@@ -20971,7 +24121,7 @@
                  * is grouped, these can't be correlated one to one. To
                  * modify the data, use {@link Highcharts.Series#setData} or {@link
                  * Highcharts.Point#update}.
-                 * @name point
+                 * @name points
                  * @memberof Series
                  * @type {Array.<Point>}
                  */
@@ -21014,7 +24164,7 @@
                     y = yData[i];
 
                     // For points within the visible range, including the first point
-                    // outside the visible range, consider y extremes
+                    // outside the visible range (#7061), consider y extremes.
                     validValue =
                         (isNumber(y, true) || isArray(y)) &&
                         (!yAxis.positiveValuesOnly || (y.length || y > 0));
@@ -21022,14 +24172,14 @@
                         this.getExtremesFromAll ||
                         this.options.getExtremesFromAll ||
                         this.cropped ||
-                        ((xData[i] || x) >= xMin && (xData[i] || x) <= xMax);
+                        ((xData[i + 1] || x) >= xMin && (xData[i - 1] || x) <= xMax);
 
                     if (validValue && withinRange) {
 
                         j = y.length;
                         if (j) { // array, like ohlc or range data
                             while (j--) {
-                                if (y[j] !== null) {
+                                if (typeof y[j] === 'number') { // #7380
                                     activeYData[activeCounter++] = y[j];
                                 }
                             }
@@ -21272,8 +24422,12 @@
                     // When animation is set, prepare the initial positions
                     if (animation) {
                         clipBox.width = 0;
+                        if (inverted) {
+                            clipBox.x = chart.plotSizeX;
+                        }
 
-                        chart[sharedClipKey + 'm'] = markerClipRect = renderer.clipRect(-99, // include the width of the first marker
+                        chart[sharedClipKey + 'm'] = markerClipRect = renderer.clipRect(
+                            inverted ? chart.plotSizeX + 99 : -99, // include the width of the first marker
                             inverted ? -chart.plotLeft : -chart.plotTop,
                             99,
                             inverted ? chart.chartWidth : chart.chartHeight
@@ -21345,12 +24499,14 @@
                     clipRect = chart[sharedClipKey];
                     if (clipRect) {
                         clipRect.animate({
-                            width: chart.plotSizeX
+                            width: chart.plotSizeX,
+                            x: 0
                         }, animation);
                     }
                     if (chart[sharedClipKey + 'm']) {
                         chart[sharedClipKey + 'm'].animate({
-                            width: chart.plotSizeX + 99
+                            width: chart.plotSizeX + 99,
+                            x: 0
                         }, animation);
                     }
 
@@ -21382,7 +24538,6 @@
                 var series = this,
                     points = series.points,
                     chart = series.chart,
-                    plotY,
                     i,
                     point,
                     symbol,
@@ -21407,7 +24562,6 @@
 
                     for (i = 0; i < points.length; i++) {
                         point = points[i];
-                        plotY = point.plotY;
                         graphic = point.graphic;
                         pointMarkerOptions = point.marker || {};
                         hasPointMarker = !!point.marker;
@@ -21415,7 +24569,7 @@
                         isInside = point.isInside;
 
                         // only draw the point if y is defined
-                        if (enabled && isNumber(plotY) && point.y !== null) {
+                        if (enabled && !point.isNull) {
 
                             // Shortcuts
                             symbol = pick(pointMarkerOptions.symbol, series.symbol);
@@ -21754,7 +24908,9 @@
                         attribs;
 
                     if (graph) {
-                        graph.endX = graphPath.xMap;
+                        graph.endX = series.preventGraphAnimation ?
+                            null :
+                            graphPath.xMap;
                         graph.animate({
                             d: graphPath
                         });
@@ -21774,7 +24930,6 @@
                     // Helpers for animation
                     if (graph) {
                         graph.startX = graphPath.xMap;
-                        //graph.shiftUnit = options.step ? 2 : 1;
                         graph.isArea = graphPath.isArea; // For arearange animation
                     }
                 });
@@ -21954,8 +25109,13 @@
                         'highcharts-' + name +
                         ' highcharts-series-' + this.index +
                         ' highcharts-' + this.type + '-series ' +
-                        'highcharts-color-' + this.colorIndex + ' ' +
-                        (this.options.className || '')
+                        (
+                            defined(this.colorIndex) ?
+                            'highcharts-color-' + this.colorIndex + ' ' :
+                            ''
+                        ) +
+                        (this.options.className || '') +
+                        (group.hasClass('highcharts-tracker') ? ' highcharts-tracker' : '')
                     ),
                     true
                 );
@@ -22295,6 +25455,217 @@
 
         }); // end Series prototype
 
+        /**
+         * A line series displays information as a series of data points connected by
+         * straight line segments.
+         *
+         * @sample {highcharts} highcharts/demo/line-basic/ Line chart
+         * @sample {highstock} stock/demo/basic-line/ Line chart
+         * 
+         * @extends plotOptions.series
+         * @product highcharts highstock
+         * @apioption plotOptions.line
+         */
+
+        /**
+         * A `line` series. If the [type](#series.line.type) option is not
+         * specified, it is inherited from [chart.type](#chart.type).
+         * 
+         * For options that apply to multiple series, it is recommended to add
+         * them to the [plotOptions.series](#plotOptions.series) options structure.
+         * To apply to all series of this specific type, apply it to [plotOptions.
+         * line](#plotOptions.line).
+         * 
+         * @type {Object}
+         * @extends series,plotOptions.line
+         * @excluding dataParser,dataURL
+         * @product highcharts highstock
+         * @apioption series.line
+         */
+
+        /**
+         * An array of data points for the series. For the `line` series type,
+         * points can be given in the following ways:
+         * 
+         * 1.  An array of numerical values. In this case, the numerical values
+         * will be interpreted as `y` options. The `x` values will be automatically
+         * calculated, either starting at 0 and incremented by 1, or from `pointStart`
+         * and `pointInterval` given in the series options. If the axis has
+         * categories, these will be used. Example:
+         * 
+         *  ```js
+         *  data: [0, 5, 3, 5]
+         *  ```
+         * 
+         * 2.  An array of arrays with 2 values. In this case, the values correspond
+         * to `x,y`. If the first value is a string, it is applied as the name
+         * of the point, and the `x` value is inferred.
+         * 
+         *  ```js
+         *     data: [
+         *         [0, 1],
+         *         [1, 2],
+         *         [2, 8]
+         *     ]
+         *  ```
+         * 
+         * 3.  An array of objects with named values. The objects are point
+         * configuration objects as seen below. If the total number of data
+         * points exceeds the series' [turboThreshold](#series.line.turboThreshold),
+         * this option is not available.
+         * 
+         *  ```js
+         *     data: [{
+         *         x: 1,
+         *         y: 9,
+         *         name: "Point2",
+         *         color: "#00FF00"
+         *     }, {
+         *         x: 1,
+         *         y: 6,
+         *         name: "Point1",
+         *         color: "#FF00FF"
+         *     }]
+         *  ```
+         * 
+         * @type {Array<Object|Array|Number>}
+         * @sample {highcharts} highcharts/chart/reflow-true/ Numerical values
+         * @sample {highcharts} highcharts/series/data-array-of-arrays/ Arrays of numeric x and y
+         * @sample {highcharts} highcharts/series/data-array-of-arrays-datetime/ Arrays of datetime x and y
+         * @sample {highcharts} highcharts/series/data-array-of-name-value/ Arrays of point.name and y
+         * @sample {highcharts} highcharts/series/data-array-of-objects/ Config objects
+         * @apioption series.line.data
+         */
+
+        /**
+         * An additional, individual class name for the data point's graphic
+         * representation.
+         * 
+         * @type {String}
+         * @since 5.0.0
+         * @product highcharts
+         * @apioption series.line.data.className
+         */
+
+        /**
+         * Individual color for the point. By default the color is pulled from
+         * the global `colors` array.
+         *
+         * In styled mode, the `color` option doesn't take effect. Instead, use 
+         * `colorIndex`.
+         * 
+         * @type {Color}
+         * @sample {highcharts} highcharts/point/color/ Mark the highest point
+         * @default undefined
+         * @product highcharts highstock
+         * @apioption series.line.data.color
+         */
+
+        /**
+         * Styled mode only. A specific color index to use for the point, so its
+         * graphic representations are given the class name
+         * `highcharts-color-{n}`.
+         * 
+         * @type {Number}
+         * @since 5.0.0
+         * @product highcharts
+         * @apioption series.line.data.colorIndex
+         */
+
+        /**
+         * Individual data label for each point. The options are the same as
+         * the ones for [plotOptions.series.dataLabels](#plotOptions.series.
+         * dataLabels)
+         * 
+         * @type {Object}
+         * @sample {highcharts} highcharts/point/datalabels/ Show a label for the last value
+         * @sample {highstock} highcharts/point/datalabels/ Show a label for the last value
+         * @product highcharts highstock
+         * @apioption series.line.data.dataLabels
+         */
+
+        /**
+         * A description of the point to add to the screen reader information
+         * about the point. Requires the Accessibility module.
+         * 
+         * @type {String}
+         * @default undefined
+         * @since 5.0.0
+         * @apioption series.line.data.description
+         */
+
+        /**
+         * An id for the point. This can be used after render time to get a
+         * pointer to the point object through `chart.get()`.
+         * 
+         * @type {String}
+         * @sample {highcharts} highcharts/point/id/ Remove an id'd point
+         * @default null
+         * @since 1.2.0
+         * @product highcharts highstock
+         * @apioption series.line.data.id
+         */
+
+        /**
+         * The rank for this point's data label in case of collision. If two
+         * data labels are about to overlap, only the one with the highest `labelrank`
+         * will be drawn.
+         * 
+         * @type {Number}
+         * @apioption series.line.data.labelrank
+         */
+
+        /**
+         * The name of the point as shown in the legend, tooltip, dataLabel
+         * etc.
+         * 
+         * @type {String}
+         * @sample {highcharts} highcharts/series/data-array-of-objects/ Point names
+         * @see [xAxis.uniqueNames](#xAxis.uniqueNames)
+         * @apioption series.line.data.name
+         */
+
+        /**
+         * Whether the data point is selected initially.
+         * 
+         * @type {Boolean}
+         * @default false
+         * @product highcharts highstock
+         * @apioption series.line.data.selected
+         */
+
+        /**
+         * The x value of the point. For datetime axes, the X value is the timestamp
+         * in milliseconds since 1970.
+         * 
+         * @type {Number}
+         * @product highcharts highstock
+         * @apioption series.line.data.x
+         */
+
+        /**
+         * The y value of the point.
+         * 
+         * @type {Number}
+         * @default null
+         * @product highcharts highstock
+         * @apioption series.line.data.y
+         */
+
+        /**
+         * Individual point events
+         * 
+         * @extends plotOptions.series.point.events
+         * @product highcharts highstock
+         * @apioption series.line.data.events
+         */
+
+        /**
+         * @extends plotOptions.series.marker
+         * @product highcharts highstock
+         * @apioption series.line.data.marker
+         */
+
     }(Highcharts));
     (function(H) {
         /**
@@ -22417,7 +25788,7 @@
                     ),
                     yZero = axis.translate(0), // stack origin
                     h = Math.abs(y - yZero), // stack height
-                    x = chart.xAxis[0].translate(stackItem.x) + xOffset, // stack x position
+                    x = chart.xAxis[0].translate(stackItem.x) + xOffset, // x position
                     stackBox = stackItem.getStackBox(chart, stackItem, x, y, xWidth, h),
                     label = stackItem.label,
                     alignAttr;
@@ -22495,11 +25866,9 @@
                     axisSeries[reversedStacks ? i : len - i - 1].setStackedPoints();
                 }
 
-                // Loop up again to compute percent stack
-                if (this.usePercentage) {
-                    for (i = 0; i < len; i++) {
-                        axisSeries[i].setPercentStacks();
-                    }
+                // Loop up again to compute percent and stream stack
+                for (i = 0; i < len; i++) {
+                    axisSeries[i].modifyStacks();
                 }
             }
         };
@@ -22551,7 +25920,7 @@
                             // Reset stacks
                         } else {
                             stack.total = null;
-                            stack.cum = null;
+                            stack.cumulative = null;
                         }
                     });
                 });
@@ -22569,7 +25938,7 @@
                 // reset stacks
                 objectEach(stacks, function(type) {
                     objectEach(type, function(stack) {
-                        stack.cum = stack.total;
+                        stack.cumulative = stack.total;
                     });
                 });
             }
@@ -22594,7 +25963,7 @@
                 yDataLength = yData.length,
                 seriesOptions = series.options,
                 threshold = seriesOptions.threshold,
-                stackThreshold = seriesOptions.startFromThreshold ? threshold : 0,
+                stackThreshold = pick(seriesOptions.startFromThreshold && threshold, 0),
                 stackOption = seriesOptions.stack,
                 stacking = seriesOptions.stacking,
                 stackKey = series.stackKey,
@@ -22656,10 +26025,10 @@
                 // If the StackItem doesn't exist, create it first
                 stack = stacks[key][x];
                 if (y !== null) {
-                    stack.points[pointKey] = stack.points[series.index] = [pick(stack.cum, stackThreshold)];
+                    stack.points[pointKey] = stack.points[series.index] = [pick(stack.cumulative, stackThreshold)];
 
                     // Record the base of the stack
-                    if (!defined(stack.cum)) {
+                    if (!defined(stack.cumulative)) {
                         stack.base = pointKey;
                     }
                     stack.touched = yAxis.stacksTouched;
@@ -22671,6 +26040,10 @@
                         stack.points[pointKey][0] =
                             stack.points[series.index + ',' + x + ',0'][0];
                     }
+
+                    // When updating to null, reset the point stack (#7493)
+                } else {
+                    stack.points[pointKey] = stack.points[series.index] = null;
                 }
 
                 // Add value to the stack total
@@ -22692,11 +26065,11 @@
                     stack.total = correctFloat(stack.total + (y || 0));
                 }
 
-                stack.cum = pick(stack.cum, stackThreshold) + (y || 0);
+                stack.cumulative = pick(stack.cumulative, stackThreshold) + (y || 0);
 
                 if (y !== null) {
-                    stack.points[pointKey].push(stack.cum);
-                    stackedYData[i] = stack.cum;
+                    stack.points[pointKey].push(stack.cumulative);
+                    stackedYData[i] = stack.cumulative;
                 }
 
             }
@@ -22714,40 +26087,49 @@
         /**
          * Iterate over all stacks and compute the absolute values to percent
          */
-        Series.prototype.setPercentStacks = function() {
+        Series.prototype.modifyStacks = function() {
             var series = this,
                 stackKey = series.stackKey,
                 stacks = series.yAxis.stacks,
                 processedXData = series.processedXData,
-                stackIndicator;
+                stackIndicator,
+                stacking = series.options.stacking;
 
-            each([stackKey, '-' + stackKey], function(key) {
-                var i = processedXData.length,
-                    x,
-                    stack,
-                    pointExtremes,
-                    totalFactor;
-
-                while (i--) {
-                    x = processedXData[i];
-                    stackIndicator = series.getStackIndicator(
-                        stackIndicator,
+            if (series[stacking + 'Stacker']) { // Modifier function exists
+                each([stackKey, '-' + stackKey], function(key) {
+                    var i = processedXData.length,
                         x,
-                        series.index,
-                        key
-                    );
-                    stack = stacks[key] && stacks[key][x];
-                    pointExtremes = stack && stack.points[stackIndicator.key];
-                    if (pointExtremes) {
-                        totalFactor = stack.total ? 100 / stack.total : 0;
-                        // Y bottom value
-                        pointExtremes[0] = correctFloat(pointExtremes[0] * totalFactor);
-                        // Y value
-                        pointExtremes[1] = correctFloat(pointExtremes[1] * totalFactor);
-                        series.stackedYData[i] = pointExtremes[1];
+                        stack,
+                        pointExtremes;
+
+                    while (i--) {
+                        x = processedXData[i];
+                        stackIndicator = series.getStackIndicator(
+                            stackIndicator,
+                            x,
+                            series.index,
+                            key
+                        );
+                        stack = stacks[key] && stacks[key][x];
+                        pointExtremes = stack && stack.points[stackIndicator.key];
+                        if (pointExtremes) {
+                            series[stacking + 'Stacker'](pointExtremes, stack, i);
+                        }
                     }
-                }
-            });
+                });
+            }
+        };
+
+        /**
+         * Modifier function for percent stacks. Blows up the stack to 100%.
+         */
+        Series.prototype.percentStacker = function(pointExtremes, stack, i) {
+            var totalFactor = stack.total ? 100 / stack.total : 0;
+            // Y bottom value
+            pointExtremes[0] = correctFloat(pointExtremes[0] * totalFactor);
+            // Y value
+            pointExtremes[1] = correctFloat(pointExtremes[1] * totalFactor);
+            this.stackedYData[i] = pointExtremes[1];
         };
 
         /**
@@ -23228,7 +26610,7 @@
              *
              * @param  {Object} options
              *         The point options. Point options are handled as described under
-             *         the `series<type>.data` item for each series type. For example
+             *         the `series.type.data` item for each series type. For example
              *         for a line series, if options is a single number, the point will
              *         be given that number as the main y value. If it is an array, it
              *         will be interpreted as x and y values respectively. If it is an
@@ -23276,6 +26658,9 @@
                         }
                         if (options && options.dataLabels && point.dataLabel) { // #2468
                             point.dataLabel = point.dataLabel.destroy();
+                        }
+                        if (point.connector) {
+                            point.connector = point.connector.destroy(); // #7243
                         }
                     }
 
@@ -23586,10 +26971,12 @@
                     newType = newOptions.type || oldOptions.type || chart.options.chart.type,
                     proto = seriesTypes[oldType].prototype,
                     n,
-                    preserve = [
+                    groups = [
                         'group',
                         'markerGroup',
-                        'dataLabelsGroup',
+                        'dataLabelsGroup'
+                    ],
+                    preserve = [
                         'navigatorSeries',
                         'baseSeries'
                     ],
@@ -23610,12 +26997,8 @@
                     return this.setData(newOptions.data, redraw);
                 }
 
-                // If we're changing type or zIndex, create new groups (#3380, #3404)
-                if ((newType && newType !== oldType) || newOptions.zIndex !== undefined) {
-                    preserve.length = 0;
-                }
-
-                // Make sure groups are not destroyed (#3094)
+                // Make sure preserved properties are not destroyed (#3094)
+                preserve = groups.concat(preserve);
                 each(preserve, function(prop) {
                     preserve[prop] = series[prop];
                     delete series[prop];
@@ -23643,6 +27026,19 @@
                 });
 
                 series.init(chart, newOptions);
+
+                // Update the Z index of groups (#3380, #7397)
+                if (newOptions.zIndex !== oldOptions.zIndex) {
+                    each(groups, function(groupName) {
+                        if (series[groupName]) {
+                            series[groupName].attr({
+                                zIndex: newOptions.zIndex
+                            });
+                        }
+                    });
+                }
+
+
                 series.oldType = oldType;
                 chart.linkSeries(); // Links are lost in series.remove (#3028)
                 if (pick(redraw, true)) {
@@ -23775,10 +27171,71 @@
          * @extends {Series}
          */
         /**
+         * The area series type.
          * @extends {plotOptions.line}
+         * @product highcharts highstock
+         * @sample {highcharts} highcharts/demo/area-basic/
+         *         Area chart
+         * @sample {highstock} stock/demo/area/
+         *         Area chart
          * @optionparent plotOptions.area
          */
         seriesType('area', 'line', {
+
+            /**
+             * Fill color or gradient for the area. When `null`, the series' `color`
+             * is used with the series' `fillOpacity`.
+             * 
+             * @type {Color}
+             * @see In styled mode, the fill color can be set with the `.highcharts-area` class name.
+             * @sample {highcharts} highcharts/plotoptions/area-fillcolor-default/ Null by default
+             * @sample {highcharts} highcharts/plotoptions/area-fillcolor-gradient/ Gradient
+             * @default null
+             * @product highcharts highstock
+             * @apioption plotOptions.area.fillColor
+             */
+
+            /**
+             * Fill opacity for the area. When you set an explicit `fillColor`,
+             * the `fillOpacity` is not applied. Instead, you should define the
+             * opacity in the `fillColor` with an rgba color definition. The `fillOpacity`
+             * setting, also the default setting, overrides the alpha component
+             * of the `color` setting.
+             * 
+             * @type {Number}
+             * @see In styled mode, the fill opacity can be set with the `.highcharts-area` class name.
+             * @sample {highcharts} highcharts/plotoptions/area-fillopacity/ Automatic fill color and fill opacity of 0.1
+             * @default {highcharts} 0.75
+             * @default {highstock} .75
+             * @product highcharts highstock
+             * @apioption plotOptions.area.fillOpacity
+             */
+
+            /**
+             * A separate color for the graph line. By default the line takes the
+             * `color` of the series, but the lineColor setting allows setting a
+             * separate color for the line without altering the `fillColor`.
+             * 
+             * @type {Color}
+             * @see In styled mode, the line stroke can be set with the `.highcharts-graph` class name.
+             * @sample {highcharts} highcharts/plotoptions/area-linecolor/ Dark gray line
+             * @default null
+             * @product highcharts highstock
+             * @apioption plotOptions.area.lineColor
+             */
+
+            /**
+             * A separate color for the negative part of the area.
+             * 
+             * @type {Color}
+             * @see [negativeColor](#plotOptions.area.negativeColor). In styled mode, a negative
+             * color is set with the `.highcharts-negative` class name ([view live
+             * demo](http://jsfiddle.net/gh/get/library/pure/highcharts/highcharts/tree/master/samples/highcharts/css/series-
+             * negative-color/)).
+             * @since 3.0
+             * @product highcharts
+             * @apioption plotOptions.area.negativeFillColor
+             */
 
             /**
              * When this is true, the series will not cause the Y axis to cross
@@ -23809,10 +27266,21 @@
              * @product highcharts highstock
              */
             threshold: 0
-            // trackByArea: false,
-            // lineColor: null, // overrides color, but lets fillColor be unaltered
-            // fillOpacity: 0.75,
-            // fillColor: null
+
+            /**
+             * Whether the whole area or just the line should respond to mouseover
+             * tooltips and other mouse or touch events.
+             * 
+             * @type {Boolean}
+             * @sample {highcharts} highcharts/plotoptions/area-trackbyarea/ Display the tooltip when the     area is hovered
+             * @sample {highstock} highcharts/plotoptions/area-trackbyarea/ Display the tooltip when the     area is hovered
+             * @default false
+             * @since 1.1.6
+             * @product highcharts highstock
+             * @apioption plotOptions.area.trackByArea
+             */
+
+
         }, /** @lends seriesTypes.area.prototype */ {
             singleStacks: false,
             /** 
@@ -23838,8 +27306,13 @@
                 points = points || this.points;
 
                 if (this.options.stacking) {
-                    // Create a map where we can quickly look up the points by their X value.
+
                     for (i = 0; i < points.length; i++) {
+                        // Reset after point update (#7326)
+                        points[i].leftNull = points[i].rightNull = null;
+
+                        // Create a map where we can quickly look up the points by their
+                        // X values.
                         pointMap[points[i].x] = points[i];
                     }
 
@@ -23941,7 +27414,6 @@
                     stacking = options.stacking,
                     yAxis = this.yAxis,
                     topPath,
-                    //topPoints = [],
                     bottomPath,
                     bottomPoints = [],
                     graphPoints = [],
@@ -24085,7 +27557,7 @@
 
                     // Create or update the area
                     if (area) { // update
-                        area.endX = areaPath.xMap;
+                        area.endX = series.preventGraphAnimation ? null : areaPath.xMap;
                         area.animate({
                             d: areaPath
                         });
@@ -24107,6 +27579,78 @@
             drawLegendSymbol: LegendSymbolMixin.drawRectangle
         });
 
+        /**
+         * A `area` series. If the [type](#series.area.type) option is not
+         * specified, it is inherited from [chart.type](#chart.type).
+         * 
+         * For options that apply to multiple series, it is recommended to add
+         * them to the [plotOptions.series](#plotOptions.series) options structure.
+         * To apply to all series of this specific type, apply it to [plotOptions.
+         * area](#plotOptions.area).
+         * 
+         * @type {Object}
+         * @extends series,plotOptions.area
+         * @excluding dataParser,dataURL
+         * @product highcharts highstock
+         * @apioption series.area
+         */
+
+        /**
+         * An array of data points for the series. For the `area` series type,
+         * points can be given in the following ways:
+         * 
+         * 1.  An array of numerical values. In this case, the numerical values
+         * will be interpreted as `y` options. The `x` values will be automatically
+         * calculated, either starting at 0 and incremented by 1, or from `pointStart`
+         * and `pointInterval` given in the series options. If the axis has
+         * categories, these will be used. Example:
+         * 
+         *  ```js
+         *  data: [0, 5, 3, 5]
+         *  ```
+         * 
+         * 2.  An array of arrays with 2 values. In this case, the values correspond
+         * to `x,y`. If the first value is a string, it is applied as the name
+         * of the point, and the `x` value is inferred.
+         * 
+         *  ```js
+         *     data: [
+         *         [0, 9],
+         *         [1, 7],
+         *         [2, 6]
+         *     ]
+         *  ```
+         * 
+         * 3.  An array of objects with named values. The objects are point
+         * configuration objects as seen below. If the total number of data
+         * points exceeds the series' [turboThreshold](#series.area.turboThreshold),
+         * this option is not available.
+         * 
+         *  ```js
+         *     data: [{
+         *         x: 1,
+         *         y: 9,
+         *         name: "Point2",
+         *         color: "#00FF00"
+         *     }, {
+         *         x: 1,
+         *         y: 6,
+         *         name: "Point1",
+         *         color: "#FF00FF"
+         *     }]
+         *  ```
+         * 
+         * @type {Array<Object|Array|Number>}
+         * @extends series.line.data
+         * @sample {highcharts} highcharts/chart/reflow-true/ Numerical values
+         * @sample {highcharts} highcharts/series/data-array-of-arrays/ Arrays of numeric x and y
+         * @sample {highcharts} highcharts/series/data-array-of-arrays-datetime/ Arrays of datetime x and y
+         * @sample {highcharts} highcharts/series/data-array-of-name-value/ Arrays of point.name and y
+         * @sample {highcharts} highcharts/series/data-array-of-objects/ Config objects
+         * @product highcharts highstock
+         * @apioption series.area.data
+         */
+
     }(Highcharts));
     (function(H) {
         /**
@@ -24118,16 +27662,33 @@
             seriesType = H.seriesType;
 
         /**
+         * A spline series is a special type of line series, where the segments between
+         * the data points are smoothed.
+         *
+         * @sample {highcharts} highcharts/demo/spline-irregular-time/ Spline chart
+         * @sample {highstock} stock/demo/spline/ Spline chart
+         * 
+         * @extends plotOptions.series
+         * @excluding step
+         * @product highcharts highstock
+         * @apioption plotOptions.spline
+         */
+
+        /**
          * Spline series type.
          * @constructor seriesTypes.spline
          * @extends {Series}
          */
         seriesType('spline', 'line', {}, /** @lends seriesTypes.spline.prototype */ {
             /**
-             * Get the spline segment from a given point's previous neighbour to the given point
+             * Get the spline segment from a given point's previous neighbour to the
+             * given point
              */
             getPointSpline: function(points, point, i) {
-                var smoothing = 1.5, // 1 means control points midway between points, 2 means 1/3 from the point, 3 is 1/4 etc
+                var
+                    // 1 means control points midway between points, 2 means 1/3 from
+                    // the point, 3 is 1/4 etc
+                    smoothing = 1.5,
                     denom = smoothing + 1,
                     plotX = point.plotX,
                     plotY = point.plotY,
@@ -24159,7 +27720,8 @@
                     rightContX = (smoothing * plotX + nextX) / denom;
                     rightContY = (smoothing * plotY + nextY) / denom;
 
-                    // Have the two control points make a straight line through main point
+                    // Have the two control points make a straight line through main
+                    // point
                     if (rightContX !== leftContX) { // #5016, division by zero
                         correction = ((rightContY - leftContY) * (rightContX - plotX)) /
                             (rightContX - leftContX) + plotY - rightContY;
@@ -24172,7 +27734,8 @@
                     // neighbouring points' y values
                     if (leftContY > lastY && leftContY > plotY) {
                         leftContY = Math.max(lastY, plotY);
-                        rightContY = 2 * plotY - leftContY; // mirror of left control point
+                        // mirror of left control point
+                        rightContY = 2 * plotY - leftContY;
                     } else if (leftContY < lastY && leftContY < plotY) {
                         leftContY = Math.min(lastY, plotY);
                         rightContY = 2 * plotY - leftContY;
@@ -24195,7 +27758,11 @@
                 // Visualize control points for debugging
                 /*
                 if (leftContX) {
-                	this.chart.renderer.circle(leftContX + this.chart.plotLeft, leftContY + this.chart.plotTop, 2)
+                	this.chart.renderer.circle(
+                			leftContX + this.chart.plotLeft,
+                			leftContY + this.chart.plotTop,
+                			2
+                		)
                 		.attr({
                 			stroke: 'red',
                 			'stroke-width': 2,
@@ -24203,7 +27770,8 @@
                 			zIndex: 9
                 		})
                 		.add();
-                	this.chart.renderer.path(['M', leftContX + this.chart.plotLeft, leftContY + this.chart.plotTop,
+                	this.chart.renderer.path(['M', leftContX + this.chart.plotLeft,
+                		leftContY + this.chart.plotTop,
                 		'L', plotX + this.chart.plotLeft, plotY + this.chart.plotTop])
                 		.attr({
                 			stroke: 'red',
@@ -24213,7 +27781,11 @@
                 		.add();
                 }
                 if (rightContX) {
-                	this.chart.renderer.circle(rightContX + this.chart.plotLeft, rightContY + this.chart.plotTop, 2)
+                	this.chart.renderer.circle(
+                			rightContX + this.chart.plotLeft,
+                			rightContY + this.chart.plotTop,
+                			2
+                		)
                 		.attr({
                 			stroke: 'green',
                 			'stroke-width': 2,
@@ -24221,7 +27793,8 @@
                 			zIndex: 9
                 		})
                 		.add();
-                	this.chart.renderer.path(['M', rightContX + this.chart.plotLeft, rightContY + this.chart.plotTop,
+                	this.chart.renderer.path(['M', rightContX + this.chart.plotLeft,
+                		rightContY + this.chart.plotTop,
                 		'L', plotX + this.chart.plotLeft, plotY + this.chart.plotTop])
                 		.attr({
                 			stroke: 'green',
@@ -24240,10 +27813,88 @@
                     plotX,
                     plotY
                 ];
-                lastPoint.rightContX = lastPoint.rightContY = null; // reset for updating series later
+                // reset for updating series later
+                lastPoint.rightContX = lastPoint.rightContY = null;
                 return ret;
             }
         });
+
+        /**
+         * A `spline` series. If the [type](#series.spline.type) option is
+         * not specified, it is inherited from [chart.type](#chart.type).
+         * 
+         * For options that apply to multiple series, it is recommended to add
+         * them to the [plotOptions.series](#plotOptions.series) options structure.
+         * To apply to all series of this specific type, apply it to [plotOptions.
+         * spline](#plotOptions.spline).
+         * 
+         * @type {Object}
+         * @extends series,plotOptions.spline
+         * @excluding dataParser,dataURL
+         * @product highcharts highstock
+         * @apioption series.spline
+         */
+
+        /**
+         * An array of data points for the series. For the `spline` series type,
+         * points can be given in the following ways:
+         * 
+         * 1.  An array of numerical values. In this case, the numerical values
+         * will be interpreted as `y` options. The `x` values will be automatically
+         * calculated, either starting at 0 and incremented by 1, or from `pointStart`
+         * and `pointInterval` given in the series options. If the axis has
+         * categories, these will be used. Example:
+         * 
+         *  ```js
+         *  data: [0, 5, 3, 5]
+         *  ```
+         * 
+         * 2.  An array of arrays with 2 values. In this case, the values correspond
+         * to `x,y`. If the first value is a string, it is applied as the name
+         * of the point, and the `x` value is inferred.
+         * 
+         *  ```js
+         *     data: [
+         *         [0, 9],
+         *         [1, 2],
+         *         [2, 8]
+         *     ]
+         *  ```
+         * 
+         * 3.  An array of objects with named values. The objects are point
+         * configuration objects as seen below. If the total number of data
+         * points exceeds the series' [turboThreshold](#series.spline.turboThreshold),
+         * this option is not available.
+         * 
+         *  ```js
+         *     data: [{
+         *         x: 1,
+         *         y: 9,
+         *         name: "Point2",
+         *         color: "#00FF00"
+         *     }, {
+         *         x: 1,
+         *         y: 0,
+         *         name: "Point1",
+         *         color: "#FF00FF"
+         *     }]
+         *  ```
+         * 
+         * @type {Array<Object|Array|Number>}
+         * @extends series.line.data
+         * @sample {highcharts} highcharts/chart/reflow-true/
+         *         Numerical values
+         * @sample {highcharts} highcharts/series/data-array-of-arrays/
+         *         Arrays of numeric x and y
+         * @sample {highcharts} highcharts/series/data-array-of-arrays-datetime/
+         *         Arrays of datetime x and y
+         * @sample {highcharts} highcharts/series/data-array-of-name-value/
+         *         Arrays of point.name and y
+         * @sample {highcharts} highcharts/series/data-array-of-objects/
+         *         Config objects
+         * @product highcharts highstock
+         * @apioption series.spline.data
+         */
 
     }(Highcharts));
     (function(H) {
@@ -24259,12 +27910,98 @@
         /**
          * AreaSplineSeries object
          */
+        /**
+         * The area spline series is an area series where the graph between the points
+         * is smoothed into a spline.
+         * 
+         * @extends plotOptions.area
+         * @excluding step
+         * @sample {highcharts} highcharts/demo/areaspline/ Area spline chart
+         * @sample {highstock} stock/demo/areaspline/ Area spline chart
+         * @product highcharts highstock
+         * @apioption plotOptions.areaspline
+         */
         seriesType('areaspline', 'spline', defaultPlotOptions.area, {
             getStackPoints: areaProto.getStackPoints,
             getGraphPath: areaProto.getGraphPath,
             drawGraph: areaProto.drawGraph,
             drawLegendSymbol: LegendSymbolMixin.drawRectangle
         });
+        /**
+         * A `areaspline` series. If the [type](#series.areaspline.type) option
+         * is not specified, it is inherited from [chart.type](#chart.type).
+         * 
+         * 
+         * For options that apply to multiple series, it is recommended to add
+         * them to the [plotOptions.series](#plotOptions.series) options structure.
+         * To apply to all series of this specific type, apply it to [plotOptions.
+         * areaspline](#plotOptions.areaspline).
+         * 
+         * @type {Object}
+         * @extends series,plotOptions.areaspline
+         * @excluding dataParser,dataURL
+         * @product highcharts highstock
+         * @apioption series.areaspline
+         */
+
+
+        /**
+         * An array of data points for the series. For the `areaspline` series
+         * type, points can be given in the following ways:
+         * 
+         * 1.  An array of numerical values. In this case, the numerical values
+         * will be interpreted as `y` options. The `x` values will be automatically
+         * calculated, either starting at 0 and incremented by 1, or from `pointStart`
+         * and `pointInterval` given in the series options. If the axis has
+         * categories, these will be used. Example:
+         * 
+         *  ```js
+         *  data: [0, 5, 3, 5]
+         *  ```
+         * 
+         * 2.  An array of arrays with 2 values. In this case, the values correspond
+         * to `x,y`. If the first value is a string, it is applied as the name
+         * of the point, and the `x` value is inferred.
+         * 
+         *  ```js
+         *     data: [
+         *         [0, 10],
+         *         [1, 9],
+         *         [2, 3]
+         *     ]
+         *  ```
+         * 
+         * 3.  An array of objects with named values. The objects are point
+         * configuration objects as seen below. If the total number of data
+         * points exceeds the series' [turboThreshold](#series.areaspline.turboThreshold),
+         * this option is not available.
+         * 
+         *  ```js
+         *     data: [{
+         *         x: 1,
+         *         y: 4,
+         *         name: "Point2",
+         *         color: "#00FF00"
+         *     }, {
+         *         x: 1,
+         *         y: 4,
+         *         name: "Point1",
+         *         color: "#FF00FF"
+         *     }]
+         *  ```
+         * 
+         * @type {Array<Object|Array|Number>}
+         * @extends series.line.data
+         * @sample {highcharts} highcharts/chart/reflow-true/ Numerical values
+         * @sample {highcharts} highcharts/series/data-array-of-arrays/ Arrays of numeric x and y
+         * @sample {highcharts} highcharts/series/data-array-of-arrays-datetime/ Arrays of datetime x and y
+         * @sample {highcharts} highcharts/series/data-array-of-name-value/ Arrays of point.name and y
+         * @sample {highcharts} highcharts/series/data-array-of-objects/ Config objects
+         * @product highcharts highstock
+         * @apioption series.areaspline.data
+         */
+
+
 
     }(Highcharts));
     (function(H) {
@@ -24293,22 +28030,71 @@
          */
 
         /**
+         * Column series display one column per value along an X axis.
+         *
+         * @sample {highcharts} highcharts/demo/column-basic/ Column chart
+         * @sample {highstock} stock/demo/column/ Column chart
+         *
          * @extends {plotOptions.line}
+         * @product highcharts highstock
+         * @excluding connectNulls,dashStyle,gapSize,gapUnit,linecap,lineWidth,marker,
+         *          connectEnds,step
          * @optionparent plotOptions.column
-         * @excluding connectNulls,dashStyle,linecap,lineWidth,marker,connectEnds,step
          */
         seriesType('column', 'line', {
 
             /**
              * The corner radius of the border surrounding each column or bar.
-             * 
+             *
              * @type {Number}
-             * @sample {highcharts} highcharts/plotoptions/column-borderradius/ Rounded columns
+             * @sample {highcharts} highcharts/plotoptions/column-borderradius/
+             *         Rounded columns
              * @default 0
              * @product highcharts highstock
              */
             borderRadius: 0,
-            //colorByPoint: undefined,
+
+            /**
+             * The width of the border surrounding each column or bar.
+             *
+             * In styled mode, the stroke width can be set with the `.highcharts-point`
+             * rule.
+             *
+             * @type {Number}
+             * @sample {highcharts} highcharts/plotoptions/column-borderwidth/
+             *         2px black border
+             * @default 1
+             * @product highcharts highstock
+             * @apioption plotOptions.column.borderWidth
+             */
+
+            /**
+             * When using automatic point colors pulled from the `options.colors`
+             * collection, this option determines whether the chart should receive
+             * one color per series or one color per point.
+             *
+             * @type {Boolean}
+             * @see [series colors](#plotOptions.column.colors)
+             * @sample {highcharts} highcharts/plotoptions/column-colorbypoint-false/
+             *         False by default
+             * @sample {highcharts} highcharts/plotoptions/column-colorbypoint-true/
+             *         True
+             * @default false
+             * @since 2.0
+             * @product highcharts highstock
+             * @apioption plotOptions.column.colorByPoint
+             */
+
+            /**
+             * A series specific or series type specific color set to apply instead
+             * of the global [colors](#colors) when [colorByPoint](#plotOptions.
+             * column.colorByPoint) is true.
+             *
+             * @type {Array<Color>}
+             * @since 3.0
+             * @product highcharts highstock
+             * @apioption plotOptions.column.colors
+             */
 
             /**
              * When true, each column edge is rounded to its nearest pixel in order
@@ -24317,9 +28103,10 @@
              * widths or distance between columns. In these cases, setting `crisp`
              * to `false` may look better, even though each column is rendered
              * blurry.
-             * 
+             *
              * @type {Boolean}
-             * @sample {highcharts} highcharts/plotoptions/column-crisp-false/ Crisp is false
+             * @sample {highcharts} highcharts/plotoptions/column-crisp-false/
+             *         Crisp is false
              * @default true
              * @since 5.0.10
              * @product highcharts highstock
@@ -24328,32 +28115,82 @@
 
             /**
              * Padding between each value groups, in x axis units.
-             * 
+             *
              * @type {Number}
-             * @sample {highcharts} highcharts/plotoptions/column-grouppadding-default/ 0.2 by default
-             * @sample {highcharts} highcharts/plotoptions/column-grouppadding-none/ No group padding - all     columns are evenly spaced
+             * @sample {highcharts} highcharts/plotoptions/column-grouppadding-default/
+             *         0.2 by default
+             * @sample {highcharts} highcharts/plotoptions/column-grouppadding-none/
+             *         No group padding - all columns are evenly spaced
              * @default 0.2
              * @product highcharts highstock
              */
             groupPadding: 0.2,
-            //grouping: true,
 
             /**
+             * Whether to group non-stacked columns or to let them render independent
+             * of each other. Non-grouped columns will be laid out individually
+             * and overlap each other.
+             *
+             * @type {Boolean}
+             * @sample {highcharts} highcharts/plotoptions/column-grouping-false/
+             *         Grouping disabled
+             * @sample {highstock} highcharts/plotoptions/column-grouping-false/
+             *         Grouping disabled
+             * @default true
+             * @since 2.3.0
+             * @product highcharts highstock
+             * @apioption plotOptions.column.grouping
              */
+
             marker: null, // point options are specified in the base options
 
             /**
-             * Padding between each column or bar, in x axis units.
-             * 
+             * The maximum allowed pixel width for a column, translated to the height
+             * of a bar in a bar chart. This prevents the columns from becoming
+             * too wide when there is a small number of points in the chart.
+             *
              * @type {Number}
-             * @sample {highcharts} highcharts/plotoptions/column-pointpadding-default/ 0.1 by default
-             * @sample {highcharts} highcharts/plotoptions/column-pointpadding-025/ 0.25
-             * @sample {highcharts} highcharts/plotoptions/column-pointpadding-none/ 0 for tightly packed columns
+             * @see [pointWidth](#plotOptions.column.pointWidth)
+             * @sample {highcharts} highcharts/plotoptions/column-maxpointwidth-20/
+             *         Limited to 50
+             * @sample {highstock} highcharts/plotoptions/column-maxpointwidth-20/
+             *         Limited to 50
+             * @default null
+             * @since 4.1.8
+             * @product highcharts highstock
+             * @apioption plotOptions.column.maxPointWidth
+             */
+
+            /**
+             * Padding between each column or bar, in x axis units.
+             *
+             * @type {Number}
+             * @sample {highcharts} highcharts/plotoptions/column-pointpadding-default/
+             *         0.1 by default
+             * @sample {highcharts} highcharts/plotoptions/column-pointpadding-025/
+             *         0.25
+             * @sample {highcharts} highcharts/plotoptions/column-pointpadding-none/
+             *         0 for tightly packed columns
              * @default 0.1
              * @product highcharts highstock
              */
             pointPadding: 0.1,
-            //pointWidth: null,
+
+            /**
+             * A pixel value specifying a fixed width for each column or bar. When
+             * `null`, the width is calculated from the `pointPadding` and
+             * `groupPadding`.
+             *
+             * @type {Number}
+             * @see [maxPointWidth](#plotOptions.column.maxPointWidth)
+             * @sample {highcharts} highcharts/plotoptions/column-pointwidth-20/
+             *         20px wide columns regardless of chart width or the amount of data
+             *         points
+             * @default null
+             * @since 1.2.5
+             * @product highcharts highstock
+             * @apioption plotOptions.column.pointWidth
+             */
 
             /**
              * The minimal height for a column or width for a bar. By default,
@@ -24361,10 +28198,12 @@
              * set the minimal point length to a pixel value like 3\. In stacked
              * column charts, minPointLength might not be respected for tightly
              * packed values.
-             * 
+             *
              * @type {Number}
-             * @sample {highcharts} highcharts/plotoptions/column-minpointlength/ Zero base value
-             * @sample {highcharts} highcharts/plotoptions/column-minpointlength-pos-and-neg/ Positive and negative close to zero values
+             * @sample {highcharts} highcharts/plotoptions/column-minpointlength/
+             *         Zero base value
+             * @sample {highcharts} highcharts/plotoptions/column-minpointlength-pos-and-neg/
+             *         Positive and negative close to zero values
              * @default 0
              * @product highcharts highstock
              */
@@ -24379,7 +28218,7 @@
              * crop threshold, the series data is cropped to only contain points
              * that fall within the plot area. The advantage of cropping away invisible
              * points is to increase performance on large series. .
-             * 
+             *
              * @type {Number}
              * @default 50
              * @product highcharts highstock
@@ -24395,7 +28234,7 @@
              *
              * The default `null` means it is computed automatically, but this option
              * can be used to override the automatic value.
-             * 
+             *
              * @type {Number}
              * @sample {highcharts} highcharts/plotoptions/column-pointrange/
              *         Set the point range to one day on a data set with one week
@@ -24406,39 +28245,48 @@
              */
             pointRange: null,
 
-            /**
-             */
             states: {
 
                 /**
-                 * @extends plotOptions.series.states.hover
-                 * @excluding lineWidth,lineWidthPlus,marker
-                 * @product highcharts highstock
+                 * Options for the hovered point. These settings override the normal
+                 * state options when a point is moused over or touched.
+                 * 
+                 * @extends   plotOptions.series.states.hover
+                 * @excluding halo,lineWidth,lineWidthPlus,marker
+                 * @product   highcharts highstock
                  */
                 hover: {
 
                     /**
+                     * @ignore-option
                      */
-                    halo: false
+                    halo: false,
+                    /**
+                     * A specific border color for the hovered point. Defaults to
+                     * inherit the normal state border color.
+                     *
+                     * @type      {Color}
+                     * @product   highcharts
+                     * @apioption plotOptions.column.states.hover.borderColor
+                     */
+
+                    /**
+                     * A specific color for the hovered point.
+                     *
+                     * @type      {Color}
+                     * @default   undefined
+                     * @product   highcharts
+                     * @apioption plotOptions.column.states.hover.color
+                     */
+
 
                 }
 
             },
 
-            /**
-             */
             dataLabels: {
-
-                /**
-                 */
                 align: null, // auto
-
-                /**
-                 */
                 verticalAlign: null, // auto
-
-                /**
-                 */
                 y: null
             },
 
@@ -24446,11 +28294,11 @@
              * When this is true, the series will not cause the Y axis to cross
              * the zero plane (or [threshold](#plotOptions.series.threshold) option)
              * unless the data actually crosses the plane.
-             * 
+             *
              * For example, if `softThreshold` is `false`, a series of 0, 1, 2,
              * 3 will make the Y axis show negative values according to the `minPadding`
              * option. If `softThreshold` is `true`, the Y axis starts at 0.
-             * 
+             *
              * @type {Boolean}
              * @default {highcharts} true
              * @default {highstock} false
@@ -24459,20 +28307,13 @@
              */
             softThreshold: false,
 
-            /**
-             */
-            startFromThreshold: true, // false doesn't work well: http://jsfiddle.net/highcharts/hz8fopan/14/
+            // false doesn't work well: http://jsfiddle.net/highcharts/hz8fopan/14/
+            /**	@ignore */
+            startFromThreshold: true,
 
-            /**
-             */
             stickyTracking: false,
 
-            /**
-             */
             tooltip: {
-
-                /**
-                 */
                 distance: 6
             },
 
@@ -24480,7 +28321,7 @@
              * The Y axis value to serve as the base for the columns, for distinguishing
              * between values above and below a threshold. If `null`, the columns
              * extend from the padding Y axis minimum.
-             * 
+             *
              * @type {Number}
              * @default 0
              * @since 2.0
@@ -24491,10 +28332,13 @@
 
         }, /** @lends seriesTypes.column.prototype */ {
             cropShoulder: 0,
-            directTouch: true, // When tooltip is not shared, this series (and derivatives) requires direct touch/hover. KD-tree does not apply.
+            // When tooltip is not shared, this series (and derivatives) requires direct
+            // touch/hover. KD-tree does not apply.
+            directTouch: true,
             trackerGroups: ['group', 'dataLabelsGroup'],
-            negStacks: true, // use separate negative stacks, unlike area stacks where a negative
-            // point is substracted from previous (#1910)
+            // use separate negative stacks, unlike area stacks where a negative point
+            // is substracted from previous (#1910)
+            negStacks: true,
 
             /**
              * Initialize the series. Extends the basic Series.init method by
@@ -24502,7 +28346,7 @@
              *
              * @function #init
              * @memberOf seriesTypes.column
-             * 
+             *
              */
             init: function() {
                 Series.prototype.init.apply(this, arguments);
@@ -24522,8 +28366,8 @@
             },
 
             /**
-             * Return the width and x offset of the columns adjusted for grouping, groupPadding, pointPadding,
-             * pointWidth etc.
+             * Return the width and x offset of the columns adjusted for grouping,
+             * groupPadding, pointPadding, pointWidth etc.
              */
             getColumnMetrics: function() {
 
@@ -24536,9 +28380,9 @@
                     stackGroups = {},
                     columnCount = 0;
 
-                // Get the total number of column type series.
-                // This is called on every series. Consider moving this logic to a
-                // chart.orderStacks() function and call it on init, addSeries and removeSeries
+                // Get the total number of column type series. This is called on every
+                // series. Consider moving this logic to a chart.orderStacks() function
+                // and call it on init, addSeries and removeSeries
                 if (options.grouping === false) {
                     columnCount = 1;
                 } else {
@@ -24570,7 +28414,13 @@
                 }
 
                 var categoryWidth = Math.min(
-                        Math.abs(xAxis.transA) * (xAxis.ordinalSlope || options.pointRange || xAxis.closestPointRange || xAxis.tickInterval || 1), // #2610
+                        Math.abs(xAxis.transA) * (
+                            xAxis.ordinalSlope ||
+                            options.pointRange ||
+                            xAxis.closestPointRange ||
+                            xAxis.tickInterval ||
+                            1
+                        ), // #2610
                         xAxis.len // #1535
                     ),
                     groupPadding = categoryWidth * options.groupPadding,
@@ -24578,13 +28428,21 @@
                     pointOffsetWidth = groupWidth / (columnCount || 1),
                     pointWidth = Math.min(
                         options.maxPointWidth || xAxis.len,
-                        pick(options.pointWidth, pointOffsetWidth * (1 - 2 * options.pointPadding))
+                        pick(
+                            options.pointWidth,
+                            pointOffsetWidth * (1 - 2 * options.pointPadding)
+                        )
                     ),
                     pointPadding = (pointOffsetWidth - pointWidth) / 2,
-                    colIndex = (series.columnIndex || 0) + (reversedXAxis ? 1 : 0), // #1251, #3737
-                    pointXOffset = pointPadding + (groupPadding + colIndex *
-                        pointOffsetWidth - (categoryWidth / 2)) *
-                    (reversedXAxis ? -1 : 1);
+                    // #1251, #3737
+                    colIndex = (series.columnIndex || 0) + (reversedXAxis ? 1 : 0),
+                    pointXOffset =
+                    pointPadding +
+                    (
+                        groupPadding +
+                        colIndex * pointOffsetWidth -
+                        (categoryWidth / 2)
+                    ) * (reversedXAxis ? -1 : 1);
 
                 // Save it for reading in linked series (Error bars particularly)
                 series.columnMetrics = {
@@ -24611,8 +28469,8 @@
                     yCrisp += 1;
                 }
 
-                // Horizontal. We need to first compute the exact right edge, then round it
-                // and compute the width from there.
+                // Horizontal. We need to first compute the exact right edge, then round
+                // it and compute the width from there.
                 if (this.options.crisp) {
                     right = Math.round(x + w) + xCrisp;
                     x = Math.round(x) + xCrisp;
@@ -24640,33 +28498,38 @@
             },
 
             /**
-             * Translate each point to the plot area coordinate system and find shape positions
+             * Translate each point to the plot area coordinate system and find shape
+             * positions
              */
             translate: function() {
                 var series = this,
                     chart = series.chart,
                     options = series.options,
-                    dense = series.dense = series.closestPointRange * series.xAxis.transA < 2,
+                    dense = series.dense =
+                    series.closestPointRange * series.xAxis.transA < 2,
                     borderWidth = series.borderWidth = pick(
                         options.borderWidth,
                         dense ? 0 : 1 // #3635
                     ),
                     yAxis = series.yAxis,
                     threshold = options.threshold,
-                    translatedThreshold = series.translatedThreshold = yAxis.getThreshold(threshold),
+                    translatedThreshold = series.translatedThreshold =
+                    yAxis.getThreshold(threshold),
                     minPointLength = pick(options.minPointLength, 5),
                     metrics = series.getColumnMetrics(),
                     pointWidth = metrics.width,
-                    seriesBarW = series.barW = Math.max(pointWidth, 1 + 2 * borderWidth), // postprocessed for border width
+                    // postprocessed for border width
+                    seriesBarW = series.barW =
+                    Math.max(pointWidth, 1 + 2 * borderWidth),
                     pointXOffset = series.pointXOffset = metrics.offset;
 
                 if (chart.inverted) {
                     translatedThreshold -= 0.5; // #3355
                 }
 
-                // When the pointPadding is 0, we want the columns to be packed tightly, so we allow individual
-                // columns to have individual sizes. When pointPadding is greater, we strive for equal-width
-                // columns (#2694).
+                // When the pointPadding is 0, we want the columns to be packed tightly,
+                // so we allow individual columns to have individual sizes. When
+                // pointPadding is greater, we strive for equal-width columns (#2694).
                 if (options.pointPadding) {
                     seriesBarW = Math.ceil(seriesBarW);
                 }
@@ -24677,7 +28540,10 @@
                 each(series.points, function(point) {
                     var yBottom = pick(point.yBottom, translatedThreshold),
                         safeDistance = 999 + Math.abs(yBottom),
-                        plotY = Math.min(Math.max(-safeDistance, point.plotY), yAxis.len + safeDistance), // Don't draw too far outside plot area (#1303, #2241, #4264)
+                        plotY = Math.min(
+                            Math.max(-safeDistance, point.plotY),
+                            yAxis.len + safeDistance
+                        ), // Don't draw too far outside plot area (#1303, #2241, #4264)
                         barX = point.plotX + pointXOffset,
                         barW = seriesBarW,
                         barY = Math.min(plotY, yBottom),
@@ -24685,14 +28551,27 @@
                         barH = Math.max(plotY, yBottom) - barY;
 
                     // Handle options.minPointLength
-                    if (Math.abs(barH) < minPointLength) {
-                        if (minPointLength) {
-                            barH = minPointLength;
-                            up = (!yAxis.reversed && !point.negative) || (yAxis.reversed && point.negative);
-                            barY = Math.abs(barY - translatedThreshold) > minPointLength ? // stacked
-                                yBottom - minPointLength : // keep position
-                                translatedThreshold - (up ? minPointLength : 0); // #1485, #4051
+                    if (minPointLength && Math.abs(barH) < minPointLength) {
+                        barH = minPointLength;
+                        up = (!yAxis.reversed && !point.negative) ||
+                            (yAxis.reversed && point.negative);
+
+                        // Reverse zeros if there's no positive value in the series
+                        // in visible range (#7046)
+                        if (
+                            point.y === threshold &&
+                            series.dataMax <= threshold &&
+                            yAxis.min < threshold // and if there's room for it (#7311)
+                        ) {
+                            up = !up;
                         }
+
+                        // If stacked...
+                        barY = Math.abs(barY - translatedThreshold) > minPointLength ?
+                            // ...keep position
+                            yBottom - minPointLength :
+                            // #1485, #4051
+                            translatedThreshold - (up ? minPointLength : 0);
                     }
 
                     // Cache for access in polar
@@ -24700,15 +28579,19 @@
                     point.pointWidth = pointWidth;
 
                     // Fix the tooltip on center of grouped columns (#1216, #424, #3648)
-                    point.tooltipPos = chart.inverted ? [yAxis.len + yAxis.pos - chart.plotLeft - plotY, series.xAxis.len - barX - barW / 2, barH] : [barX + barW / 2, plotY + yAxis.pos - chart.plotTop, barH];
+                    point.tooltipPos = chart.inverted ? [
+                        yAxis.len + yAxis.pos - chart.plotLeft - plotY,
+                        series.xAxis.len - barX - barW / 2, barH
+                    ] : [barX + barW / 2, plotY + yAxis.pos - chart.plotTop, barH];
 
                     // Register shape type and arguments to be used in drawPoints
                     point.shapeType = 'rect';
                     point.shapeArgs = series.crispCol.apply(
                         series,
                         point.isNull ?
-                        // #3169, drilldown from null must have a position to work from
-                        // #6585, dataLabel should be placed on xAxis, not floating in the middle of the chart
+                        // #3169, drilldown from null must have a position to work
+                        // from #6585, dataLabel should be placed on xAxis, not
+                        // floating in the middle of the chart
                         [barX, translatedThreshold, barW, 0] : [barX, barY, barW, barH]
                     );
                 });
@@ -24727,15 +28610,17 @@
              * Columns have no graph
              */
             drawGraph: function() {
-                this.group[this.dense ? 'addClass' : 'removeClass']('highcharts-dense-data');
+                this.group[
+                    this.dense ? 'addClass' : 'removeClass'
+                ]('highcharts-dense-data');
             },
 
 
 
             /**
-             * Draw the columns. For bars, the series.group is rotated, so the same coordinates
-             * apply for columns and bars. This method is inherited by scatter series.
-             *
+             * Draw the columns. For bars, the series.group is rotated, so the same
+             * coordinates apply for columns and bars. This method is inherited by
+             * scatter series.
              */
             drawPoints: function() {
                 var series = this,
@@ -24754,12 +28639,15 @@
                         shapeArgs = point.shapeArgs;
 
                         if (graphic) { // update
-                            graphic[chart.pointCount < animationLimit ? 'animate' : 'attr'](
+                            graphic[
+                                chart.pointCount < animationLimit ? 'animate' : 'attr'
+                            ](
                                 merge(shapeArgs)
                             );
 
                         } else {
-                            point.graphic = graphic = renderer[point.shapeType](shapeArgs)
+                            point.graphic = graphic =
+                                renderer[point.shapeType](shapeArgs)
                                 .add(point.group || series.group);
                         }
 
@@ -24791,12 +28679,17 @@
                     options = series.options,
                     inverted = this.chart.inverted,
                     attr = {},
+                    translateProp = inverted ? 'translateX' : 'translateY',
+                    translateStart,
                     translatedThreshold;
 
                 if (svg) { // VML is too slow anyway
                     if (init) {
                         attr.scaleY = 0.001;
-                        translatedThreshold = Math.min(yAxis.pos + yAxis.len, Math.max(yAxis.pos, yAxis.toPixels(options.threshold)));
+                        translatedThreshold = Math.min(
+                            yAxis.pos + yAxis.len,
+                            Math.max(yAxis.pos, yAxis.toPixels(options.threshold))
+                        );
                         if (inverted) {
                             attr.translateX = translatedThreshold - yAxis.len;
                         } else {
@@ -24805,16 +28698,21 @@
                         series.group.attr(attr);
 
                     } else { // run the animation
+                        translateStart = series.group.attr(translateProp);
+                        series.group.animate({
+                                scaleY: 1
+                            },
+                            extend(animObject(series.options.animation), {
+                                // Do the scale synchronously to ensure smooth updating
+                                // (#5030, #7228)
+                                step: function(val, fx) {
 
-                        attr[inverted ? 'translateX' : 'translateY'] = yAxis.pos;
-                        series.group.animate(attr, extend(animObject(series.options.animation), {
-                            // Do the scale synchronously to ensure smooth updating (#5030)
-                            step: function(val, fx) {
-                                series.group.attr({
-                                    scaleY: Math.max(0.001, fx.pos) // #5250
-                                });
-                            }
-                        }));
+                                    attr[translateProp] =
+                                        translateStart +
+                                        fx.pos * (yAxis.pos - translateStart);
+                                    series.group.attr(attr);
+                                }
+                            }));
 
                         // delete this function to allow it only once
                         series.animate = null;
@@ -24843,6 +28741,98 @@
             }
         });
 
+
+        /**
+         * A `column` series. If the [type](#series.column.type) option is
+         * not specified, it is inherited from [chart.type](#chart.type).
+         *
+         * For options that apply to multiple series, it is recommended to add
+         * them to the [plotOptions.series](#plotOptions.series) options structure.
+         * To apply to all series of this specific type, apply it to [plotOptions.
+         * column](#plotOptions.column).
+         *
+         * @type      {Object}
+         * @extends   series,plotOptions.column
+         * @excluding dataParser,dataURL,marker
+         * 
+         * @product   highcharts highstock
+         * @apioption series.column
+         */
+
+        /**
+         * @excluding halo,lineWidth,lineWidthPlus,marker
+         * @product   highcharts highstock
+         * @apioption series.column.states.hover
+         */
+
+        /**
+         * @excluding halo,lineWidth,lineWidthPlus,marker
+         * @product   highcharts highstock
+         * @apioption series.column.states.select
+         */
+
+        /**
+         * An array of data points for the series. For the `column` series type,
+         * points can be given in the following ways:
+         *
+         * 1.  An array of numerical values. In this case, the numerical values
+         * will be interpreted as `y` options. The `x` values will be automatically
+         * calculated, either starting at 0 and incremented by 1, or from `pointStart`
+         * and `pointInterval` given in the series options. If the axis has
+         * categories, these will be used. Example:
+         *
+         *  ```js
+         *  data: [0, 5, 3, 5]
+         *  ```
+         *
+         * 2.  An array of arrays with 2 values. In this case, the values correspond
+         * to `x,y`. If the first value is a string, it is applied as the name
+         * of the point, and the `x` value is inferred.
+         *
+         *  ```js
+         *     data: [
+         *         [0, 6],
+         *         [1, 2],
+         *         [2, 6]
+         *     ]
+         *  ```
+         *
+         * 3.  An array of objects with named values. The objects are point
+         * configuration objects as seen below. If the total number of data
+         * points exceeds the series' [turboThreshold](#series.column.turboThreshold),
+         * this option is not available.
+         *
+         *  ```js
+         *     data: [{
+         *         x: 1,
+         *         y: 9,
+         *         name: "Point2",
+         *         color: "#00FF00"
+         *     }, {
+         *         x: 1,
+         *         y: 6,
+         *         name: "Point1",
+         *         color: "#FF00FF"
+         *     }]
+         *  ```
+         *
+         * @type {Array<Object|Array|Number>}
+         * @extends series.line.data
+         * @excluding marker
+         * @sample {highcharts} highcharts/chart/reflow-true/ Numerical values
+         * @sample {highcharts} highcharts/series/data-array-of-arrays/
+         *         Arrays of numeric x and y
+         * @sample {highcharts} highcharts/series/data-array-of-arrays-datetime/
+         *         Arrays of datetime x and y
+         * @sample {highcharts} highcharts/series/data-array-of-name-value/
+         *         Arrays of point.name and y
+         * @sample {highcharts} highcharts/series/data-array-of-objects/
+         *         Config objects
+         * @product highcharts highstock
+         * @apioption series.column.data
+         */
+
+
     }(Highcharts));
     (function(H) {
         /**
@@ -24857,13 +28847,111 @@
          * The Bar series class
          */
         seriesType('bar', 'column', null, {
-            /**
-             */
             inverted: true
         });
         /**
+         * A bar series is a special type of column series where the columns are
+         * horizontal.
+         *
+         * @sample highcharts/demo/bar-basic/ Bar chart
          * @extends {plotOptions.column}
+         * @product highcharts
          * @optionparent plotOptions.bar
+         */
+
+
+        /**
+         * A `bar` series. If the [type](#series.bar.type) option is not specified,
+         * it is inherited from [chart.type](#chart.type).
+         * 
+         * For options that apply to multiple series, it is recommended to add
+         * them to the [plotOptions.series](#plotOptions.series) options structure.
+         * To apply to all series of this specific type, apply it to [plotOptions.
+         * bar](#plotOptions.bar).
+         * 
+         * @type {Object}
+         * @extends series,plotOptions.bar
+         * @excluding dataParser,dataURL
+         * @product highcharts
+         * @apioption series.bar
+         */
+
+        /**
+         * An array of data points for the series. For the `bar` series type,
+         * points can be given in the following ways:
+         * 
+         * 1.  An array of numerical values. In this case, the numerical values
+         * will be interpreted as `y` options. The `x` values will be automatically
+         * calculated, either starting at 0 and incremented by 1, or from `pointStart`
+         * and `pointInterval` given in the series options. If the axis has
+         * categories, these will be used. Example:
+         * 
+         *  ```js
+         *  data: [0, 5, 3, 5]
+         *  ```
+         * 
+         * 2.  An array of arrays with 2 values. In this case, the values correspond
+         * to `x,y`. If the first value is a string, it is applied as the name
+         * of the point, and the `x` value is inferred.
+         * 
+         *  ```js
+         *     data: [
+         *         [0, 5],
+         *         [1, 10],
+         *         [2, 3]
+         *     ]
+         *  ```
+         * 
+         * 3.  An array of objects with named values. The objects are point
+         * configuration objects as seen below. If the total number of data
+         * points exceeds the series' [turboThreshold](#series.bar.turboThreshold),
+         * this option is not available.
+         * 
+         *  ```js
+         *     data: [{
+         *         x: 1,
+         *         y: 1,
+         *         name: "Point2",
+         *         color: "#00FF00"
+         *     }, {
+         *         x: 1,
+         *         y: 10,
+         *         name: "Point1",
+         *         color: "#FF00FF"
+         *     }]
+         *  ```
+         * 
+         * @type {Array<Object|Array|Number>}
+         * @extends series.column.data
+         * @sample {highcharts} highcharts/chart/reflow-true/ Numerical values
+         * @sample {highcharts} highcharts/series/data-array-of-arrays/ Arrays of numeric x and y
+         * @sample {highcharts} highcharts/series/data-array-of-arrays-datetime/ Arrays of datetime x and y
+         * @sample {highcharts} highcharts/series/data-array-of-name-value/ Arrays of point.name and y
+         * @sample {highcharts} highcharts/series/data-array-of-objects/ Config objects
+         * @product highcharts
+         * @apioption series.bar.data
+         */
+
+        /**
+         * Alignment of the data label relative to the data point.
+         * 
+         * @type {String}
+         * @sample {highcharts} highcharts/plotoptions/bar-datalabels-align-inside-bar/
+         *         Data labels inside the bar
+         * @default left
+         * @product highcharts
+         * @apioption plotOptions.bar.dataLabels.align
+         */
+
+        /**
+         * The x position of the data label relative to the data point.
+         * 
+         * @type {Number}
+         * @sample {highcharts} highcharts/plotoptions/bar-datalabels-align-inside-bar/
+         *         Data labels inside the bar
+         * @default 5
+         * @product highcharts
+         * @apioption plotOptions.bar.dataLabels.x
          */
 
     }(Highcharts));
@@ -24875,12 +28963,15 @@
          */
         var Series = H.Series,
             seriesType = H.seriesType;
-        /**
-         * The scatter series type
-         */
 
         /**
+         * A scatter plot uses cartesian coordinates to display values for two variables
+         * for a set of data.
+         *
+         * @sample {highcharts} highcharts/demo/scatter/ Scatter plot
+         * 
          * @extends {plotOptions.line}
+         * @product highcharts highstock
          * @optionparent plotOptions.scatter
          */
         seriesType('scatter', 'line', {
@@ -24889,25 +28980,34 @@
              * The width of the line connecting the data points.
              * 
              * @type {Number}
-             * @sample {highcharts} highcharts/plotoptions/scatter-linewidth-none/ 0 by default
-             * @sample {highcharts} highcharts/plotoptions/scatter-linewidth-1/ 1px
+             * @sample {highcharts} highcharts/plotoptions/scatter-linewidth-none/
+             *         0 by default
+             * @sample {highcharts} highcharts/plotoptions/scatter-linewidth-1/
+             *         1px
              * @default 0
              * @product highcharts highstock
              */
             lineWidth: 0,
 
-            /**
-             */
             findNearestPointBy: 'xy',
-
-            /**
-             */
             marker: {
-
-                /**
-                 */
                 enabled: true // Overrides auto-enabling in line series (#3647)
             },
+
+            /**
+             * Sticky tracking of mouse events. When true, the `mouseOut` event
+             * on a series isn't triggered until the mouse moves over another series,
+             * or out of the plot area. When false, the `mouseOut` event on a series
+             * is triggered when the mouse leaves the area around the series' graph
+             * or markers. This also implies the tooltip. When `stickyTracking`
+             * is false and `tooltip.shared` is false, the tooltip will be hidden
+             * when moving the mouse between series.
+             * 
+             * @type {Boolean}
+             * @default false
+             * @product highcharts highstock
+             * @apioption plotOptions.scatter.stickyTracking
+             */
 
             /**
              * A configuration object for the tooltip rendering of each single
@@ -24922,14 +29022,9 @@
             tooltip: {
 
 
-                /**
-                 */
-                headerFormat: '<span class="highcharts-color-{point.colorIndex}">\u25CF</span> ' +
-                    '<span class="highcharts-header"> {series.name}</span><br/>',
+                headerFormat: '<span class="highcharts-color-{point.colorIndex}">\u25CF</span> <span class="highcharts-header"> {series.name}</span><br/>', // eslint-disable-line max-len
 
 
-                /**
-                 */
                 pointFormat: 'x: <b>{point.x}</b><br/>y: <b>{point.y}</b><br/>'
             }
 
@@ -24947,6 +29042,84 @@
             }
         });
 
+        /**
+         * A `scatter` series. If the [type](#series.scatter.type) option is
+         * not specified, it is inherited from [chart.type](#chart.type).
+         * 
+         * For options that apply to multiple series, it is recommended to add
+         * them to the [plotOptions.series](#plotOptions.series) options structure.
+         * To apply to all series of this specific type, apply it to [plotOptions.
+         * scatter](#plotOptions.scatter).
+         * 
+         * @type {Object}
+         * @extends series,plotOptions.scatter
+         * @excluding dataParser,dataURL,stack
+         * @product highcharts highstock
+         * @apioption series.scatter
+         */
+
+        /**
+         * An array of data points for the series. For the `scatter` series
+         * type, points can be given in the following ways:
+         * 
+         * 1.  An array of numerical values. In this case, the numerical values
+         * will be interpreted as `y` options. The `x` values will be automatically
+         * calculated, either starting at 0 and incremented by 1, or from `pointStart`
+         * and `pointInterval` given in the series options. If the axis has
+         * categories, these will be used. Example:
+         * 
+         *  ```js
+         *  data: [0, 5, 3, 5]
+         *  ```
+         * 
+         * 2.  An array of arrays with 2 values. In this case, the values correspond
+         * to `x,y`. If the first value is a string, it is applied as the name
+         * of the point, and the `x` value is inferred.
+         * 
+         *  ```js
+         *     data: [
+         *         [0, 0],
+         *         [1, 8],
+         *         [2, 9]
+         *     ]
+         *  ```
+         * 
+         * 3.  An array of objects with named values. The objects are point
+         * configuration objects as seen below. If the total number of data
+         * points exceeds the series' [turboThreshold](#series.scatter.turboThreshold),
+         * this option is not available.
+         * 
+         *  ```js
+         *     data: [{
+         *         x: 1,
+         *         y: 2,
+         *         name: "Point2",
+         *         color: "#00FF00"
+         *     }, {
+         *         x: 1,
+         *         y: 4,
+         *         name: "Point1",
+         *         color: "#FF00FF"
+         *     }]
+         *  ```
+         * 
+         * @type {Array<Object|Array|Number>}
+         * @extends series.line.data
+         * @sample {highcharts} highcharts/chart/reflow-true/
+         *         Numerical values
+         * @sample {highcharts} highcharts/series/data-array-of-arrays/
+         *         Arrays of numeric x and y
+         * @sample {highcharts} highcharts/series/data-array-of-arrays-datetime/
+         *         Arrays of datetime x and y
+         * @sample {highcharts} highcharts/series/data-array-of-name-value/
+         *         Arrays of point.name and y
+         * @sample {highcharts} highcharts/series/data-array-of-objects/
+         *         Config objects
+         * @product highcharts highstock
+         * @apioption series.scatter.data
+         */
+
+
     }(Highcharts));
     (function(H) {
         /**
@@ -24954,9 +29127,10 @@
          *
          * License: www.highcharts.com/license
          */
-        var pick = H.pick,
+        var deg2rad = H.deg2rad,
+            isNumber = H.isNumber,
+            pick = H.pick,
             relativeLength = H.relativeLength;
-
         H.CenteredSeriesMixin = {
             /**
              * Get the center of the pie based on the size and center options relative to the
@@ -24993,6 +29167,33 @@
                     positions[3] = positions[2];
                 }
                 return positions;
+            },
+            /**
+             * getStartAndEndRadians - Calculates start and end angles in radians.
+             * Used in series types such as pie and sunburst.
+             *
+             * @param  {Number} start Start angle in degrees.
+             * @param  {Number} end Start angle in degrees.
+             * @return {object} Returns an object containing start and end angles as
+             * radians.
+             */
+            getStartAndEndRadians: function getStartAndEndRadians(start, end) {
+                var startAngle = isNumber(start) ? start : 0, // must be a number
+                    endAngle = (
+                        (
+                            isNumber(end) && // must be a number
+                            end > startAngle && // must be larger than the start angle
+                            // difference must be less than 360 degrees
+                            (end - startAngle) < 360
+                        ) ?
+                        end :
+                        startAngle + 360
+                    ),
+                    correction = -90;
+                return {
+                    start: deg2rad * (startAngle + correction),
+                    end: deg2rad * (endAngle + correction)
+                };
             }
         };
 
@@ -25008,6 +29209,7 @@
             defined = H.defined,
             each = H.each,
             extend = H.extend,
+            getStartAndEndRadians = CenteredSeriesMixin.getStartAndEndRadians,
             inArray = H.inArray,
             LegendSymbolMixin = H.LegendSymbolMixin,
             noop = H.noop,
@@ -25026,7 +29228,18 @@
          */
 
         /**
+         * A pie chart is a circular graphic which is divided into slices to illustrate
+         * numerical proportion.
+         *
+         * @sample highcharts/demo/pie-basic/ Pie chart
+         * 
          * @extends {plotOptions.line}
+         * @excluding animationLimit,boostThreshold,connectEnds,connectNulls,
+         *          cropThreshold,dashStyle,findNearestPointBy,getExtremesFromAll,
+         *          lineWidth,marker,negativeColor,pointInterval,pointIntervalUnit,
+         *          pointPlacement,pointStart,softThreshold,stacking,step,threshold,
+         *          turboThreshold,zoneAxis,zones
+         * @product highcharts
          * @optionparent plotOptions.pie
          */
         seriesType('pie', 'line', {
@@ -25046,13 +29259,21 @@
              */
             center: [null, null],
 
-            /**
-             */
             clip: false,
 
-            /**
-             */
+            /** @ignore */
             colorByPoint: true, // always true for pies
+
+            /**
+             * A series specific or series type specific color set to use instead
+             * of the global [colors](#colors).
+             * 
+             * @type {Array<Color>}
+             * @sample {highcharts} highcharts/demo/pie-monochrome/ Set default colors for all pies
+             * @since 3.0
+             * @product highcharts
+             * @apioption plotOptions.pie.colors
+             */
 
             /**
              * @extends plotOptions.series.dataLabels
@@ -25060,10 +29281,48 @@
              * @product highcharts
              */
             dataLabels: {
-                // align: null,
-                // connectorWidth: 1,
-                // connectorColor: point.color,
-                // connectorPadding: 5,
+                /**
+                 * The color of the line connecting the data label to the pie slice.
+                 * The default color is the same as the point's color.
+                 * 
+                 * In styled mode, the connector stroke is given in the
+                 * `.highcharts-data-label-connector` class.
+                 * 
+                 * @type {String}
+                 * @sample {highcharts} highcharts/plotoptions/pie-datalabels-connectorcolor/ Blue connectors
+                 * @sample {highcharts} highcharts/css/pie-point/ Styled connectors
+                 * @default {point.color}
+                 * @since 2.1
+                 * @product highcharts
+                 * @apioption plotOptions.pie.dataLabels.connectorColor
+                 */
+
+                /**
+                 * The distance from the data label to the connector.
+                 * 
+                 * @type {Number}
+                 * @sample {highcharts} highcharts/plotoptions/pie-datalabels-connectorpadding/ No padding
+                 * @default 5
+                 * @since 2.1
+                 * @product highcharts
+                 * @apioption plotOptions.pie.dataLabels.connectorPadding
+                 */
+
+                /**
+                 * The width of the line connecting the data label to the pie slice.
+                 * 
+                 * 
+                 * In styled mode, the connector stroke width is given in the
+                 * `.highcharts-data-label-connector` class.
+                 * 
+                 * @type {Number}
+                 * @sample {highcharts} highcharts/plotoptions/pie-datalabels-connectorwidth-disabled/ Disable the connector
+                 * @sample {highcharts} highcharts/css/pie-point/ Styled connectors
+                 * @default 1
+                 * @since 2.1
+                 * @product highcharts
+                 * @apioption plotOptions.pie.dataLabels.connectorWidth
+                 */
 
                 /**
                  * The distance of the data label from the pie's edge. Negative numbers
@@ -25087,18 +29346,37 @@
                  */
                 enabled: true,
 
-                /**
-                 */
                 formatter: function() { // #2945
                     return this.point.isNull ? undefined : this.point.name;
                 },
-                // softConnector: true,
 
                 /**
+                 * Whether to render the connector as a soft arc or a line with sharp
+                 * break.
+                 * 
+                 * @type {Number}
+                 * @sample {highcharts} highcharts/plotoptions/pie-datalabels-softconnector-true/ Soft
+                 * @sample {highcharts} highcharts/plotoptions/pie-datalabels-softconnector-false/ Non soft
+                 * @since 2.1.7
+                 * @product highcharts
+                 * @apioption plotOptions.pie.dataLabels.softConnector
                  */
+
                 x: 0
                 // y: 0
             },
+
+            /**
+             * The end angle of the pie in degrees where 0 is top and 90 is right.
+             * Defaults to `startAngle` plus 360.
+             * 
+             * @type {Number}
+             * @sample {highcharts} highcharts/demo/pie-semi-circle/ Semi-circle donut
+             * @default null
+             * @since 1.3.6
+             * @product highcharts
+             * @apioption plotOptions.pie.endAngle
+             */
 
             /**
              * Equivalent to [chart.ignoreHiddenSeries](#chart.ignoreHiddenSeries),
@@ -25115,15 +29393,43 @@
              * @product highcharts
              */
             ignoreHiddenPoint: true,
-            //innerSize: 0,
 
             /**
+             * The size of the inner diameter for the pie. A size greater than 0
+             * renders a donut chart. Can be a percentage or pixel value. Percentages
+             * are relative to the pie size. Pixel values are given as integers.
+             * 
+             * 
+             * Note: in Highcharts < 4.1.2, the percentage was relative to the plot
+             * area, not the pie size.
+             * 
+             * @type {String|Number}
+             * @sample {highcharts} highcharts/plotoptions/pie-innersize-80px/ 80px inner size
+             * @sample {highcharts} highcharts/plotoptions/pie-innersize-50percent/ 50% of the plot area
+             * @sample {highcharts} highcharts/demo/3d-pie-donut/ 3D donut
+             * @default 0
+             * @since 2.0
+             * @product highcharts
+             * @apioption plotOptions.pie.innerSize
              */
+
+            /** @ignore */
             legendType: 'point',
 
-            /**
-             */
+            /**	 @ignore */
             marker: null, // point options are specified in the base options
+
+            /**
+             * The minimum size for a pie in response to auto margins. The pie will
+             * try to shrink to make room for data labels in side the plot area,
+             *  but only to this size.
+             * 
+             * @type {Number}
+             * @default 80
+             * @since 3.0
+             * @product highcharts
+             * @apioption plotOptions.pie.minSize
+             */
 
             /**
              * The diameter of the pie relative to the plot area. Can be a percentage
@@ -25163,6 +29469,18 @@
             slicedOffset: 10,
 
             /**
+             * The start angle of the pie slices in degrees where 0 is top and 90
+             * right.
+             * 
+             * @type {Number}
+             * @sample {highcharts} highcharts/plotoptions/pie-startangle-90/ Start from right
+             * @default 0
+             * @since 2.3.4
+             * @product highcharts
+             * @apioption plotOptions.pie.startAngle
+             */
+
+            /**
              * Sticky tracking of mouse events. When true, the `mouseOut` event
              * on a series isn't triggered until the mouse moves over another series,
              * or out of the plot area. When false, the `mouseOut` event on a
@@ -25171,18 +29489,11 @@
              * is false and `tooltip.shared` is false, the tooltip will be hidden
              * when moving the mouse between series.
              * 
-             * @type {Boolean}
-             * @default false
              * @product highcharts
              */
             stickyTracking: false,
 
-            /**
-             */
             tooltip: {
-
-                /**
-                 */
                 followPointer: true
             }
 
@@ -25282,10 +29593,10 @@
                     start,
                     end,
                     angle,
-                    startAngle = options.startAngle || 0,
-                    startAngleRad = series.startAngleRad = Math.PI / 180 * (startAngle - 90),
-                    endAngleRad = series.endAngleRad = Math.PI / 180 * ((pick(options.endAngle, startAngle + 360)) - 90),
-                    circ = endAngleRad - startAngleRad, //2 * Math.PI,
+                    radians = getStartAndEndRadians(options.startAngle, options.endAngle),
+                    startAngleRad = series.startAngleRad = radians.start,
+                    endAngleRad = series.endAngleRad = radians.end,
+                    circ = endAngleRad - startAngleRad, // 2 * Math.PI,
                     points = series.points,
                     radiusX, // the x component of the radius vector for a given point
                     radiusY,
@@ -25399,9 +29710,7 @@
                     chart = series.chart,
                     renderer = chart.renderer,
                     groupTranslation,
-                    //center,
                     graphic,
-                    //group,
                     pointAttr,
                     shapeArgs;
 
@@ -25409,8 +29718,8 @@
 
                 // draw the slices
                 each(series.points, function(point) {
+                    graphic = point.graphic;
                     if (!point.isNull) {
-                        graphic = point.graphic;
                         shapeArgs = point.shapeArgs;
 
 
@@ -25444,6 +29753,8 @@
 
                         graphic.addClass(point.getClassName());
 
+                    } else if (graphic) {
+                        point.graphic = graphic.destroy();
                     }
                 });
 
@@ -25598,13 +29909,126 @@
                         shapeArgs.y,
                         shapeArgs.r + size,
                         shapeArgs.r + size, {
-                            innerR: this.shapeArgs.r,
+                            innerR: this.shapeArgs.r - 1,
                             start: shapeArgs.start,
                             end: shapeArgs.end
                         }
                     );
             }
         });
+
+        /**
+         * A `pie` series. If the [type](#series.pie.type) option is not specified,
+         * it is inherited from [chart.type](#chart.type).
+         * 
+         * For options that apply to multiple series, it is recommended to add
+         * them to the [plotOptions.series](#plotOptions.series) options structure.
+         * To apply to all series of this specific type, apply it to [plotOptions.
+         * pie](#plotOptions.pie).
+         * 
+         * @type {Object}
+         * @extends series,plotOptions.pie
+         * @excluding dataParser,dataURL,stack,xAxis,yAxis
+         * @product highcharts
+         * @apioption series.pie
+         */
+
+        /**
+         * An array of data points for the series. For the `pie` series type,
+         * points can be given in the following ways:
+         * 
+         * 1.  An array of numerical values. In this case, the numerical values
+         * will be interpreted as `y` options. Example:
+         * 
+         *  ```js
+         *  data: [0, 5, 3, 5]
+         *  ```
+         * 
+         * 2.  An array of objects with named values. The objects are point
+         * configuration objects as seen below. If the total number of data
+         * points exceeds the series' [turboThreshold](#series.pie.turboThreshold),
+         * this option is not available.
+         * 
+         *  ```js
+         *     data: [{
+         *     y: 1,
+         *     name: "Point2",
+         *     color: "#00FF00"
+         * }, {
+         *     y: 7,
+         *     name: "Point1",
+         *     color: "#FF00FF"
+         * }]</pre>
+         * 
+         * @type {Array<Object|Number>}
+         * @extends series.line.data
+         * @excluding marker,x
+         * @sample {highcharts} highcharts/chart/reflow-true/ Numerical values
+         * @sample {highcharts} highcharts/series/data-array-of-arrays/ Arrays of numeric x and y
+         * @sample {highcharts} highcharts/series/data-array-of-arrays-datetime/ Arrays of datetime x and y
+         * @sample {highcharts} highcharts/series/data-array-of-name-value/ Arrays of point.name and y
+         * @sample {highcharts} highcharts/series/data-array-of-objects/ Config objects
+         * @product highcharts
+         * @apioption series.pie.data
+         */
+
+        /**
+         * The sequential index of the data point in the legend.
+         * 
+         * @type {Number}
+         * @product highcharts
+         * @apioption series.pie.data.legendIndex
+         */
+
+        /**
+         * Whether to display a slice offset from the center.
+         * 
+         * @type {Boolean}
+         * @sample {highcharts} highcharts/point/sliced/ One sliced point
+         * @product highcharts
+         * @apioption series.pie.data.sliced
+         */
+
+        /**
+         * Fires when the checkbox next to the point name in the legend is clicked.
+         * One parameter, event, is passed to the function. The state of the
+         * checkbox is found by event.checked. The checked item is found by
+         * event.item. Return false to prevent the default action which is to
+         * toggle the select state of the series.
+         * 
+         * @type {Function}
+         * @context Point
+         * @sample {highcharts} highcharts/plotoptions/series-events-checkboxclick/
+         *         Alert checkbox status
+         * @since 1.2.0
+         * @product highcharts
+         * @apioption plotOptions.pie.events.checkboxClick
+         */
+
+        /**
+         * Not applicable to pies, as the legend item is per point. See point.
+         * events.
+         * 
+         * @type {Function}
+         * @since 1.2.0
+         * @product highcharts
+         * @apioption plotOptions.pie.events.legendItemClick
+         */
+
+        /**
+         * Fires when the legend item belonging to the pie point (slice) is
+         * clicked. The `this` keyword refers to the point itself. One parameter,
+         * `event`, is passed to the function, containing common event information. The
+         * default action is to toggle the visibility of the point. This can be
+         * prevented by calling `event.preventDefault()`.
+         * 
+         * @type {Function}
+         * @sample {highcharts} highcharts/plotoptions/pie-point-events-legenditemclick/
+         *         Confirm toggle visibility
+         * @since 1.2.0
+         * @product highcharts
+         * @apioption plotOptions.pie.point.events.legendItemClick
+         */
 
     }(Highcharts));
     (function(H) {
@@ -25628,12 +30052,13 @@
             seriesTypes = H.seriesTypes,
             stableSort = H.stableSort;
 
-
+        /* eslint max-len: ["warn", 80, 4] */
         /**
-         * Generatl distribution algorithm for distributing labels of differing size along a
-         * confined length in two dimensions. The algorithm takes an array of objects containing
-         * a size, a target and a rank. It will place the labels as close as possible to their 
-         * targets, skipping the lowest ranked labels if necessary.
+         * General distribution algorithm for distributing labels of differing size
+         * along a confined length in two dimensions. The algorithm takes an array of
+         * objects containing a size, a target and a rank. It will place the labels as
+         * close as possible to their targets, skipping the lowest ranked labels if
+         * necessary.
          */
         H.distribute = function(boxes, len) {
 
@@ -25649,7 +30074,8 @@
                 return a.target - b.target;
             }
 
-            // If the total size exceeds the len, remove those boxes with the lowest rank
+            // If the total size exceeds the len, remove those boxes with the lowest
+            // rank
             i = boxes.length;
             while (i--) {
                 total += boxes[i].size;
@@ -25678,7 +30104,8 @@
             boxes = map(boxes, function(box) {
                 return {
                     size: box.size,
-                    targets: [box.target]
+                    targets: [box.target],
+                    align: pick(box.align, 0.5)
                 };
             });
 
@@ -25688,17 +30115,28 @@
                 while (i--) {
                     box = boxes[i];
                     // Composite box, average of targets
-                    target = (Math.min.apply(0, box.targets) + Math.max.apply(0, box.targets)) / 2;
-                    box.pos = Math.min(Math.max(0, target - box.size / 2), len - box.size);
+                    target = (
+                        Math.min.apply(0, box.targets) +
+                        Math.max.apply(0, box.targets)
+                    ) / 2;
+                    box.pos = Math.min(
+                        Math.max(0, target - box.size * box.align),
+                        len - box.size
+                    );
                 }
 
                 // Detect overlap and join boxes
                 i = boxes.length;
                 overlapping = false;
                 while (i--) {
-                    if (i > 0 && boxes[i - 1].pos + boxes[i - 1].size > boxes[i].pos) { // Overlap
-                        boxes[i - 1].size += boxes[i].size; // Add this size to the previous box
-                        boxes[i - 1].targets = boxes[i - 1].targets.concat(boxes[i].targets);
+                    // Overlap
+                    if (i > 0 && boxes[i - 1].pos + boxes[i - 1].size > boxes[i].pos) {
+                        // Add this size to the previous box
+                        boxes[i - 1].size += boxes[i].size;
+                        boxes[i - 1].targets = boxes[i - 1]
+                            .targets
+                            .concat(boxes[i].targets);
+                        boxes[i - 1].align = 0.5;
 
                         // Overlapping right, push left
                         if (boxes[i - 1].pos + boxes[i - 1].size > len) {
@@ -25710,7 +30148,8 @@
                 }
             }
 
-            // Now the composite boxes are placed, we need to put the original boxes within them
+            // Now the composite boxes are placed, we need to put the original boxes
+            // within them
             i = 0;
             each(boxes, function(box) {
                 var posInCompositeBox = 0;
@@ -25743,6 +30182,33 @@
                 defer = pick(options.defer, !!seriesOptions.animation),
                 renderer = series.chart.renderer;
 
+            /*
+             * Handle the dataLabels.filter option.
+             */
+            function applyFilter(point, options) {
+                var filter = options.filter,
+                    op,
+                    prop,
+                    val;
+                if (filter) {
+                    op = filter.operator;
+                    prop = point[filter.property];
+                    val = filter.value;
+                    if (
+                        (op === '>' && prop > val) ||
+                        (op === '<' && prop < val) ||
+                        (op === '>=' && prop >= val) ||
+                        (op === '<=' && prop <= val) ||
+                        (op === '==' && prop == val) || // eslint-disable-line eqeqeq
+                        (op === '===' && prop === val)
+                    ) {
+                        return true;
+                    }
+                    return false;
+                }
+                return true;
+            }
+
             if (options.enabled || series._hasPointLabels) {
 
                 // Process default alignment of data labels for columns
@@ -25767,7 +30233,9 @@
                             if (series.visible) { // #2597, #3023, #3024
                                 dataLabelsGroup.show(true);
                             }
-                            dataLabelsGroup[seriesOptions.animation ? 'animate' : 'attr']({
+                            dataLabelsGroup[
+                                seriesOptions.animation ? 'animate' : 'attr'
+                            ]({
                                 opacity: 1
                             }, {
                                 duration: 200
@@ -25786,26 +30254,45 @@
                         rotation,
                         connector = point.connector,
                         isNew = !dataLabel,
-                        style;
+                        style,
+                        formatString;
+
                     // Determine if each data label is enabled
                     // @note dataLabelAttribs (like pointAttribs) would eradicate
                     // the need for dlOptions, and simplify the section below.
-                    pointOptions = point.dlOptions || (point.options && point.options.dataLabels); // dlOptions is used in treemaps
-                    enabled = pick(pointOptions && pointOptions.enabled, generalOptions.enabled) && point.y !== null; // #2282, #4641
+                    pointOptions = point.dlOptions || // dlOptions is used in treemaps
+                        (point.options && point.options.dataLabels);
+                    enabled = pick(
+                        pointOptions && pointOptions.enabled,
+                        generalOptions.enabled
+                    ) && !point.isNull; // #2282, #4641, #7112
+
                     if (enabled) {
-                        // Create individual options structure that can be extended without
-                        // affecting others
+                        enabled = applyFilter(point, pointOptions || options) === true;
+                    }
+
+                    if (enabled) {
+                        // Create individual options structure that can be extended
+                        // without affecting others
                         options = merge(generalOptions, pointOptions);
                         labelConfig = point.getLabelConfig();
-                        str = options.format ?
-                            format(options.format, labelConfig) :
-                            options.formatter.call(labelConfig, options);
+                        formatString = (
+                            options[point.formatPrefix + 'Format'] ||
+                            options.format
+                        );
+
+                        str = defined(formatString) ?
+                            format(formatString, labelConfig) :
+                            (
+                                options[point.formatPrefix + 'Formatter'] ||
+                                options.formatter
+                            ).call(labelConfig, options);
+
                         style = options.style;
                         rotation = options.rotation;
 
 
                         attr = {
-                            //align: align,
 
                             r: options.borderRadius || 0,
                             rotation: rotation,
@@ -25831,18 +30318,24 @@
                     } else if (enabled && defined(str)) {
                         // create new label
                         if (!dataLabel) {
-                            dataLabel = point.dataLabel = renderer[rotation ? 'text' : 'label']( // labels don't support rotation
-                                str,
-                                0, -9999,
-                                options.shape,
-                                null,
-                                null,
-                                options.useHTML,
-                                null,
-                                'data-label'
-                            );
+                            dataLabel = point.dataLabel = rotation ?
+
+                                renderer.text(str, 0, -9999) // labels don't rotate
+                                .addClass('highcharts-data-label') :
+
+                                renderer.label(
+                                    str,
+                                    0, -9999,
+                                    options.shape,
+                                    null,
+                                    null,
+                                    options.useHTML,
+                                    null,
+                                    'data-label'
+                                );
+
                             dataLabel.addClass(
-                                'highcharts-data-label-color-' + point.colorIndex +
+                                ' highcharts-data-label-color-' + point.colorIndex +
                                 ' ' + (options.className || '') +
                                 (options.useHTML ? 'highcharts-tracker' : '') // #3398
                             );
@@ -25855,7 +30348,8 @@
                         if (!dataLabel.added) {
                             dataLabel.add(dataLabelsGroup);
                         }
-                        // Now the data label is created and placed at 0,0, so we need to align it
+                        // Now the data label is created and placed at 0,0, so we need
+                        // to align it
                         series.alignDataLabel(point, dataLabel, options, null, isNew);
                     }
                 });
@@ -25865,10 +30359,16 @@
         /**
          * Align each individual data label
          */
-        Series.prototype.alignDataLabel = function(point, dataLabel, options, alignTo, isNew) {
+        Series.prototype.alignDataLabel = function(
+            point,
+            dataLabel,
+            options,
+            alignTo,
+            isNew
+        ) {
             var chart = this.chart,
                 inverted = chart.inverted,
-                plotX = pick(point.plotX, -9999),
+                plotX = pick(point.dlBox && point.dlBox.centerX, point.plotX, -9999),
                 plotY = pick(point.plotY, -9999),
                 bBox = dataLabel.getBBox(),
                 fontSize,
@@ -25878,7 +30378,8 @@
                 negRotation,
                 align = options.align,
                 rotCorr, // rotation correction
-                // Math.round for rounding errors (#2683), alignTo to allow column labels (#2700)
+                // Math.round for rounding errors (#2683), alignTo to allow column
+                // labels (#2700)
                 visible =
                 this.visible &&
                 (
@@ -25887,7 +30388,9 @@
                     (
                         alignTo && chart.isInsidePlot(
                             plotX,
-                            inverted ? alignTo.x + 1 : alignTo.y + alignTo.height - 1,
+                            inverted ?
+                            alignTo.x + 1 :
+                            alignTo.y + alignTo.height - 1,
                             inverted
                         )
                     )
@@ -25915,17 +30418,22 @@
                     height: bBox.height
                 });
 
-                // Allow a hook for changing alignment in the last moment, then do the alignment
+                // Allow a hook for changing alignment in the last moment, then do the
+                // alignment
                 if (rotation) {
                     justify = false; // Not supported for rotated text
                     rotCorr = chart.renderer.rotCorr(baseline, rotation); // #3723
                     alignAttr = {
                         x: alignTo.x + options.x + alignTo.width / 2 + rotCorr.x,
-                        y: alignTo.y + options.y + {
-                            top: 0,
-                            middle: 0.5,
-                            bottom: 1
-                        }[options.verticalAlign] * alignTo.height
+                        y: (
+                            alignTo.y +
+                            options.y + {
+                                top: 0,
+                                middle: 0.5,
+                                bottom: 1
+                            }[options.verticalAlign] *
+                            alignTo.height
+                        )
                     };
                     dataLabel[isNew ? 'attr' : 'animate'](alignAttr)
                         .attr({ // #3003
@@ -25965,10 +30473,19 @@
 
                     // Now check that the data label is within the plot area
                 } else if (pick(options.crop, true)) {
-                    visible = chart.isInsidePlot(alignAttr.x, alignAttr.y) && chart.isInsidePlot(alignAttr.x + bBox.width, alignAttr.y + bBox.height);
+                    visible =
+                        chart.isInsidePlot(
+                            alignAttr.x,
+                            alignAttr.y
+                        ) &&
+                        chart.isInsidePlot(
+                            alignAttr.x + bBox.width,
+                            alignAttr.y + bBox.height
+                        );
                 }
 
-                // When we're using a shape, make it possible with a connector or an arrow pointing to thie point
+                // When we're using a shape, make it possible with a connector or an
+                // arrow pointing to thie point
                 if (options.shape && !rotation) {
                     dataLabel[isNew ? 'attr' : 'animate']({
                         anchorX: inverted ? chart.plotWidth - point.plotY : point.plotX,
@@ -25988,10 +30505,17 @@
         };
 
         /**
-         * If data labels fall partly outside the plot area, align them back in, in a way that
-         * doesn't hide the point.
+         * If data labels fall partly outside the plot area, align them back in, in a
+         * way that doesn't hide the point.
          */
-        Series.prototype.justifyDataLabel = function(dataLabel, options, alignAttr, bBox, alignTo, isNew) {
+        Series.prototype.justifyDataLabel = function(
+            dataLabel,
+            options,
+            alignAttr,
+            bBox,
+            alignTo,
+            isNew
+        ) {
             var chart = this.chart,
                 align = options.align,
                 verticalAlign = options.verticalAlign,
@@ -26073,7 +30597,8 @@
                     dataLabelWidth,
                     labelPos,
                     labelHeight,
-                    halves = [ // divide the points into right and left halves for anti collision
+                    // divide the points into right and left halves for anti collision
+                    halves = [
                         [], // right
                         [] // left
                     ],
@@ -26185,6 +30710,7 @@
                         dataLabel = point.dataLabel;
                         visibility = point.visible === false ? 'hidden' : 'inherit';
                         naturalY = labelPos[1];
+                        y = naturalY;
 
                         if (positions && defined(positions[positionsIndex])) {
                             if (positions[positionsIndex].pos === undefined) {
@@ -26193,9 +30719,6 @@
                                 labelHeight = positions[positionsIndex].size;
                                 y = point.top + positions[positionsIndex].pos;
                             }
-
-                        } else {
-                            y = naturalY;
                         }
 
                         // It is needed to delete point.positionIndex for 
@@ -26204,12 +30727,19 @@
                         delete point.positionIndex;
 
                         // get the x - use the natural x position for labels near the 
-                        // top and bottom, to prevent the top and botton slice connectors 
-                        // from touching each other on either side
+                        // top and bottom, to prevent the top and botton slice
+                        // connectors from touching each other on either side
                         if (options.justify) {
-                            x = seriesCenter[0] + (i ? -1 : 1) * (radius + point.labelDistance);
+                            x = seriesCenter[0] +
+                                (i ? -1 : 1) * (radius + point.labelDistance);
                         } else {
-                            x = series.getX(y < point.top + 2 || y > point.bottom - 2 ? naturalY : y, i, point);
+                            x = series.getX(
+                                y < point.top + 2 || y > point.bottom - 2 ?
+                                naturalY :
+                                y,
+                                i,
+                                point
+                            );
                         }
 
 
@@ -26219,12 +30749,17 @@
                             align: labelPos[6]
                         };
                         dataLabel._pos = {
-                            x: x + options.x +
+                            x: (
+                                x +
+                                options.x +
                                 ({
                                     left: connectorPadding,
                                     right: -connectorPadding
-                                }[labelPos[6]] || 0),
-                            y: y + options.y - 10 // 10 is for the baseline (label vs text)
+                                }[labelPos[6]] || 0)
+                            ),
+
+                            // 10 is for the baseline (label vs text)
+                            y: y + options.y - 10
                         };
                         labelPos.x = x;
                         labelPos.y = y;
@@ -26272,9 +30807,12 @@
                     } // for each point
                 }); // for each half
 
-                // Do not apply the final placement and draw the connectors until we have verified
-                // that labels are not spilling over.
-                if (arrayMax(overflow) === 0 || this.verifyDataLabelOverflow(overflow)) {
+                // Do not apply the final placement and draw the connectors until we
+                // have verified that labels are not spilling over.
+                if (
+                    arrayMax(overflow) === 0 ||
+                    this.verifyDataLabelOverflow(overflow)
+                ) {
 
                     // Place the labels in the final position
                     this.placeDataLabels();
@@ -26299,7 +30837,8 @@
 
                                 if (isNew) {
                                     point.connector = connector = chart.renderer.path()
-                                        .addClass('highcharts-data-label-connector highcharts-color-' + point.colorIndex)
+                                        .addClass('highcharts-data-label-connector ' +
+                                            ' highcharts-color-' + point.colorIndex)
                                         .add(series.dataLabelsGroup);
 
 
@@ -26318,15 +30857,16 @@
             };
 
             /**
-             * Extendable method for getting the path of the connector between the data label
-             * and the pie slice.
+             * Extendable method for getting the path of the connector between the data
+             * label and the pie slice.
              */
             seriesTypes.pie.prototype.connectorPath = function(labelPos) {
                 var x = labelPos.x,
                     y = labelPos.y;
                 return pick(this.options.dataLabels.softConnector, true) ? [
                     'M',
-                    x + (labelPos[6] === 'left' ? 5 : -5), y, // end of the string at the label
+                    // end of the string at the label
+                    x + (labelPos[6] === 'left' ? 5 : -5), y,
                     'C',
                     x, y, // first break, next to the label
                     2 * labelPos[2] - labelPos[4], 2 * labelPos[3] - labelPos[5],
@@ -26335,7 +30875,8 @@
                     labelPos[4], labelPos[5] // base
                 ] : [
                     'M',
-                    x + (labelPos[6] === 'left' ? 5 : -5), y, // end of the string at the label
+                    // end of the string at the label
+                    x + (labelPos[6] === 'left' ? 5 : -5), y,
                     'L',
                     labelPos[2], labelPos[3], // second break
                     'L',
@@ -26344,8 +30885,8 @@
             };
 
             /**
-             * Perform the final placement of the data labels after we have verified that they
-             * fall within the plot area.
+             * Perform the final placement of the data labels after we have verified
+             * that they fall within the plot area.
              */
             seriesTypes.pie.prototype.placeDataLabels = function() {
                 each(this.points, function(point) {
@@ -26382,9 +30923,9 @@
             seriesTypes.pie.prototype.alignDataLabel = noop;
 
             /**
-             * Verify whether the data labels are allowed to draw, or we should run more translation and data
-             * label positioning to keep them inside the plot area. Returns true when data labels are ready
-             * to draw.
+             * Verify whether the data labels are allowed to draw, or we should run more
+             * translation and data label positioning to keep them inside the plot area.
+             * Returns true when data labels are ready to draw.
              */
             seriesTypes.pie.prototype.verifyDataLabelOverflow = function(overflow) {
 
@@ -26457,14 +30998,26 @@
         if (seriesTypes.column) {
 
             /**
-             * Override the basic data label alignment by adjusting for the position of the column
+             * Override the basic data label alignment by adjusting for the position of
+             * the column
              */
-            seriesTypes.column.prototype.alignDataLabel = function(point, dataLabel, options, alignTo, isNew) {
+            seriesTypes.column.prototype.alignDataLabel = function(
+                point,
+                dataLabel,
+                options,
+                alignTo,
+                isNew
+            ) {
                 var inverted = this.chart.inverted,
                     series = point.series,
-                    dlBox = point.dlBox || point.shapeArgs, // data label box for alignment
-                    below = pick(point.below, point.plotY > pick(this.translatedThreshold, series.yAxis.len)), // point.below is used in range series
-                    inside = pick(options.inside, !!this.options.stacking), // draw it inside the box?
+                    // data label box for alignment
+                    dlBox = point.dlBox || point.shapeArgs,
+                    below = pick(
+                        point.below, // range series
+                        point.plotY > pick(this.translatedThreshold, series.yAxis.len)
+                    ),
+                    // draw it inside the box?
+                    inside = pick(options.inside, !!this.options.stacking),
                     overshoot;
 
                 // Align to the column itself, or the top of it
@@ -26502,8 +31055,8 @@
                 }
 
 
-                // When alignment is undefined (typically columns and bars), display the individual
-                // point below or above the point depending on the threshold
+                // When alignment is undefined (typically columns and bars), display the
+                // individual point below or above the point depending on the threshold
                 options.align = pick(
                     options.align, !inverted || inside ? 'center' : below ? 'right' : 'left'
                 );
@@ -26513,7 +31066,14 @@
                 );
 
                 // Call the parent method
-                Series.prototype.alignDataLabel.call(this, point, dataLabel, options, alignTo, isNew);
+                Series.prototype.alignDataLabel.call(
+                    this,
+                    point,
+                    dataLabel,
+                    options,
+                    alignTo,
+                    isNew
+                );
 
                 // If label was justified and we have contrast, set it:
                 if (point.isLabelJustified && point.contrastColor) {
@@ -26544,55 +31104,51 @@
         // Collect potensial overlapping data labels. Stack labels probably don't need
         // to be considered because they are usually accompanied by data labels that lie
         // inside the columns.
-        Chart.prototype.callbacks.push(function(chart) {
-            function collectAndHide() {
-                var labels = [];
+        addEvent(Chart.prototype, 'render', function collectAndHide() {
+            var labels = [];
 
-                each(chart.yAxis || [], function(yAxis) {
-                    if (
-                        yAxis.options.stackLabels &&
-                        !yAxis.options.stackLabels.allowOverlap
-                    ) {
-                        objectEach(yAxis.stacks, function(stack) {
-                            objectEach(stack, function(stackItem) {
-                                labels.push(stackItem.label);
-                            });
+            // Consider external label collectors
+            each(this.labelCollectors || [], function(collector) {
+                labels = labels.concat(collector());
+            });
+
+            each(this.yAxis || [], function(yAxis) {
+                if (
+                    yAxis.options.stackLabels &&
+                    !yAxis.options.stackLabels.allowOverlap
+                ) {
+                    objectEach(yAxis.stacks, function(stack) {
+                        objectEach(stack, function(stackItem) {
+                            labels.push(stackItem.label);
                         });
-                    }
-                });
+                    });
+                }
+            });
 
-                each(chart.series || [], function(series) {
-                    var dlOptions = series.options.dataLabels,
-                        // Range series have two collections
-                        collections = series.dataLabelCollections || ['dataLabel'];
+            each(this.series || [], function(series) {
+                var dlOptions = series.options.dataLabels,
+                    // Range series have two collections
+                    collections = series.dataLabelCollections || ['dataLabel'];
 
-                    if (
-                        (dlOptions.enabled || series._hasPointLabels) &&
-                        !dlOptions.allowOverlap &&
-                        series.visible
-                    ) { // #3866
-                        each(collections, function(coll) {
-                            each(series.points, function(point) {
-                                if (point[coll]) {
-                                    point[coll].labelrank = pick(
-                                        point.labelrank,
-                                        point.shapeArgs && point.shapeArgs.height
-                                    ); // #4118
-                                    labels.push(point[coll]);
-                                }
-                            });
+                if (
+                    (dlOptions.enabled || series._hasPointLabels) &&
+                    !dlOptions.allowOverlap &&
+                    series.visible
+                ) { // #3866
+                    each(collections, function(coll) {
+                        each(series.points, function(point) {
+                            if (point[coll]) {
+                                point[coll].labelrank = pick(
+                                    point.labelrank,
+                                    point.shapeArgs && point.shapeArgs.height
+                                ); // #4118
+                                labels.push(point[coll]);
+                            }
                         });
-                    }
-                });
-                chart.hideOverlappingLabels(labels);
-            }
-
-            // Do it now ...
-            collectAndHide();
-
-            // ... and after each chart redraw
-            addEvent(chart, 'redraw', collectAndHide);
-
+                    });
+                }
+            });
+            this.hideOverlappingLabels(labels);
         });
 
         /**
@@ -26853,13 +31409,6 @@
                     }
                 }
 
-                // handle single points
-                /*for (i = 0; i < singlePoints.length; i++) {
-                	singlePoint = singlePoints[i];
-                	trackerPath.push(M, singlePoint.plotX - snap, singlePoint.plotY,
-                	L, singlePoint.plotX + snap, singlePoint.plotY);
-                }*/
-
                 // draw the tracker
                 if (tracker) {
                     tracker.attr({
@@ -26924,7 +31473,8 @@
             setItemEvents: function(item, legendItem, useHTML) {
                 var legend = this,
                     boxWrapper = legend.chart.renderer.boxWrapper,
-                    activeClass = 'highcharts-legend-' + (item.series ? 'point' : 'series') + '-active';
+                    activeClass = 'highcharts-legend-' +
+                    (item instanceof Point ? 'point' : 'series') + '-active';
 
                 // Set the events on the item group, or in case of useHTML, the item itself (#1249)
                 (useHTML ? legendItem : item.legendGroup).on('mouseover', function() {
@@ -26950,6 +31500,11 @@
                                     item.setVisible();
                                 }
                             };
+
+                        // A CSS class to dim or hide other than the hovered series. Event
+                        // handling in iOS causes the activeClass to be added prior to click
+                        // in some cases (#7418).
+                        boxWrapper.removeClass(activeClass);
 
                         // Pass over the click/touch event. #4.
                         event = {
@@ -27130,12 +31685,16 @@
                         newMax = flipped ? panMin : panMax,
                         paddedMin = Math.min(
                             extremes.dataMin,
+                            halfPointRange ?
+                            extremes.min :
                             axis.toValue(
                                 axis.toPixels(extremes.min) - axis.minPixelPadding
                             )
                         ),
                         paddedMax = Math.max(
                             extremes.dataMax,
+                            halfPointRange ?
+                            extremes.max :
                             axis.toValue(
                                 axis.toPixels(extremes.max) + axis.minPixelPadding
                             )
@@ -27370,13 +31929,6 @@
                         point.graphic.addClass('highcharts-point-' + state);
                     }
 
-                    /*attribs = radius ? { // new symbol attributes (#507, #612)
-                    	x: plotX - radius,
-                    	y: plotY - radius,
-                    	width: 2 * radius,
-                    	height: 2 * radius
-                    } : {};*/
-
 
 
                     if (markerAttribs) {
@@ -27548,12 +32100,12 @@
             },
 
             /**
-             * Set the state of the series. Called internally on mouse interaction and
-             * select operations, but it can also be called directly to visually
+             * Set the state of the series. Called internally on mouse interaction
+             * operations, but it can also be called directly to visually
              * highlight a series.
              *
              * @param  {String} [state]
-             *         Can be either `hover`, `select` or undefined to set to normal
+             *         Can be either `hover` or undefined to set to normal
              *         state.
              */
             setState: function(state) {
@@ -27730,6 +32282,108 @@
             pick = H.pick,
             splat = H.splat;
 
+
+        /**
+         * Allows setting a set of rules to apply for different screen or chart
+         * sizes. Each rule specifies additional chart options.
+         * 
+         * @sample {highstock} stock/demo/responsive/ Stock chart
+         * @sample highcharts/responsive/axis/ Axis
+         * @sample highcharts/responsive/legend/ Legend
+         * @sample highcharts/responsive/classname/ Class name
+         * @since 5.0.0
+         * @apioption responsive
+         */
+
+        /**
+         * A set of rules for responsive settings. The rules are executed from
+         * the top down.
+         * 
+         * @type {Array<Object>}
+         * @sample {highcharts} highcharts/responsive/axis/ Axis changes
+         * @sample {highstock} highcharts/responsive/axis/ Axis changes
+         * @sample {highmaps} highcharts/responsive/axis/ Axis changes
+         * @since 5.0.0
+         * @apioption responsive.rules
+         */
+
+        /**
+         * A full set of chart options to apply as overrides to the general
+         * chart options. The chart options are applied when the given rule
+         * is active.
+         * 
+         * A special case is configuration objects that take arrays, for example
+         * [xAxis](#xAxis), [yAxis](#yAxis) or [series](#series). For these
+         * collections, an `id` option is used to map the new option set to
+         * an existing object. If an existing object of the same id is not found,
+         * the item of the same indexupdated. So for example, setting `chartOptions`
+         * with two series items without an `id`, will cause the existing chart's
+         * two series to be updated with respective options.
+         * 
+         * @type {Object}
+         * @sample {highstock} stock/demo/responsive/ Stock chart
+         * @sample highcharts/responsive/axis/ Axis
+         * @sample highcharts/responsive/legend/ Legend
+         * @sample highcharts/responsive/classname/ Class name
+         * @since 5.0.0
+         * @apioption responsive.rules.chartOptions
+         */
+
+        /**
+         * Under which conditions the rule applies.
+         * 
+         * @type {Object}
+         * @since 5.0.0
+         * @apioption responsive.rules.condition
+         */
+
+        /**
+         * A callback function to gain complete control on when the responsive
+         * rule applies. Return `true` if it applies. This opens for checking
+         * against other metrics than the chart size, or example the document
+         * size or other elements.
+         * 
+         * @type {Function}
+         * @context Chart
+         * @since 5.0.0
+         * @apioption responsive.rules.condition.callback
+         */
+
+        /**
+         * The responsive rule applies if the chart height is less than this.
+         * 
+         * @type {Number}
+         * @since 5.0.0
+         * @apioption responsive.rules.condition.maxHeight
+         */
+
+        /**
+         * The responsive rule applies if the chart width is less than this.
+         * 
+         * @type {Number}
+         * @sample highcharts/responsive/axis/ Max width is 500
+         * @since 5.0.0
+         * @apioption responsive.rules.condition.maxWidth
+         */
+
+        /**
+         * The responsive rule applies if the chart height is greater than this.
+         * 
+         * @type {Number}
+         * @default 0
+         * @since 5.0.0
+         * @apioption responsive.rules.condition.minHeight
+         */
+
+        /**
+         * The responsive rule applies if the chart width is greater than this.
+         * 
+         * @type {Number}
+         * @default 0
+         * @since 5.0.0
+         * @apioption responsive.rules.condition.minWidth
+         */
+
         /**
          * Update the chart based on the current chart/document size and options for
          * responsiveness.
@@ -27822,13 +32476,13 @@
                 var i;
                 H.objectEach(options, function(val, key) {
                     if (!depth && inArray(key, ['series', 'xAxis', 'yAxis']) > -1) {
-                        options[key] = splat(options[key]);
+                        val = splat(val);
 
                         ret[key] = [];
 
                         // Iterate over collections like series, xAxis or yAxis and map
                         // the items by index.
-                        for (i = 0; i < options[key].length; i++) {
+                        for (i = 0; i < val.length; i++) {
                             if (curr[key][i]) { // Item exists in current data (#6347)
                                 ret[key][i] = {};
                                 getCurrent(
@@ -27872,6 +32526,7 @@
             each = H.each,
             extend = H.extend,
             noop = H.noop,
+            pick = H.pick,
             Series = H.Series,
             timeUnits = H.timeUnits,
             wrap = H.wrap;
@@ -28081,15 +32736,42 @@
                     slope,
                     hasBreaks = axis.isXAxis && !!axis.options.breaks,
                     isOrdinal = axis.options.ordinal,
+                    overscrollPointsRange = Number.MAX_VALUE,
                     ignoreHiddenSeries = axis.chart.options.chart.ignoreHiddenSeries,
+                    isNavigatorAxis = axis.options.className === 'highcharts-navigator-xaxis',
                     i;
 
-                // apply the ordinal logic
+                if (
+                    axis.options.overscroll &&
+                    axis.max === axis.dataMax &&
+                    (
+                        // Panning is an execption,
+                        // We don't want to apply overscroll when panning over the dataMax
+                        !axis.chart.mouseIsDown ||
+                        isNavigatorAxis
+                    ) && (
+                        // Scrollbar buttons are the other execption:
+                        !axis.eventArgs ||
+                        axis.eventArgs && axis.eventArgs.trigger !== 'navigator'
+                    )
+                ) {
+                    axis.max += axis.options.overscroll;
+
+                    // Live data and buttons require translation for the min:
+                    if (!isNavigatorAxis && defined(axis.userMin)) {
+                        axis.min += axis.options.overscroll;
+                    }
+                }
+
+                // Apply the ordinal logic
                 if (isOrdinal || hasBreaks) { // #4167 YAxis is never ordinal ?
 
                     each(axis.series, function(series, i) {
 
-                        if ((!ignoreHiddenSeries || series.visible !== false) && (series.takeOrdinalPosition !== false || hasBreaks)) {
+                        if (
+                            (!ignoreHiddenSeries || series.visible !== false) &&
+                            (series.takeOrdinalPosition !== false || hasBreaks)
+                        ) {
 
                             // concatenate the processed X data into the existing positions, or the empty array
                             ordinalPositions = ordinalPositions.concat(series.processedXData);
@@ -28099,6 +32781,15 @@
                             ordinalPositions.sort(function(a, b) {
                                 return a - b; // without a custom function it is sorted as strings
                             });
+
+                            overscrollPointsRange = Math.min(
+                                overscrollPointsRange,
+                                pick(
+                                    // Check for a single-point series:
+                                    series.closestPointRange,
+                                    overscrollPointsRange
+                                )
+                            );
 
                             if (len) {
                                 i = len - 1;
@@ -28128,8 +32819,26 @@
 
                         // When zooming in on a week, prevent axis padding for weekends even though the data within
                         // the week is evenly spaced.
-                        if (!axis.options.keepOrdinalPadding && (ordinalPositions[0] - min > dist || max - ordinalPositions[ordinalPositions.length - 1] > dist)) {
+                        if (!axis.options.keepOrdinalPadding &&
+                            (
+                                ordinalPositions[0] - min > dist ||
+                                max - ordinalPositions[ordinalPositions.length - 1] > dist
+                            )
+                        ) {
                             useOrdinal = true;
+                        }
+                    } else if (axis.options.overscroll) {
+                        if (len === 2) {
+                            // Exactly two points, distance for overscroll is fixed:
+                            overscrollPointsRange = ordinalPositions[1] - ordinalPositions[0];
+                        } else if (len === 1) {
+                            // We have just one point, closest distance is unknown.
+                            // Assume then it is last point and overscrolled range:
+                            overscrollPointsRange = axis.options.overscroll;
+                            ordinalPositions = [ordinalPositions[0], ordinalPositions[0] + overscrollPointsRange];
+                        } else {
+                            // In case of zooming in on overscrolled range, stick to the old range:
+                            overscrollPointsRange = axis.overscrollPointsRange;
                         }
                     }
 
@@ -28137,6 +32846,11 @@
                     // Since the ordinal positions may exceed the current range, get the start and
                     // end positions within it (#719, #665b)
                     if (useOrdinal) {
+
+                        if (axis.options.overscroll) {
+                            axis.overscrollPointsRange = overscrollPointsRange;
+                            ordinalPositions = ordinalPositions.concat(axis.getOverscrollPositions());
+                        }
 
                         // Register
                         axis.ordinalPositions = ordinalPositions;
@@ -28163,9 +32877,11 @@
                         axis.ordinalOffset = min - (minIndex * slope);
 
                     } else {
+                        axis.overscrollPointsRange = pick(axis.closestPointRange, axis.overscrollPointsRange);
                         axis.ordinalPositions = axis.ordinalSlope = axis.ordinalOffset = undefined;
                     }
                 }
+
                 axis.isOrdinal = isOrdinal && useOrdinal; // #3818, #4196, #4926
                 axis.groupIntervalFactor = null; // reset for next run
             },
@@ -28287,6 +33003,7 @@
                     grouping = axis.series[0].currentDataGrouping,
                     ordinalIndex = axis.ordinalIndex,
                     key = grouping ? grouping.count + grouping.unitName : 'raw',
+                    overscroll = axis.options.overscroll,
                     extremes = axis.getExtremes(),
                     fakeAxis,
                     fakeSeries;
@@ -28307,7 +33024,7 @@
                         getExtremes: function() {
                             return {
                                 min: extremes.dataMin,
-                                max: extremes.dataMax
+                                max: extremes.dataMax + overscroll
                             };
                         },
                         options: {
@@ -28321,10 +33038,13 @@
                     each(axis.series, function(series) {
                         fakeSeries = {
                             xAxis: fakeAxis,
-                            xData: series.xData,
+                            xData: series.xData.slice(),
                             chart: chart,
                             destroyGroupedData: noop
                         };
+
+                        fakeSeries.xData = fakeSeries.xData.concat(axis.getOverscrollPositions());
+
                         fakeSeries.options = {
                             dataGrouping: grouping ? {
                                 enabled: true,
@@ -28339,6 +33059,7 @@
                         };
                         series.processData.apply(fakeSeries);
 
+
                         fakeAxis.series.push(fakeSeries);
                     });
 
@@ -28349,6 +33070,38 @@
                     ordinalIndex[key] = fakeAxis.ordinalPositions;
                 }
                 return ordinalIndex[key];
+            },
+
+            /**
+             * Get ticks for an ordinal axis within a range where points don't exist.
+             * It is required when overscroll is enabled. We can't base on points,
+             * because we may not have any, so we use approximated pointRange and
+             * generate these ticks between <Axis.dataMax, Axis.dataMax + Axis.overscroll>
+             * evenly spaced. Used in panning and navigator scrolling.
+             *
+             * @returns positions {Array} Generated ticks
+             * @private
+             */
+            getOverscrollPositions: function() {
+                var axis = this,
+                    extraRange = axis.options.overscroll,
+                    distance = axis.overscrollPointsRange,
+                    positions = [],
+                    max = axis.dataMax;
+
+                if (H.defined(distance)) {
+                    // Max + pointRange because we need to scroll to the last
+
+                    positions.push(max);
+
+                    while (max <= axis.dataMax + extraRange) {
+                        max += distance;
+                        positions.push(max);
+                    }
+
+                }
+
+                return positions;
             },
 
             /**
@@ -28422,7 +33175,7 @@
                     if (!this.options.breaks) {
                         ret = tickInterval / (ordinalSlope / this.closestPointRange);
                     } else {
-                        ret = this.closestPointRange;
+                        ret = this.closestPointRange || tickInterval; // #7275
                     }
                 } else {
                     ret = tickInterval;
@@ -28438,6 +33191,7 @@
         wrap(Chart.prototype, 'pan', function(proceed, e) {
             var chart = this,
                 xAxis = chart.xAxis[0],
+                overscroll = xAxis.options.overscroll,
                 chartX = e.chartX,
                 runBase = false;
 
@@ -28450,7 +33204,7 @@
                     max = extremes.max,
                     trimmedRange,
                     hoverPoints = chart.hoverPoints,
-                    closestPointRange = xAxis.closestPointRange,
+                    closestPointRange = xAxis.closestPointRange || xAxis.overscrollPointsRange,
                     pointPixelWidth = xAxis.translationSlope * (xAxis.ordinalSlope || closestPointRange),
                     movedUnits = (mouseDownX - chartX) / pointPixelWidth, // how many ordinal units did we move?
                     extendedAxis = {
@@ -28507,7 +33261,10 @@
                     );
 
                     // Apply it if it is within the available data range
-                    if (trimmedRange.min >= Math.min(extremes.dataMin, min) && trimmedRange.max <= Math.max(dataMax, max)) {
+                    if (
+                        trimmedRange.min >= Math.min(extremes.dataMin, min) &&
+                        trimmedRange.max <= Math.max(dataMax, max) + overscroll
+                    ) {
                         xAxis.setExtremes(trimmedRange.min, trimmedRange.max, true, false, {
                             trigger: 'pan'
                         });
@@ -28525,6 +33282,9 @@
 
             // revert to the linear chart.pan version
             if (runBase) {
+                if (overscroll) {
+                    xAxis.max = xAxis.dataMax + overscroll;
+                }
                 // call the original function
                 proceed.apply(this, Array.prototype.slice.call(arguments, 1));
             }
@@ -28906,7 +33666,7 @@
              * @type {String}
              * @see [gapSize](plotOptions.series.gapSize)
              * @default relative
-             * @validvalues ["relative", "value"]
+             * @validvalue ["relative", "value"]
              * @since 5.0.13
              * @product highstock
              * @apioption plotOptions.series.gapUnit
@@ -28985,18 +33745,202 @@
          * Start data grouping module												 *
          ******************************************************************************/
 
+        /**
+         * Data grouping is the concept of sampling the data values into larger
+         * blocks in order to ease readability and increase performance of the
+         * JavaScript charts. Highstock by default applies data grouping when
+         * the points become closer than a certain pixel value, determined by
+         * the `groupPixelWidth` option.
+         * 
+         * If data grouping is applied, the grouping information of grouped
+         * points can be read from the [Point.dataGroup](#Point.dataGroup).
+         * 
+         * @product highstock
+         * @apioption plotOptions.series.dataGrouping
+         */
+
+        /**
+         * The method of approximation inside a group. When for example 30 days
+         * are grouped into one month, this determines what value should represent
+         * the group. Possible values are "average", "averages", "open", "high",
+         * "low", "close" and "sum". For OHLC and candlestick series the approximation
+         * is "ohlc" by default, which finds the open, high, low and close values
+         * within all the grouped data. For ranges, the approximation is "range",
+         * which finds the low and high values. For multi-dimensional data,
+         * like ranges and OHLC, "averages" will compute the average for each
+         * dimension.
+         * 
+         * Custom aggregate methods can be added by assigning a callback function
+         * as the approximation. This function takes a numeric array as the
+         * argument and should return a single numeric value or `null`. Note
+         * that the numeric array will never contain null values, only true
+         * numbers. Instead, if null values are present in the raw data, the
+         * numeric array will have an `.hasNulls` property set to `true`. For
+         * single-value data sets the data is available in the first argument
+         * of the callback function. For OHLC data sets, all the open values
+         * are in the first argument, all high values in the second etc.
+         * 
+         * Since v4.2.7, grouping meta data is available in the approximation
+         * callback from `this.dataGroupInfo`. It can be used to extract information
+         * from the raw data.
+         * 
+         * Defaults to `average` for line-type series, `sum` for columns, `range`
+         * for range series and `ohlc` for OHLC and candlestick.
+         * 
+         * @validvalue ["average", "averages", "open", "high", "low", "close", "sum"]
+         * @type {String|Function}
+         * @sample {highstock} stock/plotoptions/series-datagrouping-approximation Approximation callback with custom data
+         * @product highstock
+         * @apioption plotOptions.series.dataGrouping.approximation
+         */
+
+        /**
+         * Datetime formats for the header of the tooltip in a stock chart.
+         * The format can vary within a chart depending on the currently selected
+         * time range and the current data grouping.
+         * 
+         * The default formats are:
+         * 
+         * <pre>{
+         *     millisecond: ['%A, %b %e, %H:%M:%S.%L', '%A, %b %e, %H:%M:%S.%L', '-%H:%M:%S.%L'],
+         *     second: ['%A, %b %e, %H:%M:%S', '%A, %b %e, %H:%M:%S', '-%H:%M:%S'],
+         *     minute: ['%A, %b %e, %H:%M', '%A, %b %e, %H:%M', '-%H:%M'],
+         *     hour: ['%A, %b %e, %H:%M', '%A, %b %e, %H:%M', '-%H:%M'],
+         *     day: ['%A, %b %e, %Y', '%A, %b %e', '-%A, %b %e, %Y'],
+         *     week: ['Week from %A, %b %e, %Y', '%A, %b %e', '-%A, %b %e, %Y'],
+         *     month: ['%B %Y', '%B', '-%B %Y'],
+         *     year: ['%Y', '%Y', '-%Y']
+         * }</pre>
+         * 
+         * For each of these array definitions, the first item is the format
+         * used when the active time span is one unit. For instance, if the
+         * current data applies to one week, the first item of the week array
+         * is used. The second and third items are used when the active time
+         * span is more than two units. For instance, if the current data applies
+         * to two weeks, the second and third item of the week array are used,
+         *  and applied to the start and end date of the time span.
+         * 
+         * @type {Object}
+         * @product highstock
+         * @apioption plotOptions.series.dataGrouping.dateTimeLabelFormats
+         */
+
+        /**
+         * Enable or disable data grouping.
+         * 
+         * @type {Boolean}
+         * @default true
+         * @product highstock
+         * @apioption plotOptions.series.dataGrouping.enabled
+         */
+
+        /**
+         * When data grouping is forced, it runs no matter how small the intervals
+         * are. This can be handy for example when the sum should be calculated
+         * for values appearing at random times within each hour.
+         * 
+         * @type {Boolean}
+         * @default false
+         * @product highstock
+         * @apioption plotOptions.series.dataGrouping.forced
+         */
+
+        /**
+         * The approximate pixel width of each group. If for example a series
+         * with 30 points is displayed over a 600 pixel wide plot area, no grouping
+         * is performed. If however the series contains so many points that
+         * the spacing is less than the groupPixelWidth, Highcharts will try
+         * to group it into appropriate groups so that each is more or less
+         * two pixels wide. If multiple series with different group pixel widths
+         * are drawn on the same x axis, all series will take the greatest width.
+         * For example, line series have 2px default group width, while column
+         * series have 10px. If combined, both the line and the column will
+         * have 10px by default.
+         * 
+         * @type {Number}
+         * @default 2
+         * @product highstock
+         * @apioption plotOptions.series.dataGrouping.groupPixelWidth
+         */
+
+        /**
+         * Normally, a group is indexed by the start of that group, so for example
+         * when 30 daily values are grouped into one month, that month's x value
+         * will be the 1st of the month. This apparently shifts the data to
+         * the left. When the smoothed option is true, this is compensated for.
+         * The data is shifted to the middle of the group, and min and max
+         * values are preserved. Internally, this is used in the Navigator series.
+         * 
+         * @type {Boolean}
+         * @default false
+         * @product highstock
+         * @apioption plotOptions.series.dataGrouping.smoothed
+         */
+
+        /**
+         * An array determining what time intervals the data is allowed to be
+         * grouped to. Each array item is an array where the first value is
+         * the time unit and the second value another array of allowed multiples.
+         * Defaults to:
+         * 
+         * <pre>units: [[
+         *     'millisecond', // unit name
+         *     [1, 2, 5, 10, 20, 25, 50, 100, 200, 500] // allowed multiples
+         * ], [
+         *     'second',
+         *     [1, 2, 5, 10, 15, 30]
+         * ], [
+         *     'minute',
+         *     [1, 2, 5, 10, 15, 30]
+         * ], [
+         *     'hour',
+         *     [1, 2, 3, 4, 6, 8, 12]
+         * ], [
+         *     'day',
+         *     [1]
+         * ], [
+         *     'week',
+         *     [1]
+         * ], [
+         *     'month',
+         *     [1, 3, 6]
+         * ], [
+         *     'year',
+         *     null
+         * ]]</pre>
+         * 
+         * @type {Array}
+         * @product highstock
+         * @apioption plotOptions.series.dataGrouping.units
+         */
+
+        /**
+         * The approximate pixel width of each group. If for example a series
+         * with 30 points is displayed over a 600 pixel wide plot area, no grouping
+         * is performed. If however the series contains so many points that
+         * the spacing is less than the groupPixelWidth, Highcharts will try
+         * to group it into appropriate groups so that each is more or less
+         * two pixels wide. Defaults to `10`.
+         * 
+         * @type {Number}
+         * @sample {highstock} stock/plotoptions/series-datagrouping-grouppixelwidth/
+         *         Two series with the same data density but different groupPixelWidth
+         * @default 10
+         * @product highstock
+         * @apioption plotOptions.column.dataGrouping.groupPixelWidth
+         */
+
         var seriesProto = Series.prototype,
             baseProcessData = seriesProto.processData,
             baseGeneratePoints = seriesProto.generatePoints,
-            baseDestroy = seriesProto.destroy,
 
             /** 
              * 
              */
             commonOptions = {
                 approximation: 'average', // average, open, high, low, close, sum
-                //enabled: null, // (true for stock charts, false for basic),
-                //forced: undefined,
+                // enabled: null, // (true for stock charts, false for basic),
+                // forced: undefined,
                 groupPixelWidth: 2,
                 // the first one is the point or start value, the second is the start value if we're dealing with range,
                 // the third one is the end value if dealing with a range
@@ -29080,7 +34024,7 @@
              * only of numbers. In case null values belong to the group, the property
              * .hasNulls will be set to true on the array.
              */
-            approximations = {
+            approximations = H.approximations = {
                 sum: function(arr) {
                     var len = arr.length,
                         ret;
@@ -29121,7 +34065,9 @@
                         ret.push(approximations.average(arr));
                     });
 
-                    return ret;
+                    // Return undefined when first elem. is undefined and let
+                    // sum method handle null (#7377)
+                    return ret[0] === undefined ? undefined : ret;
                 },
                 open: function(arr) {
                     return arr.length ? arr[0] : (arr.hasNulls ? null : undefined);
@@ -29159,7 +34105,6 @@
                     // else, return is undefined
                 }
             };
-
 
         /**
          * Takes parallel arrays of x and y data and groups the data into intervals 
@@ -29305,7 +34250,9 @@
                 pick(dataGroupingOptions.enabled, chart.options.isStock),
                 visible = series.visible || !chart.options.chart.ignoreHiddenSeries,
                 hasGroupedData,
-                skip;
+                skip,
+                lastDataGrouping = this.currentDataGrouping,
+                currentDataGrouping;
 
             // run base method
             series.forceCrop = groupingEnabled; // #334
@@ -29351,7 +34298,7 @@
 
                     // prevent the smoothed data to spill out left and right, and make
                     // sure data is not shifted to the left
-                    if (dataGroupingOptions.smoothed) {
+                    if (dataGroupingOptions.smoothed && groupedXData.length) {
                         i = groupedXData.length - 1;
                         groupedXData[i] = Math.min(groupedXData[i], xMax);
                         while (i-- && i > 0) {
@@ -29361,7 +34308,7 @@
                     }
 
                     // record what data grouping values were used
-                    series.currentDataGrouping = groupPositions.info;
+                    currentDataGrouping = groupPositions.info;
                     series.closestPointRange = groupPositions.info.totalRange;
                     series.groupMap = groupedData[2];
 
@@ -29378,9 +34325,14 @@
                     series.processedXData = groupedXData;
                     series.processedYData = groupedYData;
                 } else {
-                    series.currentDataGrouping = series.groupMap = null;
+                    series.groupMap = null;
                 }
                 series.hasGroupedData = hasGroupedData;
+                series.currentDataGrouping = currentDataGrouping;
+
+                series.preventGraphAnimation =
+                    (lastDataGrouping && lastDataGrouping.totalRange) !==
+                    (currentDataGrouping && currentDataGrouping.totalRange);
             }
         };
 
@@ -29485,20 +34437,12 @@
         });
 
         /**
-         * Extend the series destroyer
+         * Destroy grouped data on series destroy
          */
-        seriesProto.destroy = function() {
-            var series = this,
-                groupedData = series.groupedData || [],
-                i = groupedData.length;
-
-            while (i--) {
-                if (groupedData[i]) {
-                    groupedData[i].destroy();
-                }
-            }
-            baseDestroy.apply(series);
-        };
+        wrap(seriesProto, 'destroy', function(proceed) {
+            proceed.call(this);
+            this.destroyGroupedData();
+        });
 
 
         // Handle default options for data grouping. This must be set at runtime because some series types are
@@ -29657,26 +34601,46 @@
          * @augments seriesTypes.column
          */
         /**
+         * An OHLC chart is a style of financial chart used to describe price
+         * movements over time. It displays open, high, low and close values per data
+         * point.
+         *
+         * @sample stock/demo/ohlc/ OHLC chart
          * @extends {plotOptions.column}
+         * @excluding borderColor,borderRadius,borderWidth,crisp
+         * @product highstock
          * @optionparent plotOptions.ohlc
          */
         seriesType('ohlc', 'column', {
 
             /**
+             * The approximate pixel width of each group. If for example a series
+             * with 30 points is displayed over a 600 pixel wide plot area, no grouping
+             * is performed. If however the series contains so many points that
+             * the spacing is less than the groupPixelWidth, Highcharts will try
+             * to group it into appropriate groups so that each is more or less
+             * two pixels wide. Defaults to `5`.
+             * 
+             * @type {Number}
+             * @default 5
+             * @product highstock
+             * @apioption plotOptions.ohlc.dataGrouping.groupPixelWidth
+             */
+
+            /**
              * The pixel width of the line/border. Defaults to `1`.
              * 
              * @type {Number}
-             * @sample {highstock} stock/plotoptions/ohlc-linewidth/ A greater line width
+             * @sample {highstock} stock/plotoptions/ohlc-linewidth/
+             *         A greater line width
              * @default 1
              * @product highstock
              */
             lineWidth: 1,
 
-            /**
-             */
             tooltip: {
 
-                pointFormat: '<span class="highcharts-color-{point.colorIndex}">\u25CF</span> <b> {series.name}</b><br/>' +
+                pointFormat: '<span class="highcharts-color-{point.colorIndex}">\u25CF</span> <b> {series.name}</b><br/>' + // eslint-disable-line max-len
                     'Open: {point.open}<br/>' +
                     'High: {point.high}<br/>' +
                     'Low: {point.low}<br/>' +
@@ -29684,14 +34648,14 @@
 
             },
 
-            /**
-             */
-            threshold: null
+            threshold: null,
 
+
+            stickyTracking: true
 
         }, /** @lends seriesTypes.ohlc */ {
             directTouch: false,
-            pointArrayMap: ['open', 'high', 'low', 'close'], // array point configs are mapped to this
+            pointArrayMap: ['open', 'high', 'low', 'close'],
             toYData: function(point) { // return a plain array for speedy calculation
                 return [point.open, point.high, point.low, point.close];
             },
@@ -29706,20 +34670,29 @@
                 var series = this,
                     yAxis = series.yAxis,
                     hasModifyValue = !!series.modifyValue,
-                    translated = ['plotOpen', 'plotHigh', 'plotLow', 'plotClose', 'yBottom']; // translate OHLC for
+                    translated = [
+                        'plotOpen',
+                        'plotHigh',
+                        'plotLow',
+                        'plotClose',
+                        'yBottom'
+                    ]; // translate OHLC for
 
                 seriesTypes.column.prototype.translate.apply(series);
 
                 // Do the translation
                 each(series.points, function(point) {
-                    each([point.open, point.high, point.low, point.close, point.low], function(value, i) {
-                        if (value !== null) {
-                            if (hasModifyValue) {
-                                value = series.modifyValue(value);
+                    each(
+                        [point.open, point.high, point.low, point.close, point.low],
+                        function(value, i) {
+                            if (value !== null) {
+                                if (hasModifyValue) {
+                                    value = series.modifyValue(value);
+                                }
+                                point[translated[i]] = yAxis.toPixels(value, true);
                             }
-                            point[translated[i]] = yAxis.toPixels(value, true);
                         }
-                    });
+                    );
 
                     // Align the tooltip to the high value to avoid covering the point
                     point.tooltipPos[1] =
@@ -29819,12 +34792,97 @@
              */
             getClassName: function() {
                 return Point.prototype.getClassName.call(this) +
-                    (this.open < this.close ? ' highcharts-point-up' : ' highcharts-point-down');
+                    (
+                        this.open < this.close ?
+                        ' highcharts-point-up' :
+                        ' highcharts-point-down'
+                    );
             }
         });
-        /* ****************************************************************************
-         * End OHLC series code													   *
-         *****************************************************************************/
+
+        /**
+         * A `ohlc` series. If the [type](#series.ohlc.type) option is not
+         * specified, it is inherited from [chart.type](#chart.type).
+         * 
+         * For options that apply to multiple series, it is recommended to add
+         * them to the [plotOptions.series](#plotOptions.series) options structure.
+         * To apply to all series of this specific type, apply it to [plotOptions.
+         * ohlc](#plotOptions.ohlc).
+         * 
+         * @type {Object}
+         * @extends series,plotOptions.ohlc
+         * @excluding dataParser,dataURL
+         * @product highstock
+         * @apioption series.ohlc
+         */
+
+        /**
+         * An array of data points for the series. For the `ohlc` series type,
+         * points can be given in the following ways:
+         * 
+         * 1.  An array of arrays with 5 or 4 values. In this case, the values
+         * correspond to `x,open,high,low,close`. If the first value is a string,
+         * it is applied as the name of the point, and the `x` value is inferred.
+         * The `x` value can also be omitted, in which case the inner arrays
+         * should be of length 4\. Then the `x` value is automatically calculated,
+         * either starting at 0 and incremented by 1, or from `pointStart`
+         * and `pointInterval` given in the series options.
+         * 
+         *  ```js
+         *     data: [
+         *         [0, 6, 5, 6, 7],
+         *         [1, 9, 4, 8, 2],
+         *         [2, 6, 3, 4, 10]
+         *     ]
+         *  ```
+         * 
+         * 2.  An array of objects with named values. The objects are point
+         * configuration objects as seen below. If the total number of data
+         * points exceeds the series' [turboThreshold](#series.ohlc.turboThreshold),
+         * this option is not available.
+         * 
+         *  ```js
+         *     data: [{
+         *         x: 1,
+         *         open: 3,
+         *         high: 4,
+         *         low: 5,
+         *         close: 2,
+         *         name: "Point2",
+         *         color: "#00FF00"
+         *     }, {
+         *         x: 1,
+         *         open: 4,
+         *         high: 3,
+         *         low: 6,
+         *         close: 7,
+         *         name: "Point1",
+         *         color: "#FF00FF"
+         *     }]
+         *  ```
+         * 
+         * @type {Array<Object|Array>}
+         * @extends series.arearange.data
+         * @excluding y,marker
+         * @product highstock
+         * @apioption series.ohlc.data
+         */
+
+        /**
+         * The closing value of each data point.
+         * 
+         * @type {Number}
+         * @product highstock
+         * @apioption series.ohlc.data.close
+         */
+
+        /**
+         * The opening value of each data point.
+         * 
+         * @type {Number}
+         * @product highstock
+         * @apioption series.ohlc.data.open
+         */
 
     }(Highcharts));
     (function(H) {
@@ -29840,14 +34898,18 @@
             seriesTypes = H.seriesTypes;
 
         /**
+         * A candlestick chart is a style of financial chart used to describe price
+         * movements over time.
+         *
+         * @sample stock/demo/candlestick/ Candlestick chart
+         * 
          * @extends {plotOptions.ohlc}
-         * @products highstock
+         * @excluding borderColor,borderRadius,borderWidth
+         * @product highstock
          * @optionparent plotOptions.candlestick
          */
         var candlestickOptions = {
 
-            /**
-             */
             states: {
 
                 /**
@@ -29857,8 +34919,7 @@
                 hover: {
 
                     /**
-                     * The pixel width of the line/border around the candlestick. Defaults
-                     * to `2`.
+                     * The pixel width of the line/border around the candlestick.
                      * 
                      * @type {Number}
                      * @default 2
@@ -29869,13 +34930,17 @@
             },
 
             /**
+             * @extends {plotOptions.ohlc.tooltip}
              */
             tooltip: defaultPlotOptions.ohlc.tooltip,
 
-            /**
-             */
-            threshold: null
+            threshold: null,
 
+
+            /**
+             * @default ohlc
+             * @apioption plotOptions.candlestick.dataGrouping.approximation
+             */
 
         };
 
@@ -29894,7 +34959,7 @@
              * Draw the data points
              */
             drawPoints: function() {
-                var series = this, //state = series.state,
+                var series = this,
                     points = series.points,
                     chart = series.chart;
 
@@ -29974,12 +35039,206 @@
 
         });
 
-        /* ****************************************************************************
-         * End Candlestick series code												*
-         *****************************************************************************/
+        /**
+         * A `candlestick` series. If the [type](#series.candlestick.type)
+         * option is not specified, it is inherited from [chart.type](#chart.
+         * type).
+         * 
+         * For options that apply to multiple series, it is recommended to add
+         * them to the [plotOptions.series](#plotOptions.series) options structure.
+         * To apply to all series of this specific type, apply it to [plotOptions.
+         * candlestick](#plotOptions.candlestick).
+         * 
+         * @type {Object}
+         * @extends series,plotOptions.candlestick
+         * @excluding dataParser,dataURL
+         * @product highstock
+         * @apioption series.candlestick
+         */
+
+        /**
+         * An array of data points for the series. For the `candlestick` series
+         * type, points can be given in the following ways:
+         * 
+         * 1.  An array of arrays with 5 or 4 values. In this case, the values
+         * correspond to `x,open,high,low,close`. If the first value is a string,
+         * it is applied as the name of the point, and the `x` value is inferred.
+         * The `x` value can also be omitted, in which case the inner arrays
+         * should be of length 4\. Then the `x` value is automatically calculated,
+         * either starting at 0 and incremented by 1, or from `pointStart`
+         * and `pointInterval` given in the series options.
+         * 
+         *  ```js
+         *     data: [
+         *         [0, 7, 2, 0, 4],
+         *         [1, 1, 4, 2, 8],
+         *         [2, 3, 3, 9, 3]
+         *     ]
+         *  ```
+         * 
+         * 2.  An array of objects with named values. The objects are point
+         * configuration objects as seen below. If the total number of data
+         * points exceeds the series' [turboThreshold](#series.candlestick.
+         * turboThreshold), this option is not available.
+         * 
+         *  ```js
+         *     data: [{
+         *         x: 1,
+         *         open: 9,
+         *         high: 2,
+         *         low: 4,
+         *         close: 6,
+         *         name: "Point2",
+         *         color: "#00FF00"
+         *     }, {
+         *         x: 1,
+         *         open: 1,
+         *         high: 4,
+         *         low: 7,
+         *         close: 7,
+         *         name: "Point1",
+         *         color: "#FF00FF"
+         *     }]
+         *  ```
+         * 
+         * @type {Array<Object|Array>}
+         * @extends series.ohlc.data
+         * @excluding y
+         * @product highstock
+         * @apioption series.candlestick.data
+         */
 
     }(Highcharts));
-    (function(H) {
+    var onSeriesMixin = (function(H) {
+        /**
+         * (c) 2010-2017 Torstein Honsi
+         *
+         * License: www.highcharts.com/license
+         */
+
+        var each = H.each,
+            seriesTypes = H.seriesTypes,
+            stableSort = H.stableSort;
+
+        var onSeriesMixin = {
+            /**
+             * Extend the translate method by placing the point on the related series
+             */
+            translate: function() {
+
+                seriesTypes.column.prototype.translate.apply(this);
+
+                var series = this,
+                    options = series.options,
+                    chart = series.chart,
+                    points = series.points,
+                    cursor = points.length - 1,
+                    point,
+                    lastPoint,
+                    optionsOnSeries = options.onSeries,
+                    onSeries = optionsOnSeries && chart.get(optionsOnSeries),
+                    onKey = options.onKey || 'y',
+                    step = onSeries && onSeries.options.step,
+                    onData = onSeries && onSeries.points,
+                    i = onData && onData.length,
+                    xAxis = series.xAxis,
+                    yAxis = series.yAxis,
+                    xAxisExt = xAxis.getExtremes(),
+                    xOffset = 0,
+                    leftPoint,
+                    lastX,
+                    rightPoint,
+                    currentDataGrouping,
+                    distanceRatio;
+
+                // relate to a master series
+                if (onSeries && onSeries.visible && i) {
+                    xOffset = (onSeries.pointXOffset || 0) + (onSeries.barW || 0) / 2;
+                    currentDataGrouping = onSeries.currentDataGrouping;
+                    lastX = (
+                        onData[i - 1].x +
+                        (currentDataGrouping ? currentDataGrouping.totalRange : 0)
+                    ); // #2374
+
+                    // sort the data points
+                    stableSort(points, function(a, b) {
+                        return (a.x - b.x);
+                    });
+
+                    onKey = 'plot' + onKey[0].toUpperCase() + onKey.substr(1);
+                    while (i-- && points[cursor]) {
+                        leftPoint = onData[i];
+                        point = points[cursor];
+                        point.y = leftPoint.y;
+
+                        if (leftPoint.x <= point.x && leftPoint[onKey] !== undefined) {
+                            if (point.x <= lastX) { // #803
+
+                                point.plotY = leftPoint[onKey];
+
+                                // interpolate between points, #666
+                                if (leftPoint.x < point.x && !step) {
+                                    rightPoint = onData[i + 1];
+                                    if (rightPoint && rightPoint[onKey] !== undefined) {
+                                        // the distance ratio, between 0 and 1
+                                        distanceRatio = (point.x - leftPoint.x) /
+                                            (rightPoint.x - leftPoint.x);
+                                        point.plotY +=
+                                            distanceRatio *
+                                            // the plotY distance
+                                            (rightPoint[onKey] - leftPoint[onKey]);
+                                        point.y +=
+                                            distanceRatio *
+                                            (rightPoint.y - leftPoint.y);
+                                    }
+                                }
+                            }
+                            cursor--;
+                            i++; // check again for points in the same x position
+                            if (cursor < 0) {
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Add plotY position and handle stacking
+                each(points, function(point, i) {
+
+                    var stackIndex;
+
+                    // Undefined plotY means the point is either on axis, outside series
+                    // range or hidden series. If the series is outside the range of the
+                    // x axis it should fall through with an undefined plotY, but then
+                    // we must remove the shapeArgs (#847).
+                    if (point.plotY === undefined) {
+                        if (point.x >= xAxisExt.min && point.x <= xAxisExt.max) {
+                            // we're inside xAxis range
+                            point.plotY = chart.chartHeight - xAxis.bottom -
+                                (xAxis.opposite ? xAxis.height : 0) +
+                                xAxis.offset - yAxis.top; // #3517
+                        } else {
+                            point.shapeArgs = {}; // 847
+                        }
+                    }
+                    point.plotX += xOffset; // #2049
+                    // if multiple flags appear at the same x, order them into a stack
+                    lastPoint = points[i - 1];
+                    if (lastPoint && lastPoint.plotX === point.plotX) {
+                        if (lastPoint.stackIndex === undefined) {
+                            lastPoint.stackIndex = 0;
+                        }
+                        stackIndex = lastPoint.stackIndex + 1;
+                    }
+                    point.stackIndex = stackIndex; // #3639
+                });
+
+
+            }
+        };
+        return onSeriesMixin;
+    }(Highcharts));
+    (function(H, onSeriesMixin) {
         /**
          * (c) 2010-2017 Torstein Honsi
          *
@@ -29992,29 +35251,67 @@
             Renderer = H.Renderer,
             Series = H.Series,
             seriesType = H.seriesType,
-            seriesTypes = H.seriesTypes,
             SVGRenderer = H.SVGRenderer,
             TrackerMixin = H.TrackerMixin,
             VMLRenderer = H.VMLRenderer,
-            symbols = SVGRenderer.prototype.symbols,
-            stableSort = H.stableSort;
+            symbols = SVGRenderer.prototype.symbols;
 
         /**
-         * The flags series type.
-         *
+         * The Flags series.
          * @constructor seriesTypes.flags
          * @augments seriesTypes.column
          */
         /**
+         * Flags are used to mark events in stock charts. They can be added on the
+         * timeline, or attached to a specific series.
+         *
+         * @sample stock/demo/flags-general/ Flags on a line series
          * @extends {plotOptions.column}
+         * @excluding animation,borderColor,borderRadius,borderWidth,colorByPoint,dataGrouping,pointPadding,pointWidth,turboThreshold
+         * @product highstock
          * @optionparent plotOptions.flags
          */
         seriesType('flags', 'column', {
 
             /**
+             * In case the flag is placed on a series, on what point key to place
+             * it. Line and columns have one key, `y`. In range or OHLC-type series,
+             * however, the flag can optionally be placed on the `open`, `high`,
+             *  `low` or `close` key.
+             * 
+             * @validvalue ["y", "open", "high", "low", "close"]
+             * @type {String}
+             * @sample {highstock} stock/plotoptions/flags-onkey/ Range series, flag on high
+             * @default y
+             * @since 4.2.2
+             * @product highstock
+             * @apioption plotOptions.flags.onKey
              */
+
+            /**
+             * The id of the series that the flags should be drawn on. If no id
+             * is given, the flags are drawn on the x axis.
+             * 
+             * @type {String}
+             * @sample {highstock} stock/plotoptions/flags/ Flags on series and on x axis
+             * @default undefined
+             * @product highstock
+             * @apioption plotOptions.flags.onSeries
+             */
+
             pointRange: 0, // #673
-            //radius: 2,
+
+            /**
+             * Whether the flags are allowed to overlap sideways. If `false`, the flags
+             * are moved sideways using an algorithm that seeks to place every flag as
+             * close as possible to its original position.
+             *
+             * @sample {highstock} stock/plotoptions/flags-allowoverlapx
+             *         Allow sideways overlap
+             *
+             * @since 6.0.4
+             */
+            allowOverlapX: false,
 
             /**
              * The shape of the marker. Can be one of "flag", "circlepin", "squarepin",
@@ -30063,15 +35360,20 @@
              * @product highstock
              */
             tooltip: {
-
-                /**
-                 */
                 pointFormat: '{point.text}<br/>'
             },
 
-            /**
-             */
             threshold: null,
+
+            /**
+             * The text to display on each flag. This can be defined on series level,
+             *  or individually for each point. Defaults to `"A"`.
+             * 
+             * @type {String}
+             * @default A
+             * @product highstock
+             * @apioption plotOptions.flags.title
+             */
 
             /**
              * The y position of the top left corner of the flag relative to either
@@ -30082,7 +35384,21 @@
              * @default -30
              * @product highstock
              */
-            y: -30
+            y: -30,
+
+            /**
+             * Whether to use HTML to render the flag texts. Using HTML allows for
+             * advanced formatting, images and reliable bi-directional text rendering.
+             * Note that exported images won't respect the HTML, and that HTML
+             * won't respect Z-index settings.
+             * 
+             * @type {Boolean}
+             * @default false
+             * @since 1.3
+             * @product highstock
+             * @apioption plotOptions.flags.useHTML
+             */
+
 
 
         }, /** @lends seriesTypes.flags.prototype */ {
@@ -30099,107 +35415,7 @@
 
 
 
-            /**
-             * Extend the translate method by placing the point on the related series
-             */
-            translate: function() {
-
-                seriesTypes.column.prototype.translate.apply(this);
-
-                var series = this,
-                    options = series.options,
-                    chart = series.chart,
-                    points = series.points,
-                    cursor = points.length - 1,
-                    point,
-                    lastPoint,
-                    optionsOnSeries = options.onSeries,
-                    onSeries = optionsOnSeries && chart.get(optionsOnSeries),
-                    onKey = options.onKey || 'y',
-                    step = onSeries && onSeries.options.step,
-                    onData = onSeries && onSeries.points,
-                    i = onData && onData.length,
-                    xAxis = series.xAxis,
-                    yAxis = series.yAxis,
-                    xAxisExt = xAxis.getExtremes(),
-                    xOffset = 0,
-                    leftPoint,
-                    lastX,
-                    rightPoint,
-                    currentDataGrouping;
-
-                // relate to a master series
-                if (onSeries && onSeries.visible && i) {
-                    xOffset = (onSeries.pointXOffset || 0) + (onSeries.barW || 0) / 2;
-                    currentDataGrouping = onSeries.currentDataGrouping;
-                    lastX = onData[i - 1].x + (currentDataGrouping ? currentDataGrouping.totalRange : 0); // #2374
-
-                    // sort the data points
-                    stableSort(points, function(a, b) {
-                        return (a.x - b.x);
-                    });
-
-                    onKey = 'plot' + onKey[0].toUpperCase() + onKey.substr(1);
-                    while (i-- && points[cursor]) {
-                        point = points[cursor];
-                        leftPoint = onData[i];
-                        if (leftPoint.x <= point.x && leftPoint[onKey] !== undefined) {
-                            if (point.x <= lastX) { // #803
-
-                                point.plotY = leftPoint[onKey];
-
-                                // interpolate between points, #666
-                                if (leftPoint.x < point.x && !step) {
-                                    rightPoint = onData[i + 1];
-                                    if (rightPoint && rightPoint[onKey] !== undefined) {
-                                        point.plotY +=
-                                            ((point.x - leftPoint.x) / (rightPoint.x - leftPoint.x)) * // the distance ratio, between 0 and 1
-                                            (rightPoint[onKey] - leftPoint[onKey]); // the y distance
-                                    }
-                                }
-                            }
-                            cursor--;
-                            i++; // check again for points in the same x position
-                            if (cursor < 0) {
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                // Add plotY position and handle stacking
-                each(points, function(point, i) {
-
-                    var stackIndex;
-
-                    // Undefined plotY means the point is either on axis, outside series
-                    // range or hidden series. If the series is outside the range of the
-                    // x axis it should fall through with an undefined plotY, but then
-                    // we must remove the shapeArgs (#847).
-                    if (point.plotY === undefined) {
-                        if (point.x >= xAxisExt.min && point.x <= xAxisExt.max) {
-                            // we're inside xAxis range
-                            point.plotY = chart.chartHeight - xAxis.bottom -
-                                (xAxis.opposite ? xAxis.height : 0) +
-                                xAxis.offset - yAxis.top; // #3517
-                        } else {
-                            point.shapeArgs = {}; // 847
-                        }
-                    }
-                    point.plotX += xOffset; // #2049
-                    // if multiple flags appear at the same x, order them into a stack
-                    lastPoint = points[i - 1];
-                    if (lastPoint && lastPoint.plotX === point.plotX) {
-                        if (lastPoint.stackIndex === undefined) {
-                            lastPoint.stackIndex = 0;
-                        }
-                        stackIndex = lastPoint.stackIndex + 1;
-                    }
-                    point.stackIndex = stackIndex; // #3639
-                });
-
-
-            },
+            translate: onSeriesMixin.translate,
 
             /**
              * Draw the markers
@@ -30218,10 +35434,12 @@
                     point,
                     graphic,
                     stackIndex,
-                    anchorX,
                     anchorY,
+                    attribs,
                     outsideRight,
-                    yAxis = series.yAxis;
+                    yAxis = series.yAxis,
+                    boxesMap = {},
+                    boxes = [];
 
                 i = points.length;
                 while (i--) {
@@ -30235,7 +35453,7 @@
                     if (plotY !== undefined) {
                         plotY = point.plotY + optionsY - (stackIndex !== undefined && stackIndex * options.stackDistance);
                     }
-                    anchorX = stackIndex ? undefined : point.plotX; // skip connectors for higher level stacked points
+                    point.anchorX = stackIndex ? undefined : point.plotX; // skip connectors for higher level stacked points
                     anchorY = stackIndex ? undefined : point.plotY;
 
                     graphic = point.graphic;
@@ -30270,6 +35488,7 @@
                             }
 
 
+                            graphic.isNew = true;
                         }
 
                         if (plotX > 0) { // #3119
@@ -30277,13 +35496,34 @@
                         }
 
                         // Plant the flag
-                        graphic.attr({
-                            text: point.options.title || options.title || 'A',
-                            x: plotX,
+                        attribs = {
                             y: plotY,
-                            anchorX: anchorX,
                             anchorY: anchorY
-                        });
+                        };
+                        if (options.allowOverlapX) {
+                            attribs.x = plotX;
+                            attribs.anchorX = point.anchorX;
+                        }
+                        graphic.attr({
+                            text: point.options.title || options.title || 'A'
+                        })[graphic.isNew ? 'attr' : 'animate'](attribs);
+
+                        // Rig for the distribute function
+                        if (!options.allowOverlapX) {
+                            if (!boxesMap[point.plotX]) {
+                                boxesMap[point.plotX] = {
+                                    align: 0,
+                                    size: graphic.width,
+                                    target: plotX,
+                                    anchorX: plotX
+                                };
+                            } else {
+                                boxesMap[point.plotX].size = Math.max(
+                                    boxesMap[point.plotX].size,
+                                    graphic.width
+                                );
+                            }
+                        }
 
                         // Set the tooltip anchor position
                         point.tooltipPos = chart.inverted ? [yAxis.len + yAxis.pos - chart.plotLeft - plotY, series.xAxis.len - plotX] : [plotX, plotY + yAxis.pos - chart.plotTop]; // #6327
@@ -30292,6 +35532,27 @@
                         point.graphic = graphic.destroy();
                     }
 
+                }
+
+                // Handle X-dimension overlapping
+                if (!options.allowOverlapX) {
+                    H.objectEach(boxesMap, function(box) {
+                        box.plotX = box.anchorX;
+                        boxes.push(box);
+                    });
+
+                    H.distribute(boxes, this.xAxis.len);
+
+                    each(points, function(point) {
+                        var box = point.graphic && boxesMap[point.plotX];
+                        if (box) {
+                            point.graphic[point.graphic.isNew ? 'attr' : 'animate']({
+                                x: box.pos,
+                                anchorX: point.anchorX
+                            });
+                            point.graphic.isNew = false;
+                        }
+                    });
                 }
 
                 // Might be a mix of SVG and HTML and we need events for both (#6303)
@@ -30355,19 +35616,23 @@
             var anchorX = (options && options.anchorX) || x,
                 anchorY = (options && options.anchorY) || y;
 
-            return [
-                'M', anchorX, anchorY,
-                'L', x, y + h,
-                x, y,
-                x + w, y,
-                x + w, y + h,
-                x, y + h,
-                'Z'
-            ];
+            return symbols.circle(anchorX - 1, anchorY - 1, 2, 2).concat(
+                [
+                    'M', anchorX, anchorY,
+                    'L', x, y + h,
+                    x, y,
+                    x + w, y,
+                    x + w, y + h,
+                    x, y + h,
+                    'Z'
+                ]
+            );
         };
 
-        // create the circlepin and squarepin icons with anchor
-        each(['circle', 'square'], function(shape) {
+        /*
+         * Create the circlepin and squarepin icons with anchor
+         */
+        function createPinSymbol(shape) {
             symbols[shape + 'pin'] = function(x, y, w, h, options) {
 
                 var anchorX = options && options.anchorX,
@@ -30387,19 +35652,97 @@
                     // if the label is below the anchor, draw the connecting line from the top edge of the label
                     // otherwise start drawing from the bottom edge
                     labelTopOrBottomY = (y > anchorY) ? y : y + h;
-                    path.push('M', anchorX, labelTopOrBottomY, 'L', anchorX, anchorY);
+                    path.push(
+                        'M',
+                        shape === 'circle' ? path[1] - path[4] : path[1] + path[4] / 2,
+                        labelTopOrBottomY,
+                        'L',
+                        anchorX,
+                        anchorY
+                    );
+                    path = path.concat(
+                        symbols.circle(anchorX - 1, anchorY - 1, 2, 2)
+                    );
                 }
 
                 return path;
             };
-        });
+        }
+        createPinSymbol('circle');
+        createPinSymbol('square');
 
 
-        /* ****************************************************************************
-         * End Flags series code													  *
-         *****************************************************************************/
 
-    }(Highcharts));
+        /**
+         * A `flags` series. If the [type](#series.flags.type) option is not
+         * specified, it is inherited from [chart.type](#chart.type).
+         * 
+         * For options that apply to multiple series, it is recommended to add
+         * them to the [plotOptions.series](#plotOptions.series) options structure.
+         * To apply to all series of this specific type, apply it to [plotOptions.
+         * flags](#plotOptions.flags).
+         * 
+         * @type {Object}
+         * @extends series,plotOptions.flags
+         * @excluding dataParser,dataURL
+         * @product highstock
+         * @apioption series.flags
+         */
+
+        /**
+         * An array of data points for the series. For the `flags` series type,
+         * points can be given in the following ways:
+         * 
+         * 1.  An array of objects with named values. The objects are point
+         * configuration objects as seen below. If the total number of data
+         * points exceeds the series' [turboThreshold](#series.flags.turboThreshold),
+         * this option is not available.
+         * 
+         *  ```js
+         *     data: [{
+         *     x: 1,
+         *     title: "A",
+         *     text: "First event"
+         * }, {
+         *     x: 1,
+         *     title: "B",
+         *     text: "Second event"
+         * }]</pre>
+         * 
+         * @type {Array<Object>}
+         * @extends series.line.data
+         * @excluding y,dataLabels,marker,name
+         * @product highstock
+         * @apioption series.flags.data
+         */
+
+        /**
+         * The fill color of an individual flag. By default it inherits from
+         * the series color.
+         * 
+         * @type {Color}
+         * @product highstock
+         * @apioption series.flags.data.fillColor
+         */
+
+        /**
+         * The longer text to be shown in the flag's tooltip.
+         * 
+         * @type {String}
+         * @product highstock
+         * @apioption series.flags.data.text
+         */
+
+        /**
+         * The short text to be shown on the flag.
+         * 
+         * @type {String}
+         * @product highstock
+         * @apioption series.flags.data.title
+         */
+
+
+    }(Highcharts, onSeriesMixin));
     (function(H) {
         /**
          * (c) 2010-2017 Torstein Honsi
@@ -30425,20 +35768,17 @@
 
         /**
          * 
-         * The scrollbar is a means of panning over the X axis of a chart.
+         * The scrollbar is a means of panning over the X axis of a stock chart.
          * 
-         * In [styled mode](http://www.highcharts.com/docs/chart-design-
-         * and-style/style-by-css), all the presentational options for the
-         * scrollbar are replaced by the classes `.highcharts-scrollbar-
-         * thumb`, `.highcharts-scrollbar-arrow`, `.highcharts-scrollbar-
-         * button`, `.highcharts-scrollbar-rifles` and `.highcharts-scrollbar-
-         * track`.
+         * In styled mode, all the presentational options for the
+         * scrollbar are replaced by the classes `.highcharts-scrollbar-thumb`,
+         * `.highcharts-scrollbar-arrow`, `.highcharts-scrollbar-button`,
+         * `.highcharts-scrollbar-rifles` and `.highcharts-scrollbar-track`.
          * 
          * @product highstock
          * @optionparent scrollbar
          */
         var defaultScrollbarOptions = {
-            //enabled: true
 
             /**
              * The height of the scrollbar. The height also applies to the width
@@ -30450,7 +35790,6 @@
              * @product highstock
              */
             height: isTouchDevice ? 20 : 14,
-            // trackBorderRadius: 0
 
             /**
              * The border rounding radius of the bar.
@@ -30484,6 +35823,8 @@
             liveRedraw: svg && !isTouchDevice,
 
             /**
+             * The margin between the scrollbar and its axis when the scrollbar is
+             * applied directly to an axis.
              */
             margin: 10,
 
@@ -30496,14 +35837,11 @@
              * @product highstock
              */
             minWidth: 6,
-            //showFull: true,
-            //size: null,
 
-            /**
-             */
             step: 0.2,
 
             /**
+             * The z index of the scrollbar group.
              */
             zIndex: 3
 
@@ -31195,9 +36533,38 @@
          *
          * License: www.highcharts.com/license
          */
-        /* ****************************************************************************
-         * Start Navigator code														*
-         *****************************************************************************/
+        /* eslint max-len: ["warn", 80, 4] */
+
+        /**
+         * Options for the corresponding navigator series if `showInNavigator`
+         * is `true` for this series. Available options are the same as any
+         * series, documented at [plotOptions](#plotOptions.series) and
+         * [series](#series).
+         *
+         *
+         * These options are merged with options in [navigator.series](#navigator.
+         * series), and will take precedence if the same option is defined both
+         * places.
+         *
+         * @type {Object}
+         * @see [navigator.series](#navigator.series)
+         * @default undefined
+         * @since 5.0.0
+         * @product highstock
+         * @apioption plotOptions.series.navigatorOptions
+         */
+
+        /**
+         * Whether or not to show the series in the navigator. Takes precedence
+         * over [navigator.baseSeries](#navigator.baseSeries) if defined.
+         *
+         * @type {Boolean}
+         * @default undefined
+         * @since 5.0.0
+         * @product highstock
+         * @apioption plotOptions.series.showInNavigator
+         */
+
         var addEvent = H.addEvent,
             Axis = H.Axis,
             Chart = H.Chart,
@@ -31222,14 +36589,13 @@
             Series = H.Series,
             seriesTypes = H.seriesTypes,
             wrap = H.wrap,
-            swapXY = H.swapXY,
 
             units = [].concat(defaultDataGroupingUnits), // copy
             defaultSeriesType,
 
-            // Finding the min or max of a set of variables where we don't know if they are defined,
-            // is a pattern that is repeated several places in Highcharts. Consider making this
-            // a global utility method.
+            // Finding the min or max of a set of variables where we don't know if they
+            // are defined, is a pattern that is repeated several places in Highcharts.
+            // Consider making this a global utility method.
             numExt = function(extreme) {
                 var numbers = grep(arguments, isNumber);
                 if (numbers.length) {
@@ -31241,7 +36607,9 @@
         units[4] = ['day', [1, 2, 3, 4]]; // allow more days
         units[5] = ['week', [1, 2, 3]]; // allow more weeks
 
-        defaultSeriesType = seriesTypes.areaspline === undefined ? 'line' : 'areaspline';
+        defaultSeriesType = seriesTypes.areaspline === undefined ?
+            'line' :
+            'areaspline';
 
         extend(defaultOptions, {
 
@@ -31250,15 +36618,13 @@
              * a view of the entire data set. It provides tools to zoom in and
              * out on parts of the data as well as panning across the dataset.
              *
-             * @optionparent navigator
              * @product highstock
+             * @optionparent navigator
              */
             navigator: {
-                //enabled: true,
-
                 /**
                  * The height of the navigator.
-                 * 
+                 *
                  * @type {Number}
                  * @sample {highstock} stock/navigator/height/ A higher navigator
                  * @default 40
@@ -31268,9 +36634,10 @@
 
                 /**
                  * The distance from the nearest element, the X axis or X axis labels.
-                 * 
+                 *
                  * @type {Number}
-                 * @sample {highstock} stock/navigator/margin/ A margin of 2 draws the     navigator closer to the X axis labels
+                 * @sample {highstock} stock/navigator/margin/
+                 *         A margin of 2 draws the navigator closer to the X axis labels
                  * @default 25
                  * @product highstock
                  */
@@ -31279,271 +36646,318 @@
                 /**
                  * Whether the mask should be inside the range marking the zoomed
                  * range, or outside. In Highstock 1.x it was always `false`.
-                 * 
+                 *
                  * @type {Boolean}
-                 * @sample {highstock} stock/navigator/maskinside-false/ False, mask outside
+                 * @sample {highstock} stock/navigator/maskinside-false/
+                 *         False, mask outside
                  * @default true
                  * @since 2.0
                  * @product highstock
                  */
                 maskInside: true,
 
+                /**
+                 * Options for the handles for dragging the zoomed area.
+                 *
+                 * @type {Object}
+                 * @sample {highstock} stock/navigator/handles/ Colored handles
+                 * @product highstock
+                 */
+                handles: {
+                    /**
+                     * Width for handles.
+                     *
+                     * @type {Number}
+                     * @default 7
+                     * @product highstock
+                     * @sample {highstock} stock/navigator/styled-handles/
+                     *         Styled handles
+                     * @since 6.0.0
+                     */
+                    width: 7,
+
+                    /**
+                     * Height for handles.
+                     *
+                     * @type {Number}
+                     * @default 15
+                     * @product highstock
+                     * @sample {highstock} stock/navigator/styled-handles/
+                     *         Styled handles
+                     * @since 6.0.0
+                     */
+                    height: 15,
+
+                    /**
+                     * Array to define shapes of handles. 0-index for left, 1-index for
+                     * right.
+                     *
+                     * Additionally, the URL to a graphic can be given on this form:
+                     * `url(graphic.png)`. Note that for the image to be applied to
+                     * exported charts, its URL needs to be accessible by the export
+                     * server.
+                     *
+                     * Custom callbacks for symbol path generation can also be added to
+                     * `Highcharts.SVGRenderer.prototype.symbols`. The callback is then
+                     * used by its method name, as shown in the demo.
+                     *
+                     * @type {Array}
+                     * @default ['navigator-handle', 'navigator-handle']
+                     * @product highstock
+                     * @sample {highstock} stock/navigator/styled-handles/
+                     *         Styled handles
+                     * @since 6.0.0
+                     */
+                    symbols: ['navigator-handle', 'navigator-handle'],
+
+                    /**
+                     * Allows to enable/disable handles.
+                     *
+                     * @type {Boolean}
+                     * @default true
+                     * @product highstock
+                     * @since 6.0.0
+                     */
+                    enabled: true
+
+
+                },
+
+
 
                 /**
                  * Options for the navigator series. Available options are the same
                  * as any series, documented at [plotOptions](#plotOptions.series)
                  * and [series](#series).
-                 * 
+                 *
                  * Unless data is explicitly defined on navigator.series, the data
                  * is borrowed from the first series in the chart.
-                 * 
+                 *
                  * Default series options for the navigator series are:
-                 * 
+                 *
                  * <pre>series: {
-                 * type: 'areaspline',
-                 * color: '#4572A7',
-                 * fillOpacity: 0.05,
-                 * dataGrouping: {
-                 * smoothed: true
-                 * },
-                 * lineWidth: 1,
-                 * marker: {
-                 * enabled: false
-                 * }
+                 *     type: 'areaspline',
+                 *     fillOpacity: 0.05,
+                 *     dataGrouping: {
+                 *         smoothed: true
+                 *     },
+                 *     lineWidth: 1,
+                 *     marker: {
+                 *         enabled: false
+                 *     }
                  * }</pre>
-                 * 
+                 *
                  * @type {Object}
-                 * @see In [styled mode](http://www.highcharts.com/docs/chart-design-and-
-                 * style/style-by-css), the navigator series is styled with the `.
+                 * @see In styled mode, the navigator series is styled with the `.
                  * highcharts-navigator-series` class.
-                 * @sample {highstock} stock/navigator/series-data/ Using a separate data set for the navigator
-                 * @sample {highstock} stock/navigator/series/ A green navigator series
+                 * @sample {highstock} stock/navigator/series-data/
+                 *         Using a separate data set for the navigator
+                 * @sample {highstock} stock/navigator/series/
+                 *         A green navigator series
                  * @product highstock
                  */
                 series: {
 
                     /**
+                     * The type of the navigator series. Defaults to `areaspline` if
+                     * defined, otherwise `line`.
+                     *
+                     * @type {String}
                      */
                     type: defaultSeriesType,
 
 
                     /**
+                     * @ignore
                      */
                     compare: null,
 
                     /**
+                     * Data grouping options for the navigator series.
+                     *
+                     * @extends {plotOptions.series.dataGrouping}
                      */
                     dataGrouping: {
-
-                        /**
-                         */
                         approximation: 'average',
-
-                        /**
-                         */
                         enabled: true,
-
-                        /**
-                         */
                         groupPixelWidth: 2,
-
-                        /**
-                         */
                         smoothed: true,
-
-                        /**
-                         */
                         units: units
                     },
 
                     /**
+                     * Data label options for the navigator series. Data labels are
+                     * disabled by default on the navigator series.
+                     *
+                     * @extends {plotOptions.series.dataLabels}
                      */
                     dataLabels: {
-
-                        /**
-                         */
                         enabled: false,
-
-                        /**
-                         */
                         zIndex: 2 // #1839
                     },
 
-                    /**
-                     */
                     id: 'highcharts-navigator-series',
-
-                    /**
-                     */
                     className: 'highcharts-navigator-series',
 
                     /**
+                     * Line color for the navigator series. Allows setting the color
+                     * while disallowing the default candlestick setting.
+                     *
+                     * @type {Color}
                      */
-                    lineColor: null, // Allow color setting while disallowing default candlestick setting (#4602)
+                    lineColor: null, // #4602
 
-                    /**
-                     */
                     marker: {
-
-                        /**
-                         */
                         enabled: false
                     },
 
-                    /**
-                     */
                     pointRange: 0,
-
                     /**
-                     */
-                    shadow: false,
-
-                    /**
+                     * The threshold option. Setting it to 0 will make the default
+                     * navigator area series draw its area from the 0 value and up.
+                     * @type {Number}
                      */
                     threshold: null
                 },
-                //top: undefined,
-                //opposite: undefined,
 
                 /**
-                 * Options for the navigator X axis. Available options are the same
-                 * as any X axis, documented at [xAxis](#xAxis). Default series options
+                 * Options for the navigator X axis. Default series options
                  * for the navigator xAxis are:
-                 * 
+                 *
                  * <pre>xAxis: {
-                 * tickWidth: 0,
-                 * lineWidth: 0,
-                 * gridLineWidth: 1,
-                 * tickPixelInterval: 200,
-                 * labels: {
-                 * align: 'left',
-                 * style: {
-                 * color: '#888'
-                 * },
-                 * x: 3,
-                 * y: -4
-                 * }
+                 *     tickWidth: 0,
+                 *     lineWidth: 0,
+                 *     gridLineWidth: 1,
+                 *     tickPixelInterval: 200,
+                 *     labels: {
+                 *     	   align: 'left',
+                 *         style: {
+                 *             color: '#888'
+                 *         },
+                 *         x: 3,
+                 *         y: -4
+                 *     }
                  * }</pre>
-                 * 
+                 *
                  * @type {Object}
+                 * @extends {xAxis}
+                 * @excluding linkedTo,maxZoom,minRange,opposite,range,scrollbar,
+                 *          showEmpty,maxRange
                  * @product highstock
                  */
                 xAxis: {
-
                     /**
+                     * Additional range on the right side of the xAxis. Works similar to
+                     * xAxis.maxPadding, but value is set in milliseconds.
+                     * Can be set for both, main xAxis and navigator's xAxis.
+                     *
+                     * @type {Number}
+                     * @default 0
+                     * @since 6.0.0
+                     * @product highstock
+                     * @apioption xAxis.overscroll
                      */
+                    overscroll: 0,
+
                     className: 'highcharts-navigator-xaxis',
-
-                    /**
-                     */
                     tickLength: 0,
 
 
-                    /**
-                     */
+
                     tickPixelInterval: 200,
 
-                    /**
-                     */
                     labels: {
-
-                        /**
-                         */
                         align: 'left',
 
 
-                        /**
-                         */
-                        x: 3,
 
-                        /**
-                         */
+                        x: 3,
                         y: -4
                     },
 
-                    /**
-                     */
                     crosshair: false
                 },
 
                 /**
-                 * Options for the navigator Y axis. Available options are the same
-                 * as any y axis, documented at [yAxis](#yAxis). Default series options
+                 * Options for the navigator Y axis. Default series options
                  * for the navigator yAxis are:
-                 * 
+                 *
                  * <pre>yAxis: {
-                 * gridLineWidth: 0,
-                 * startOnTick: false,
-                 * endOnTick: false,
-                 * minPadding: 0.1,
-                 * maxPadding: 0.1,
-                 * labels: {
-                 * enabled: false
-                 * },
-                 * title: {
-                 * text: null
-                 * },
-                 * tickWidth: 0
+                 *     gridLineWidth: 0,
+                 *     startOnTick: false,
+                 *     endOnTick: false,
+                 *     minPadding: 0.1,
+                 *     maxPadding: 0.1,
+                 *     labels: {
+                 *         enabled: false
+                 *     },
+                 *     title: {
+                 *         text: null
+                 *     },
+                 *     tickWidth: 0
                  * }</pre>
-                 * 
+                 *
                  * @type {Object}
+                 * @extends {yAxis}
+                 * @excluding height,linkedTo,maxZoom,minRange,ordinal,range,showEmpty,
+                 *          scrollbar,top,units,maxRange
                  * @product highstock
                  */
                 yAxis: {
 
-                    /**
-                     */
                     className: 'highcharts-navigator-yaxis',
 
 
-                    /**
-                     */
+
                     startOnTick: false,
-
-                    /**
-                     */
                     endOnTick: false,
-
-                    /**
-                     */
                     minPadding: 0.1,
-
-                    /**
-                     */
                     maxPadding: 0.1,
-
-                    /**
-                     */
                     labels: {
-
-                        /**
-                         */
                         enabled: false
                     },
-
-                    /**
-                     */
                     crosshair: false,
-
-                    /**
-                     */
                     title: {
-
-                        /**
-                         */
                         text: null
                     },
-
-                    /**
-                     */
                     tickLength: 0,
-
-                    /**
-                     */
                     tickWidth: 0
                 }
             }
         });
+
+        /**
+         * Draw one of the handles on the side of the zoomed range in the navigator
+         * @param {Boolean} inverted flag for chart.inverted
+         * @returns {Array} Path to be used in a handle
+         */
+        H.Renderer.prototype.symbols['navigator-handle'] = function(
+            x,
+            y,
+            w,
+            h,
+            options
+        ) {
+            var halfWidth = options.width / 2,
+                markerPosition = Math.round(halfWidth / 3) + 0.5,
+                height = options.height;
+
+            return [
+                'M', -halfWidth - 1, 0.5,
+                'L',
+                halfWidth, 0.5,
+                'L',
+                halfWidth, height + 0.5,
+                'L', -halfWidth - 1, height + 0.5,
+                'L', -halfWidth - 1, 0.5,
+                'M', -markerPosition, 4,
+                'L', -markerPosition, height - 3,
+                'M',
+                markerPosition - 1, 4,
+                'L',
+                markerPosition - 1, height - 3
+            ];
+        };
 
         /**
          * The Navigator class
@@ -31563,40 +36977,23 @@
              * @param {String} verb use 'animate' or 'attr'
              */
             drawHandle: function(x, index, inverted, verb) {
-                var navigator = this;
+                var navigator = this,
+                    height = navigator.navigatorOptions.handles.height;
 
                 // Place it
                 navigator.handles[index][verb](inverted ? {
-                    translateX: Math.round(navigator.left + navigator.height / 2 - 8),
-                    translateY: Math.round(navigator.top + parseInt(x, 10) + 0.5)
+                    translateX: Math.round(navigator.left + navigator.height / 2),
+                    translateY: Math.round(
+                        navigator.top + parseInt(x, 10) + 0.5 - height
+                    )
                 } : {
                     translateX: Math.round(navigator.left + parseInt(x, 10)),
-                    translateY: Math.round(navigator.top + navigator.height / 2 - 8)
+                    translateY: Math.round(
+                        navigator.top + navigator.height / 2 - height / 2 - 1
+                    )
                 });
             },
 
-            /**
-             * Draw one of the handles on the side of the zoomed range in the navigator
-             * @param {Boolean} inverted flag for chart.inverted
-             * @returns {Array} Path to be used in a handle
-             */
-            getHandlePath: function(inverted) {
-                return swapXY([
-                    'M', -4.5, 0.5,
-                    'L',
-                    3.5, 0.5,
-                    'L',
-                    3.5, 15.5,
-                    'L', -4.5, 15.5,
-                    'L', -4.5, 0.5,
-                    'M', -1.5, 4,
-                    'L', -1.5, 12,
-                    'M',
-                    0.5, 4,
-                    'L',
-                    0.5, 12
-                ], inverted);
-            },
             /**
              * Render outline around the zoomed range
              * @param {Number} zoomedMin in pixels position where zoomed range starts
@@ -31705,7 +37102,7 @@
                     x,
                     y;
 
-                // Determine rectangle position & size 
+                // Determine rectangle position & size
                 // According to (non)inverted position:
                 if (inverted) {
                     x = [left, left, left];
@@ -31779,20 +37176,29 @@
                     .add(navigatorGroup);
 
                 // Create the handlers:
-                each([0, 1], function(index) {
-                    navigator.handles[index] = renderer
-                        .path(navigator.getHandlePath(inverted))
+                if (navigatorOptions.handles.enabled) {
+                    each([0, 1], function(index) {
+                        navigatorOptions.handles.inverted = chart.inverted;
+                        navigator.handles[index] = renderer.symbol(
+                            navigatorOptions.handles.symbols[index], -navigatorOptions.handles.width / 2 - 1,
+                            0,
+                            navigatorOptions.handles.width,
+                            navigatorOptions.handles.height,
+                            navigatorOptions.handles
+                        );
                         // zIndex = 6 for right handle, 7 for left.
                         // Can't be 10, because of the tooltip in inverted chart #2908
-                        .attr({
-                            zIndex: 7 - index
-                        })
-                        .addClass(
-                            'highcharts-navigator-handle highcharts-navigator-handle-' + ['left', 'right'][index]
-                        ).add(navigatorGroup);
+                        navigator.handles[index].attr({
+                                zIndex: 7 - index
+                            })
+                            .addClass(
+                                'highcharts-navigator-handle ' +
+                                'highcharts-navigator-handle-' + ['left', 'right'][index]
+                            ).add(navigatorGroup);
 
 
-                });
+                    });
+                }
             },
 
             /**
@@ -31821,6 +37227,7 @@
              * @param {Number} pxMax Pixel value maximum
              */
             render: function(min, max, pxMin, pxMax) {
+
                 var navigator = this,
                     chart = navigator.chart,
                     navigatorWidth,
@@ -31838,7 +37245,9 @@
                     verb,
                     newMin,
                     newMax,
-                    minRange = chart.xAxis[0].minRange;
+                    currentRange,
+                    minRange = chart.xAxis[0].minRange,
+                    maxRange = chart.xAxis[0].options.maxRange;
 
                 // Don't redraw while moving the handles (#4703).
                 if (this.hasDragged && !defined(pxMin)) {
@@ -31851,7 +37260,7 @@
                     // it. For example hidden series, but visible navigator (#6022).
                     if (rendered) {
                         pxMin = 0;
-                        pxMax = xAxis.width;
+                        pxMax = pick(xAxis.width, scrollbarXAxis.width);
                     } else {
                         return;
                     }
@@ -31865,7 +37274,8 @@
 
                 navigator.size = zoomedMax = navigatorSize = pick(
                     xAxis.len,
-                    (inverted ? chart.plotHeight : chart.plotWidth) - 2 * scrollbarHeight
+                    (inverted ? chart.plotHeight : chart.plotWidth) -
+                    2 * scrollbarHeight
                 );
 
                 if (inverted) {
@@ -31878,7 +37288,8 @@
                 pxMin = pick(pxMin, xAxis.toPixels(min, true));
                 pxMax = pick(pxMax, xAxis.toPixels(max, true));
 
-                if (!isNumber(pxMin) || Math.abs(pxMin) === Infinity) { // Verify (#1851, #2238)
+                // Verify (#1851, #2238)
+                if (!isNumber(pxMin) || Math.abs(pxMin) === Infinity) {
                     pxMin = 0;
                     pxMax = navigatorWidth;
                 }
@@ -31886,13 +37297,30 @@
                 // Are we below the minRange? (#2618, #6191)
                 newMin = xAxis.toValue(pxMin, true);
                 newMax = xAxis.toValue(pxMax, true);
-                if (Math.abs(newMax - newMin) < minRange) {
+                currentRange = Math.abs(H.correctFloat(newMax - newMin));
+                if (currentRange < minRange) {
                     if (this.grabbedLeft) {
                         pxMin = xAxis.toPixels(newMax - minRange, true);
                     } else if (this.grabbedRight) {
                         pxMax = xAxis.toPixels(newMin + minRange, true);
-                    } else {
-                        return;
+                    }
+                } else if (defined(maxRange) && currentRange > maxRange) {
+                    /**
+                     * Maximum range which can be set using the navigator's handles.
+                     * Opposite of [xAxis.minRange](#xAxis.minRange).
+                     *
+                     * @type {Number}
+                     * @default undefined
+                     * @product highstock
+                     * @sample {highstock} stock/navigator/maxrange/
+                     *         Defined max and min range
+                     * @since 6.0.0
+                     * @apioption xAxis.maxRange
+                     */
+                    if (this.grabbedLeft) {
+                        pxMin = xAxis.toPixels(newMax - maxRange, true);
+                    } else if (this.grabbedRight) {
+                        pxMax = xAxis.toPixels(newMin + maxRange, true);
                     }
                 }
 
@@ -31922,8 +37350,11 @@
 
                     navigator.drawMasks(zoomedMin, zoomedMax, inverted, verb);
                     navigator.drawOutline(zoomedMin, zoomedMax, inverted, verb);
-                    navigator.drawHandle(zoomedMin, 0, inverted, verb);
-                    navigator.drawHandle(zoomedMax, 1, inverted, verb);
+
+                    if (navigator.navigatorOptions.handles.enabled) {
+                        navigator.drawHandle(zoomedMin, 0, inverted, verb);
+                        navigator.drawHandle(zoomedMax, 1, inverted, verb);
+                    }
                 }
 
                 if (navigator.scrollbar) {
@@ -31951,7 +37382,8 @@
                     );
                     // Keep scale 0-1
                     navigator.scrollbar.setRange(
-                        // Use real value, not rounded because range can be very small (#1716)
+                        // Use real value, not rounded because range can be very small
+                        // (#1716)
                         navigator.zoomedMin / navigatorSize,
                         navigator.zoomedMax / navigatorSize
                     );
@@ -31984,7 +37416,8 @@
                 // Add shades and handles mousedown events
                 eventsToUnbind = navigator.getPartsEvents('mousedown');
                 // Add mouse move and mouseup events. These are bind to doc/container,
-                // because Navigator.grabbedSomething flags are stored in mousedown events:
+                // because Navigator.grabbedSomething flags are stored in mousedown
+                // events
                 eventsToUnbind.push(
                     addEvent(container, 'mousemove', mouseMoveHandler),
                     addEvent(container.ownerDocument, 'mouseup', mouseUpHandler)
@@ -32004,9 +37437,13 @@
                 // Data events
                 if (navigator.series && navigator.series[0]) {
                     eventsToUnbind.push(
-                        addEvent(navigator.series[0].xAxis, 'foundExtremes', function() {
-                            chart.navigator.modifyNavigatorAxisExtremes();
-                        })
+                        addEvent(
+                            navigator.series[0].xAxis,
+                            'foundExtremes',
+                            function() {
+                                chart.navigator.modifyNavigatorAxisExtremes();
+                            }
+                        )
                     );
                 }
             },
@@ -32037,7 +37474,7 @@
 
             /**
              * Mousedown on a shaded mask, either:
-             * - will be stored for future drag&drop 
+             * - will be stored for future drag&drop
              * - will directly shift to a new range
              *
              * @param {Object} e Mouse event
@@ -32082,15 +37519,17 @@
                         navigator.fixedWidth = range; // #1370
 
                         ext = xAxis.toFixedRange(left, left + range, null, fixedMax);
-                        chart.xAxis[0].setExtremes(
-                            Math.min(ext.min, ext.max),
-                            Math.max(ext.min, ext.max),
-                            true,
-                            null, // auto animation
-                            {
-                                trigger: 'navigator'
-                            }
-                        );
+                        if (defined(ext.min)) { // #7411
+                            chart.xAxis[0].setExtremes(
+                                Math.min(ext.min, ext.max),
+                                Math.max(ext.min, ext.max),
+                                true,
+                                null, // auto animation
+                                {
+                                    trigger: 'navigator'
+                                }
+                            );
+                        }
                     }
                 }
             },
@@ -32142,9 +37581,10 @@
                     chartX;
 
 
-                // In iOS, a mousemove event with e.pageX === 0 is fired when holding the finger
-                // down in the center of the scrollbar. This should be ignored.
-                if (!e.touches || e.touches[0].pageX !== 0) { // #4696, scrollbar failed on Android
+                // In iOS, a mousemove event with e.pageX === 0 is fired when holding
+                // the finger down in the center of the scrollbar. This should be
+                // ignored.
+                if (!e.touches || e.touches[0].pageX !== 0) { // #4696
 
                     e = chart.pointer.normalize(e);
                     chartX = e.chartX;
@@ -32178,7 +37618,8 @@
                         navigator.hasDragged = true;
                         if (chartX < dragOffset) { // outside left
                             chartX = dragOffset;
-                        } else if (chartX > navigatorSize + dragOffset - range) { // outside right
+                            // outside right
+                        } else if (chartX > navigatorSize + dragOffset - range) {
                             chartX = navigatorSize + dragOffset - range;
                         }
 
@@ -32189,8 +37630,12 @@
                             chartX - dragOffset + range
                         );
                     }
-                    if (navigator.hasDragged && navigator.scrollbar && navigator.scrollbar.options.liveRedraw) {
-                        e.DOMType = e.type; // DOMType is for IE8 because it can't read type async
+                    if (
+                        navigator.hasDragged &&
+                        navigator.scrollbar &&
+                        navigator.scrollbar.options.liveRedraw
+                    ) {
+                        e.DOMType = e.type; // DOMType is for IE8
                         setTimeout(function() {
                             navigator.onMouseUp(e);
                         }, 0);
@@ -32241,8 +37686,9 @@
                             Math.min(ext.min, ext.max),
                             Math.max(ext.min, ext.max),
                             true,
-                            navigator.hasDragged ? false : null, // Run animation when clicking buttons, scrollbar track etc, but not when dragging handles or scrollbar
-                            {
+                            // Run animation when clicking buttons, scrollbar track etc,
+                            // but not when dragging handles or scrollbar
+                            navigator.hasDragged ? false : null, {
                                 trigger: 'navigator',
                                 triggerOp: 'navigator-drag',
                                 DOMEvent: DOMEvent // #1838
@@ -32286,7 +37732,11 @@
 
                     // We only listen for extremes-events on the first baseSeries
                     if (baseSeries[0].xAxis) {
-                        removeEvent(baseSeries[0].xAxis, 'foundExtremes', this.modifyBaseAxisExtremes);
+                        removeEvent(
+                            baseSeries[0].xAxis,
+                            'foundExtremes',
+                            this.modifyBaseAxisExtremes
+                        );
                     }
                 }
             },
@@ -32317,21 +37767,30 @@
                 this.scrollbarOptions = scrollbarOptions;
                 this.outlineHeight = height + scrollbarHeight;
 
-                this.opposite = pick(navigatorOptions.opposite, !navigatorEnabled && chart.inverted); // #6262
+                this.opposite = pick(
+                    navigatorOptions.opposite, !navigatorEnabled && chart.inverted
+                ); // #6262
 
                 var navigator = this,
                     baseSeries = navigator.baseSeries,
                     xAxisIndex = chart.xAxis.length,
                     yAxisIndex = chart.yAxis.length,
-                    baseXaxis = baseSeries && baseSeries[0] && baseSeries[0].xAxis || chart.xAxis[0];
+                    baseXaxis = baseSeries && baseSeries[0] && baseSeries[0].xAxis ||
+                    chart.xAxis[0];
 
                 // Make room for the navigator, can be placed around the chart:
                 chart.extraMargin = {
                     type: navigator.opposite ? 'plotTop' : 'marginBottom',
-                    value: (navigatorEnabled || !chart.inverted ? navigator.outlineHeight : 0) + navigatorOptions.margin
+                    value: (
+                        navigatorEnabled || !chart.inverted ?
+                        navigator.outlineHeight :
+                        0
+                    ) + navigatorOptions.margin
                 };
                 if (chart.inverted) {
-                    chart.extraMargin.type = navigator.opposite ? 'marginRight' : 'plotLeft';
+                    chart.extraMargin.type = navigator.opposite ?
+                        'marginRight' :
+                        'plotLeft';
                 }
                 chart.isDirtyBox = true;
 
@@ -32404,7 +37863,11 @@
                                 ext = axis.getExtremes(),
                                 scrollTrackWidth = axis.len - 2 * scrollbarHeight,
                                 min = numExt('min', axis.options.min, ext.dataMin),
-                                valueRange = numExt('max', axis.options.max, ext.dataMax) - min;
+                                valueRange = numExt(
+                                    'max',
+                                    axis.options.max,
+                                    ext.dataMax
+                                ) - min;
 
                             return reverse ?
                                 // from pixel to value
@@ -32442,7 +37905,10 @@
                         navigator.hasDragged = navigator.scrollbar.hasDragged;
                         navigator.render(0, 0, from, to);
 
-                        if (chart.options.scrollbar.liveRedraw || e.DOMType !== 'mousemove') {
+                        if (
+                            chart.options.scrollbar.liveRedraw ||
+                            e.DOMType !== 'mousemove'
+                        ) {
                             setTimeout(function() {
                                 navigator.onMouseUp(e);
                             });
@@ -32457,8 +37923,8 @@
             },
 
             /**
-             * Get the union data extremes of the chart - the outer data extremes of the base
-             * X axis and the navigator axis.
+             * Get the union data extremes of the chart - the outer data extremes of the
+             * base X axis and the navigator axis.
              * @param {boolean} returnFalseOnNoBaseSeries - as the param says.
              */
             getUnionExtremes: function(returnFalseOnNoBaseSeries) {
@@ -32496,20 +37962,30 @@
             },
 
             /**
-             * Set the base series and update the navigator series from this. With a bit 
-             * of modification we should be able to make this an API method to be called 
+             * Set the base series and update the navigator series from this. With a bit
+             * of modification we should be able to make this an API method to be called
              * from the outside
-             * @param {Object} baseSeriesOptions - additional series options for a navigator
+             * @param  {Object} baseSeriesOptions
+             *         Additional series options for a navigator
+             * @param  {Boolean} [redraw]
+             *         Whether to redraw after update.
              */
-            setBaseSeries: function(baseSeriesOptions) {
+            setBaseSeries: function(baseSeriesOptions, redraw) {
                 var chart = this.chart,
                     baseSeries = this.baseSeries = [];
 
-                baseSeriesOptions = baseSeriesOptions || chart.options && chart.options.navigator.baseSeries || 0;
+                baseSeriesOptions = (
+                    baseSeriesOptions ||
+                    chart.options && chart.options.navigator.baseSeries ||
+                    0
+                );
 
-                // Iterate through series and add the ones that should be shown in navigator.
+                // Iterate through series and add the ones that should be shown in
+                // navigator.
                 each(chart.series || [], function(series, i) {
-                    if (!series.options.isInternal && // Don't include existing nav series
+                    if (
+                        // Don't include existing nav series
+                        !series.options.isInternal &&
                         (
                             series.options.showInNavigator ||
                             (
@@ -32525,7 +38001,7 @@
 
                 // When run after render, this.xAxis already exists
                 if (this.xAxis && !this.xAxis.fake) {
-                    this.updateNavigatorSeries();
+                    this.updateNavigatorSeries(redraw);
                 }
             },
 
@@ -32533,7 +38009,7 @@
              * Update series in the navigator from baseSeries, adding new if does not
              * exist.
              */
-            updateNavigatorSeries: function() {
+            updateNavigatorSeries: function(redraw) {
                 var navigator = this,
                     chart = navigator.chart,
                     baseSeries = navigator.baseSeries,
@@ -32560,8 +38036,8 @@
                         function(navSeries) {
                             var base = navSeries.baseSeries;
                             if (H.inArray(base, baseSeries) < 0) { // Not in array
-                                // If there is still a base series connected to this series,
-                                // remove event handler and reference.
+                                // If there is still a base series connected to this
+                                // series, remove event handler and reference.
                                 if (base) {
                                     removeEvent(
                                         base,
@@ -32578,12 +38054,19 @@
                         }
                     );
 
-                // Go through each base series and merge the options to create new series
+                // Go through each base series and merge the options to create new
+                // series
                 if (baseSeries && baseSeries.length) {
-                    each(baseSeries, function(base, i) {
+                    each(baseSeries, function eachBaseSeries(base) {
                         var linkedNavSeries = base.navigatorSeries,
-                            userNavOptions = !isArray(chartNavigatorSeriesOptions) ?
-                            chartNavigatorSeriesOptions : {};
+                            userNavOptions = extend(
+                                // Grab color from base as default
+                                {
+                                    color: base.color
+                                }, !isArray(chartNavigatorSeriesOptions) ?
+                                chartNavigatorSeriesOptions :
+                                defaultOptions.navigator.series
+                            );
 
                         // Don't update if the series exists in nav and we have disabled
                         // adaptToUpdatedData.
@@ -32594,7 +38077,7 @@
                             return;
                         }
 
-                        navSeriesMixin.name = 'Navigator ' + (i + 1);
+                        navSeriesMixin.name = 'Navigator ' + baseSeries.length;
 
                         baseOptions = base.options || {};
                         baseNavigatorOptions = baseOptions.navigatorOptions || {};
@@ -32605,24 +38088,31 @@
                             baseNavigatorOptions
                         );
 
-                        // Merge data separately. Do a slice to avoid mutating the navigator options from base series (#4923).
-                        var navigatorSeriesData = baseNavigatorOptions.data || userNavOptions.data;
-                        navigator.hasNavigatorData = navigator.hasNavigatorData || !!navigatorSeriesData;
-                        mergedNavSeriesOptions.data = navigatorSeriesData || baseOptions.data && baseOptions.data.slice(0);
+                        // Merge data separately. Do a slice to avoid mutating the
+                        // navigator options from base series (#4923).
+                        var navigatorSeriesData =
+                            baseNavigatorOptions.data || userNavOptions.data;
+                        navigator.hasNavigatorData =
+                            navigator.hasNavigatorData || !!navigatorSeriesData;
+                        mergedNavSeriesOptions.data =
+                            navigatorSeriesData ||
+                            baseOptions.data && baseOptions.data.slice(0);
 
                         // Update or add the series
-                        if (linkedNavSeries) {
-                            linkedNavSeries.update(mergedNavSeriesOptions);
+                        if (linkedNavSeries && linkedNavSeries.options) {
+                            linkedNavSeries.update(mergedNavSeriesOptions, redraw);
                         } else {
-                            base.navigatorSeries = chart.initSeries(mergedNavSeriesOptions);
+                            base.navigatorSeries = chart.initSeries(
+                                mergedNavSeriesOptions
+                            );
                             base.navigatorSeries.baseSeries = base; // Store ref
                             navigatorSeries.push(base.navigatorSeries);
                         }
                     });
                 }
 
-                // If user has defined data (and no base series) or explicitly defined 
-                // navigator.series as an array, we create these series on top of any 
+                // If user has defined data (and no base series) or explicitly defined
+                // navigator.series as an array, we create these series on top of any
                 // base series.
                 if (
                     chartNavigatorSeriesOptions.data &&
@@ -32633,10 +38123,13 @@
                     // Allow navigator.series to be an array
                     chartNavigatorSeriesOptions = H.splat(chartNavigatorSeriesOptions);
                     each(chartNavigatorSeriesOptions, function(userSeriesOptions, i) {
-                        mergedNavSeriesOptions = merge({
+                        navSeriesMixin.name =
+                            'Navigator ' + (navigatorSeries.length + 1);
+                        mergedNavSeriesOptions = merge(
+                            defaultOptions.navigator.series, {
                                 // Since we don't have a base series to pull color from,
                                 // try to fake it by using color from series with same
-                                // index. Otherwise pull from the colors array. We need 
+                                // index. Otherwise pull from the colors array. We need
                                 // an explicit color as otherwise updates will increment
                                 // color counter and we'll get a new color for each
                                 // update of the nav series.
@@ -32646,13 +38139,15 @@
                                     chart.options.colors[i] ||
                                     chart.options.colors[0]
                             },
-                            userSeriesOptions,
-                            navSeriesMixin
+                            navSeriesMixin,
+                            userSeriesOptions
                         );
                         mergedNavSeriesOptions.data = userSeriesOptions.data;
                         if (mergedNavSeriesOptions.data) {
                             navigator.hasNavigatorData = true;
-                            navigatorSeries.push(chart.initSeries(mergedNavSeriesOptions));
+                            navigatorSeries.push(
+                                chart.initSeries(mergedNavSeriesOptions)
+                            );
                         }
                     });
                 }
@@ -32670,26 +38165,30 @@
 
                 // Bind modified extremes event to first base's xAxis only.
                 // In event of > 1 base-xAxes, the navigator will ignore those.
-                // Adding this multiple times to the same axis is no problem, as 
+                // Adding this multiple times to the same axis is no problem, as
                 // duplicates should be discarded by the browser.
                 if (baseSeries[0] && baseSeries[0].xAxis) {
-                    addEvent(baseSeries[0].xAxis, 'foundExtremes', this.modifyBaseAxisExtremes);
+                    addEvent(
+                        baseSeries[0].xAxis,
+                        'foundExtremes',
+                        this.modifyBaseAxisExtremes
+                    );
                 }
 
                 each(baseSeries, function(base) {
                     // Link base series show/hide to navigator series visibility
                     addEvent(base, 'show', function() {
                         if (this.navigatorSeries) {
-                            this.navigatorSeries.show();
+                            this.navigatorSeries.setVisible(true, false);
                         }
                     });
                     addEvent(base, 'hide', function() {
                         if (this.navigatorSeries) {
-                            this.navigatorSeries.hide();
+                            this.navigatorSeries.setVisible(false, false);
                         }
                     });
 
-                    // Respond to updated data in the base series, unless explicitily 
+                    // Respond to updated data in the base series, unless explicitily
                     // not adapting to data changes.
                     if (this.navigatorOptions.adaptToUpdatedData !== false) {
                         if (base.xAxis) {
@@ -32709,9 +38208,9 @@
             },
 
             /**
-             * Set the navigator x axis extremes to reflect the total. The navigator extremes
-             * should always be the extremes of the union of all series in the chart as
-             * well as the navigator series.
+             * Set the navigator x axis extremes to reflect the total. The navigator
+             * extremes should always be the extremes of the union of all series in the
+             * chart as well as the navigator series.
              */
             modifyNavigatorAxisExtremes: function() {
                 var xAxis = this.xAxis,
@@ -32719,7 +38218,13 @@
 
                 if (xAxis.getExtremes) {
                     unionExtremes = this.getUnionExtremes(true);
-                    if (unionExtremes && (unionExtremes.dataMin !== xAxis.min || unionExtremes.dataMax !== xAxis.max)) {
+                    if (
+                        unionExtremes &&
+                        (
+                            unionExtremes.dataMin !== xAxis.min ||
+                            unionExtremes.dataMax !== xAxis.max
+                        )
+                    ) {
                         xAxis.min = unionExtremes.dataMin;
                         xAxis.max = unionExtremes.dataMax;
                     }
@@ -32740,29 +38245,34 @@
                     range = baseMax - baseMin,
                     stickToMin = navigator.stickToMin,
                     stickToMax = navigator.stickToMax,
+                    overscroll = baseXAxis.options.overscroll,
                     newMax,
                     newMin,
                     navigatorSeries = navigator.series && navigator.series[0],
                     hasSetExtremes = !!baseXAxis.setExtremes,
 
-                    // When the extremes have been set by range selector button, don't stick to min or max.
-                    // The range selector buttons will handle the extremes. (#5489)
-                    unmutable = baseXAxis.eventArgs && baseXAxis.eventArgs.trigger === 'rangeSelectorButton';
+                    // When the extremes have been set by range selector button, don't
+                    // stick to min or max. The range selector buttons will handle the
+                    // extremes. (#5489)
+                    unmutable = baseXAxis.eventArgs &&
+                    baseXAxis.eventArgs.trigger === 'rangeSelectorButton';
 
                 if (!unmutable) {
 
-                    // If the zoomed range is already at the min, move it to the right as new data
-                    // comes in
+                    // If the zoomed range is already at the min, move it to the right
+                    // as new data comes in
                     if (stickToMin) {
                         newMin = baseDataMin;
                         newMax = newMin + range;
                     }
 
-                    // If the zoomed range is already at the max, move it to the right as new data
-                    // comes in
+                    // If the zoomed range is already at the max, move it to the right
+                    // as new data comes in
                     if (stickToMax) {
-                        newMax = baseDataMax;
-                        if (!stickToMin) { // if stickToMin is true, the new min value is set above
+                        newMax = baseDataMax + overscroll;
+
+                        // if stickToMin is true, the new min value is set above
+                        if (!stickToMin) {
                             newMin = Math.max(
                                 newMax - range,
                                 navigatorSeries && navigatorSeries.xData ?
@@ -32785,21 +38295,23 @@
             },
 
             /**
-             * Handler for updated data on the base series. When data is modified, the navigator series
-             * must reflect it. This is called from the Chart.redraw function before axis and series
-             * extremes are computed.
+             * Handler for updated data on the base series. When data is modified, the
+             * navigator series must reflect it. This is called from the Chart.redraw
+             * function before axis and series extremes are computed.
              */
             updatedDataHandler: function() {
                 var navigator = this.chart.navigator,
                     baseSeries = this,
                     navigatorSeries = this.navigatorSeries;
 
-                // If the scrollbar is scrolled all the way to the right, keep right as new data 
-                // comes in.
-                navigator.stickToMax = Math.round(navigator.zoomedMax) >= Math.round(navigator.size);
+                // If the scrollbar is scrolled all the way to the right, keep right as
+                // new data  comes in.
+                navigator.stickToMax =
+                    Math.round(navigator.zoomedMax) >= Math.round(navigator.size);
 
-                // Detect whether the zoomed area should stick to the minimum or maximum. If the current
-                // axis minimum falls outside the new updated dataset, we must adjust.
+                // Detect whether the zoomed area should stick to the minimum or
+                // maximum. If the current axis minimum falls outside the new updated
+                // dataset, we must adjust.
                 navigator.stickToMin = isNumber(baseSeries.xAxis.min) &&
                     (baseSeries.xAxis.min <= baseSeries.xData[0]) &&
                     (!this.chart.fixedRange || !navigator.stickToMax);
@@ -32807,7 +38319,12 @@
                 // Set the navigator series data to the new data of the base series
                 if (navigatorSeries && !navigator.hasNavigatorData) {
                     navigatorSeries.options.pointStart = baseSeries.xData[0];
-                    navigatorSeries.setData(baseSeries.options.data, false, null, false); // #5414
+                    navigatorSeries.setData(
+                        baseSeries.options.data,
+                        false,
+                        null,
+                        false
+                    ); // #5414
                 }
             },
 
@@ -32816,7 +38333,8 @@
              */
             addChartEvents: function() {
                 addEvent(this.chart, 'redraw', function() {
-                    // Move the scrollbar after redraw, like after data updata even if axes don't redraw
+                    // Move the scrollbar after redraw, like after data updata even if
+                    // axes don't redraw
                     var navigator = this.navigator,
                         xAxis = navigator && (
                             navigator.baseSeries &&
@@ -32876,8 +38394,9 @@
         H.Navigator = Navigator;
 
         /**
-         * For Stock charts, override selection zooming with some special features because
-         * X axis zooming is already allowed by the Navigator and Range selector.
+         * For Stock charts, override selection zooming with some special features
+         * because X axis zooming is already allowed by the Navigator and Range
+         * selector.
          */
         wrap(Axis.prototype, 'zoom', function(proceed, newMin, newMax) {
             var chart = this.chart,
@@ -32891,8 +38410,8 @@
             if (this.isXAxis && ((navigator && navigator.enabled) ||
                     (rangeSelector && rangeSelector.enabled))) {
 
-                // For x only zooming, fool the chart.zoom method not to create the zoom button
-                // because the property already exists
+                // For x only zooming, fool the chart.zoom method not to create the zoom
+                // button because the property already exists
                 if (zoomType === 'x') {
                     chart.resetZoomButton = 'blocked';
 
@@ -32900,9 +38419,12 @@
                 } else if (zoomType === 'y') {
                     ret = false;
 
-                    // For xy zooming, record the state of the zoom before zoom selection, then when
-                    // the reset button is pressed, revert to this state
-                } else if (zoomType === 'xy') {
+                    // For xy zooming, record the state of the zoom before zoom selection,
+                    // then when the reset button is pressed, revert to this state. This
+                    // should apply only if the chart is initialized with a range (#6612),
+                    // otherwise zoom all the way out.
+                } else if (zoomType === 'xy' && this.options.range) {
+
                     previousZoom = this.previousZoom;
                     if (defined(newMin)) {
                         this.previousZoom = [this.min, this.max];
@@ -32932,9 +38454,10 @@
         });
 
         /**
-         * For stock charts, extend the Chart.setChartSize method so that we can set the final top position
-         * of the navigator once the height of the chart, including the legend, is determined. #367.
-         * We can't use Chart.getMargins, because labels offsets are not calculated yet.
+         * For stock charts, extend the Chart.setChartSize method so that we can set the
+         * final top position of the navigator once the height of the chart, including
+         * the legend, is determined. #367. We can't use Chart.getMargins, because
+         * labels offsets are not calculated yet.
          */
         wrap(Chart.prototype, 'setChartSize', function(proceed) {
 
@@ -32948,7 +38471,7 @@
             proceed.apply(this, [].slice.call(arguments, 1));
 
             if (navigator) {
-                legendOptions = legend.options;
+                legendOptions = legend && legend.options;
                 xAxis = navigator.xAxis;
                 yAxis = navigator.yAxis;
                 scrollbarHeight = navigator.scrollbarHeight;
@@ -32962,9 +38485,25 @@
                 } else {
                     navigator.left = this.plotLeft + scrollbarHeight;
                     navigator.top = navigator.navigatorOptions.top ||
-                        this.chartHeight - navigator.height - scrollbarHeight - this.spacing[2] -
-                        (legendOptions.verticalAlign === 'bottom' && legendOptions.enabled && !legendOptions.floating ?
-                            legend.legendHeight + pick(legendOptions.margin, 10) : 0);
+                        this.chartHeight -
+                        navigator.height -
+                        scrollbarHeight -
+                        this.spacing[2] -
+                        (
+                            this.rangeSelector && this.extraBottomMargin ?
+                            this.rangeSelector.getHeight() :
+                            0
+                        ) -
+                        (
+                            (
+                                legendOptions &&
+                                legendOptions.verticalAlign === 'bottom' &&
+                                legendOptions.enabled &&
+                                !legendOptions.floating
+                            ) ?
+                            legend.legendHeight + pick(legendOptions.margin, 10) :
+                            0
+                        );
                 }
 
                 if (xAxis && yAxis) { // false if navigator is disabled (#904)
@@ -32982,19 +38521,36 @@
         });
 
         // Pick up badly formatted point options to addPoint
-        wrap(Series.prototype, 'addPoint', function(proceed, options, redraw, shift, animation) {
+        wrap(Series.prototype, 'addPoint', function(
+            proceed,
+            options,
+            redraw,
+            shift,
+            animation
+        ) {
             var turboThreshold = this.options.turboThreshold;
-            if (turboThreshold && this.xData.length > turboThreshold && isObject(options, true) && this.chart.navigator) {
+            if (
+                turboThreshold &&
+                this.xData.length > turboThreshold &&
+                isObject(options, true) &&
+                this.chart.navigator
+            ) {
                 error(20, true);
             }
             proceed.call(this, options, redraw, shift, animation);
         });
 
         // Handle adding new series
-        wrap(Chart.prototype, 'addSeries', function(proceed, options, redraw, animation) {
+        wrap(Chart.prototype, 'addSeries', function(
+            proceed,
+            options,
+            redraw,
+            animation
+        ) {
             var series = proceed.call(this, options, false, animation);
             if (this.navigator) {
-                this.navigator.setBaseSeries(); // Recompute which series should be shown in navigator, and add them
+                // Recompute which series should be shown in navigator, and add them
+                this.navigator.setBaseSeries(null, false);
             }
             if (pick(redraw, true)) {
                 this.redraw();
@@ -33006,7 +38562,7 @@
         wrap(Series.prototype, 'update', function(proceed, newOptions, redraw) {
             proceed.call(this, newOptions, false);
             if (this.chart.navigator && !this.options.isInternal) {
-                this.chart.navigator.setBaseSeries();
+                this.chart.navigator.setBaseSeries(null, false);
             }
             if (pick(redraw, true)) {
                 this.chart.redraw();
@@ -33024,9 +38580,6 @@
             }
         });
 
-        /* ****************************************************************************
-         * End Navigator code														  *
-         *****************************************************************************/
 
     }(Highcharts));
     (function(H) {
@@ -33068,14 +38621,26 @@
              * the chart, like 1 day, 1 week, 1 month etc. It also provides input
              * boxes where min and max dates can be manually input.
              *
-             * @optionparent rangeSelector
              * @product highstock
+             * @optionparent rangeSelector
              */
             rangeSelector: {
                 // allButtonsEnabled: false,
                 // enabled: true,
                 // buttons: {Object}
                 // buttonSpacing: 0,
+
+                /**
+                 * The vertical alignment of the rangeselector box. Allowed properties are `top`,
+                 * `middle`, `bottom`.
+                 *
+                 * @since 6.0.0
+                 *
+                 * @sample {highstock} stock/rangeselector/vertical-align-middle/ Middle
+                 *
+                 * @sample {highstock} stock/rangeselector/vertical-align-bottom/ Bottom
+                 */
+                verticalAlign: 'top',
 
                 /**
                  * A collection of attributes for the buttons. The object takes SVG
@@ -33087,8 +38652,7 @@
                  * 
                  * CSS styles for the text label.
                  * 
-                 * In [styled mode](http://www.highcharts.com/docs/chart-design-and-
-                 * style/style-by-css), the buttons are styled by the `.highcharts-
+                 * In styled mode, the buttons are styled by the `.highcharts-
                  * range-selector-buttons .highcharts-button` rule with its different
                  * states.
                  * 
@@ -33097,53 +38661,103 @@
                  * @product highstock
                  */
                 buttonTheme: {
-
-                    /**
-                     */
                     'stroke-width': 0,
-
-                    /**
-                     */
                     width: 28,
-
-                    /**
-                     */
                     height: 18,
-
-                    /**
-                     */
                     padding: 2,
-
-                    /**
-                     */
                     zIndex: 7 // #484, #852
                 },
 
                 /**
-                 * The height of the range selector, used to reserve space for buttons
-                 * and input.
+                 * When the rangeselector is floating, the plot area does not reserve 
+                 * space for it. This opens for positioning anywhere on the chart.
                  * 
-                 * @type {Number}
-                 * @default 35
-                 * @since 2.1.9
+                 * @sample {highstock} stock/rangeselector/floating/
+                 *         Placing the range selector between the plot area and the
+                 *         navigator
+                 * @since 6.0.0
                  * @product highstock
                  */
-                height: 35, // reserved space for buttons and input
+                floating: false,
+
+                /**
+                 * The x offset of the range selector relative to its horizontal
+                 * alignment within `chart.spacingLeft` and `chart.spacingRight`.
+                 * 
+                 * @since 6.0.0
+                 * @product highstock
+                 */
+                x: 0,
+
+                /**
+                 * The y offset of the range selector relative to its horizontal
+                 * alignment within `chart.spacingLeft` and `chart.spacingRight`.
+                 * 
+                 * @since 6.0.0
+                 * @product highstock
+                 */
+                y: 0,
+
+                /**
+                 * Deprecated. The height of the range selector. Currently it is
+                 * calculated dynamically.
+                 * 
+                 * @type {Number}
+                 * @default undefined
+                 * @since 2.1.9
+                 * @product highstock
+                 * @deprecated true
+                 */
+                height: undefined, // reserved space for buttons and input
 
                 /**
                  * Positioning for the input boxes. Allowed properties are `align`,
-                 *  `verticalAlign`, `x` and `y`.
+                 *  `x` and `y`.
                  * 
                  * @type {Object}
                  * @default { align: "right" }
-                 * @since 1.2.5
+                 * @since 1.2.4
                  * @product highstock
                  */
                 inputPosition: {
-
                     /**
+                     * The alignment of the input box. Allowed properties are `left`,
+                     * `center`, `right`.
+                     * @validvalue ["left", "center", "right"]
+                     * @sample {highstock} stock/rangeselector/input-button-position/ 
+                     *         Alignment
+                     * @since 6.0.0
                      */
-                    align: 'right'
+                    align: 'right',
+                    x: 0,
+                    y: 0
+                },
+
+                /**
+                 * Positioning for the button row.
+                 * 
+                 * @since 1.2.4
+                 * @product highstock
+                 */
+                buttonPosition: {
+                    /**
+                     * The alignment of the input box. Allowed properties are `left`,
+                     * `center`, `right`.
+                     *
+                     * @validvalue ["left", "center", "right"]
+                     * @sample {highstock} stock/rangeselector/input-button-position/ 
+                     *         Alignment
+                     * @since 6.0.0
+                     */
+                    align: 'left',
+                    /**
+                     * X offset of the button row.
+                     */
+                    x: 0,
+                    /**
+                     * Y offset of the button row.
+                     */
+                    y: 0
                 },
                 // inputDateFormat: '%b %e, %Y',
                 // inputEditDateFormat: '%Y-%m-%d',
@@ -33161,13 +38775,17 @@
              * set it before any chart is initialized.
              * 
              * <pre>Highcharts.setOptions({
-             * lang: {
-             * months: ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-             * 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'],
-             * 
-             * weekdays: ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi',
-             * 'Samedi']
-             * }
+             *     lang: {
+             *         months: [
+             *             'Janvier', 'Février', 'Mars', 'Avril',
+             *             'Mai', 'Juin', 'Juillet', 'Août',
+             *             'Septembre', 'Octobre', 'Novembre', 'Décembre'
+             *         ],
+             *         weekdays: [
+             *             'Dimanche', 'Lundi', 'Mardi', 'Mercredi',
+             *             'Jeudi', 'Vendredi', 'Samedi'
+             *         ]
+             *     }
              * });</pre>
              *
              * @optionparent lang
@@ -33317,6 +38935,10 @@
                     newMin = dataMin;
                     newMax = dataMax;
                 }
+
+                newMin += rangeOptions._offsetMin;
+                newMax += rangeOptions._offsetMax;
+
                 rangeSelector.setSelected(i);
 
                 // Update the chart
@@ -33348,8 +38970,8 @@
             },
 
             /**
-             * Set the selected option. This method only sets the internal flag, it doesn't
-             * update the buttons or the actual zoomed range.
+             * Set the selected option. This method only sets the internal flag, it
+             * doesn't update the buttons or the actual zoomed range.
              */
             setSelected: function(selected) {
                 this.selected = this.options.selected = selected;
@@ -33393,11 +39015,13 @@
                     blurInputs = function() {
                         var minInput = rangeSelector.minInput,
                             maxInput = rangeSelector.maxInput;
-                        if (minInput && minInput.blur) { //#3274 in some case blur is not defined
-                            fireEvent(minInput, 'blur'); //#3274
+
+                        // #3274 in some case blur is not defined
+                        if (minInput && minInput.blur) {
+                            fireEvent(minInput, 'blur');
                         }
-                        if (maxInput && maxInput.blur) { //#3274 in some case blur is not defined
-                            fireEvent(maxInput, 'blur'); //#3274
+                        if (maxInput && maxInput.blur) {
+                            fireEvent(maxInput, 'blur');
                         }
                     };
 
@@ -33421,18 +39045,26 @@
 
 
                 addEvent(chart, 'load', function() {
-                    // If a data grouping is applied to the current button, release it when extremes change
-                    addEvent(chart.xAxis[0], 'setExtremes', function(e) {
-                        if (this.max - this.min !== chart.fixedRange && e.trigger !== 'rangeSelectorButton' &&
-                            e.trigger !== 'updatedData' && rangeSelector.forcedDataGrouping) {
-                            this.setDataGrouping(false, false);
-                        }
-                    });
+                    // If a data grouping is applied to the current button, release it
+                    // when extremes change
+                    if (chart.xAxis && chart.xAxis[0]) {
+                        addEvent(chart.xAxis[0], 'setExtremes', function(e) {
+                            if (
+                                this.max - this.min !== chart.fixedRange &&
+                                e.trigger !== 'rangeSelectorButton' &&
+                                e.trigger !== 'updatedData' &&
+                                rangeSelector.forcedDataGrouping
+                            ) {
+                                this.setDataGrouping(false, false);
+                            }
+                        });
+                    }
                 });
             },
 
             /**
-             * Dynamically update the range selector buttons after a new range has been set
+             * Dynamically update the range selector buttons after a new range has been
+             * set
              */
             updateButtonStates: function() {
                 var rangeSelector = this,
@@ -33441,10 +39073,17 @@
                     actualRange = Math.round(baseAxis.max - baseAxis.min),
                     hasNoData = !baseAxis.hasVisibleSeries,
                     day = 24 * 36e5, // A single day in milliseconds
-                    unionExtremes = (chart.scroller && chart.scroller.getUnionExtremes()) || baseAxis,
+                    unionExtremes = (
+                        chart.scroller &&
+                        chart.scroller.getUnionExtremes()
+                    ) || baseAxis,
                     dataMin = unionExtremes.dataMin,
                     dataMax = unionExtremes.dataMax,
-                    ytdExtremes = rangeSelector.getYTDExtremes(dataMax, dataMin, useUTC),
+                    ytdExtremes = rangeSelector.getYTDExtremes(
+                        dataMax,
+                        dataMin,
+                        useUTC
+                    ),
                     ytdMin = ytdExtremes.min,
                     ytdMax = ytdExtremes.max,
                     selected = rangeSelector.selected,
@@ -33460,10 +39099,13 @@
                         state = 0,
                         disable,
                         select,
+                        offsetRange = rangeOptions._offsetMax - rangeOptions._offsetMin,
                         isSelected = i === selected,
-                        // Disable buttons where the range exceeds what is allowed in the current view
+                        // Disable buttons where the range exceeds what is allowed in
+                        // the current view
                         isTooGreatRange = range > dataMax - dataMin,
-                        // Disable buttons where the range is smaller than the minimum range
+                        // Disable buttons where the range is smaller than the minimum
+                        // range
                         isTooSmallRange = range < baseAxis.minRange,
                         // Do not select the YTD button if not explicitly told so
                         isYTDButNotSelected = false,
@@ -33473,26 +39115,35 @@
                     // Months and years have a variable range so we check the extremes
                     if (
                         (type === 'month' || type === 'year') &&
-                        (actualRange >= {
-                            month: 28,
-                            year: 365
-                        }[type] * day * count) &&
-                        (actualRange <= {
-                            month: 31,
-                            year: 366
-                        }[type] * day * count)
+                        (
+                            actualRange + 36e5 >= {
+                                month: 28,
+                                year: 365
+                            }[type] * day * count + offsetRange
+                        ) &&
+                        (
+                            actualRange - 36e5 <= {
+                                month: 31,
+                                year: 366
+                            }[type] * day * count + offsetRange
+                        )
                     ) {
                         isSameRange = true;
                     } else if (type === 'ytd') {
-                        isSameRange = (ytdMax - ytdMin) === actualRange;
+                        isSameRange = (ytdMax - ytdMin + offsetRange) === actualRange;
                         isYTDButNotSelected = !isSelected;
                     } else if (type === 'all') {
                         isSameRange = baseAxis.max - baseAxis.min >= dataMax - dataMin;
-                        isAllButAlreadyShowingAll = !isSelected && selectedExists && isSameRange;
+                        isAllButAlreadyShowingAll = (!isSelected &&
+                            selectedExists &&
+                            isSameRange
+                        );
                     }
-                    // The new zoom area happens to match the range for a button - mark it selected.
-                    // This happens when scrolling across an ordinal gap. It can be seen in the intraday
-                    // demos when selecting 1h and scroll across the night gap.
+
+                    // The new zoom area happens to match the range for a button - mark
+                    // it selected. This happens when scrolling across an ordinal gap.
+                    // It can be seen in the intraday demos when selecting 1h and scroll
+                    // across the night gap.
                     disable = (!allButtonsEnabled &&
                         (
                             isTooGreatRange ||
@@ -33527,8 +39178,8 @@
                 var type = rangeOptions.type,
                     count = rangeOptions.count || 1,
 
-                    // these time intervals have a fixed number of milliseconds, as opposed
-                    // to month, ytd and year
+                    // these time intervals have a fixed number of milliseconds, as
+                    // opposed to month, ytd and year
                     fixedTimes = {
                         millisecond: 1,
                         second: 1000,
@@ -33547,6 +39198,11 @@
                         year: 365
                     }[type] * 24 * 36e5 * count;
                 }
+
+                rangeOptions._offsetMin = pick(rangeOptions.offsetMin, 0);
+                rangeOptions._offsetMax = pick(rangeOptions.offsetMax, 0);
+                rangeOptions._range +=
+                    rangeOptions._offsetMax - rangeOptions._offsetMin;
             },
 
             /**
@@ -33568,7 +39224,10 @@
                     input.HCTime
                 );
                 this[name + 'DateBox'].attr({
-                    text: dateFormat(options.inputDateFormat || '%b %e, %Y', input.HCTime)
+                    text: dateFormat(
+                        options.inputDateFormat || '%b %e, %Y',
+                        input.HCTime
+                    )
                 });
             },
 
@@ -33733,11 +39392,11 @@
             getPosition: function() {
                 var chart = this.chart,
                     options = chart.options.rangeSelector,
-                    buttonTop = pick((options.buttonPosition || {}).y, chart.plotTop - chart.axisOffset[0] - options.height);
+                    top = (options.verticalAlign) === 'top' ? chart.plotTop - chart.axisOffset[0] : 0; // set offset only for varticalAlign top
 
                 return {
-                    buttonTop: buttonTop,
-                    inputTop: buttonTop - 10
+                    buttonTop: top + options.buttonPosition.y,
+                    inputTop: top + options.inputPosition.y - 10
                 };
             },
             /**
@@ -33778,21 +39437,35 @@
                     chartOptions = chart.options,
                     navButtonOptions = chartOptions.exporting && chartOptions.exporting.enabled !== false &&
                     chartOptions.navigation && chartOptions.navigation.buttonOptions,
-                    options = chartOptions.rangeSelector,
-                    buttons = rangeSelector.buttons,
                     lang = defaultOptions.lang,
                     div = rangeSelector.div,
+                    options = chartOptions.rangeSelector,
+                    floating = options.floating,
+                    buttons = rangeSelector.buttons,
                     inputGroup = rangeSelector.inputGroup,
                     buttonTheme = options.buttonTheme,
-                    buttonPosition = options.buttonPosition || {},
+                    buttonPosition = options.buttonPosition,
+                    inputPosition = options.inputPosition,
                     inputEnabled = options.inputEnabled,
                     states = buttonTheme && buttonTheme.states,
                     plotLeft = chart.plotLeft,
                     buttonLeft,
-                    pos = this.getPosition(),
-                    buttonGroup = rangeSelector.group,
-                    buttonBBox,
-                    rendered = rangeSelector.rendered;
+                    buttonGroup = rangeSelector.buttonGroup,
+                    group,
+                    groupHeight,
+                    rendered = rangeSelector.rendered,
+                    verticalAlign = rangeSelector.options.verticalAlign,
+                    legend = chart.legend,
+                    legendOptions = legend && legend.options,
+                    buttonPositionY = buttonPosition.y,
+                    inputPositionY = inputPosition.y,
+                    animate = rendered || false,
+                    exportingX = 0,
+                    alignTranslateY,
+                    legendHeight,
+                    minPosition,
+                    translateY = 0,
+                    translateX;
 
                 if (options.enabled === false) {
                     return;
@@ -33801,22 +39474,41 @@
                 // create the elements
                 if (!rendered) {
 
-                    rangeSelector.group = buttonGroup = renderer.g('range-selector-buttons').add();
+                    rangeSelector.group = group = renderer.g('range-selector-group')
+                        .attr({
+                            zIndex: 7
+                        })
+                        .add();
 
-                    rangeSelector.zoomText = renderer.text(lang.rangeSelectorZoom, pick(buttonPosition.x, plotLeft), 15)
+                    rangeSelector.buttonGroup = buttonGroup = renderer.g('range-selector-buttons').add(group);
+
+                    rangeSelector.zoomText = renderer.text(lang.rangeSelectorZoom, pick(plotLeft + buttonPosition.x, plotLeft), 15)
                         .css(options.labelStyle)
                         .add(buttonGroup);
 
-                    // button starting position
-                    buttonLeft = pick(buttonPosition.x, plotLeft) + rangeSelector.zoomText.getBBox().width + 5;
+                    // button start position
+                    buttonLeft = pick(plotLeft + buttonPosition.x, plotLeft) + rangeSelector.zoomText.getBBox().width + 5;
 
                     each(rangeSelector.buttonOptions, function(rangeOptions, i) {
+
                         buttons[i] = renderer.button(
                                 rangeOptions.text,
                                 buttonLeft,
                                 0,
                                 function() {
-                                    rangeSelector.clickButton(i);
+
+                                    // extract events from button object and call
+                                    var buttonEvents = rangeOptions.events && rangeOptions.events.click,
+                                        callDefaultEvent;
+
+                                    if (buttonEvents) {
+                                        callDefaultEvent = buttonEvents.call(rangeOptions);
+                                    }
+
+                                    if (callDefaultEvent !== false) {
+                                        rangeSelector.clickButton(i);
+                                    }
+
                                     rangeSelector.isActive = true;
                                 },
                                 buttonTheme,
@@ -33846,53 +39538,229 @@
 
                         // Create the group to keep the inputs
                         rangeSelector.inputGroup = inputGroup = renderer.g('input-group')
-                            .add();
+                            .add(group);
                         inputGroup.offset = 0;
 
                         rangeSelector.drawInput('min');
                         rangeSelector.drawInput('max');
                     }
                 }
+
+                plotLeft = chart.plotLeft - chart.spacing[3];
                 rangeSelector.updateButtonStates();
 
-                // Set or update the group position
-                buttonGroup[rendered ? 'animate' : 'attr']({
-                    translateY: pos.buttonTop
-                });
+                // detect collisiton with exporting
+                if (
+                    navButtonOptions &&
+                    this.titleCollision(chart) &&
+                    verticalAlign === 'top' &&
+                    buttonPosition.align === 'right' &&
+                    (
+                        (buttonPosition.y + buttonGroup.getBBox().height - 12) <
+                        ((navButtonOptions.y || 0) + navButtonOptions.height)
+                    )
+                ) {
+                    exportingX = -40;
+                }
+
+                if (buttonPosition.align === 'left') {
+                    translateX = buttonPosition.x - chart.spacing[3];
+                } else if (buttonPosition.align === 'right') {
+                    translateX = buttonPosition.x + exportingX - chart.spacing[1];
+                }
+
+                // align button group
+                buttonGroup.align({
+                    y: buttonPosition.y,
+                    width: buttonGroup.getBBox().width,
+                    align: buttonPosition.align,
+                    x: translateX
+                }, true, chart.spacingBox);
+
+                // skip animation
+                rangeSelector.group.placed = animate;
+                rangeSelector.buttonGroup.placed = animate;
 
                 if (inputEnabled !== false) {
 
-                    // Update the alignment to the updated spacing box
-                    inputGroup.align(extend({
-                        y: pos.inputTop,
-                        width: inputGroup.offset,
-                        // Detect collision with the exporting buttons
-                        x: navButtonOptions && (pos.inputTop < (navButtonOptions.y || 0) + navButtonOptions.height - chart.spacing[0]) ?
-                            -40 : 0
-                    }, options.inputPosition), true, chart.spacingBox);
+                    var inputGroupX,
+                        inputGroupWidth,
+                        buttonGroupX,
+                        buttonGroupWidth;
 
-                    // Hide if overlapping - inputEnabled is null or undefined
-                    if (!defined(inputEnabled)) {
-                        buttonBBox = buttonGroup.getBBox();
-                        inputGroup[inputGroup.alignAttr.translateX < buttonBBox.x + buttonBBox.width + 10 ? 'hide' : 'show']();
+                    // detect collision with exporting
+                    if (
+                        navButtonOptions &&
+                        this.titleCollision(chart) &&
+                        verticalAlign === 'top' &&
+                        inputPosition.align === 'right' &&
+                        (
+                            (inputPosition.y - inputGroup.getBBox().height - 12) <
+                            ((navButtonOptions.y || 0) + navButtonOptions.height + chart.spacing[0])
+                        )
+                    ) {
+                        exportingX = -40;
+                    } else {
+                        exportingX = 0;
+                    }
+
+                    if (inputPosition.align === 'left') {
+                        translateX = plotLeft;
+                    } else if (inputPosition.align === 'right') {
+                        translateX = -Math.max(chart.axisOffset[1], -exportingX); // yAxis offset
+                    }
+
+                    // Update the alignment to the updated spacing box
+                    inputGroup.align({
+                        y: inputPosition.y,
+                        width: inputGroup.getBBox().width,
+                        align: inputPosition.align,
+                        x: inputPosition.x + translateX - 2 // fix wrong getBBox() value on right align 
+                    }, true, chart.spacingBox);
+
+                    // detect collision
+                    inputGroupX = inputGroup.alignAttr.translateX + inputGroup.alignOptions.x -
+                        exportingX + inputGroup.getBBox().x + 2; // getBBox for detecing left margin, 2px padding to not overlap input and label
+
+                    inputGroupWidth = inputGroup.alignOptions.width;
+
+                    buttonGroupX = buttonGroup.alignAttr.translateX + buttonGroup.getBBox().x;
+                    buttonGroupWidth = buttonGroup.getBBox().width + 20; // 20 is minimal spacing between elements
+
+                    if (
+                        (inputPosition.align === buttonPosition.align) ||
+                        (
+                            (buttonGroupX + buttonGroupWidth > inputGroupX) &&
+                            (inputGroupX + inputGroupWidth > buttonGroupX) &&
+                            (buttonPositionY < (inputPositionY + inputGroup.getBBox().height))
+                        )
+                    ) {
+
+                        inputGroup.attr({
+                            translateX: inputGroup.alignAttr.translateX + (chart.axisOffset[1] >= -exportingX ? 0 : -exportingX),
+                            translateY: inputGroup.alignAttr.translateY + buttonGroup.getBBox().height + 10
+                        });
+
                     }
 
                     // Set or reset the input values
                     rangeSelector.setInputValue('min', min);
                     rangeSelector.setInputValue('max', max);
+
+                    // skip animation
+                    rangeSelector.inputGroup.placed = animate;
+                }
+
+                // vertical align
+                rangeSelector.group.align({
+                    verticalAlign: verticalAlign
+                }, true, chart.spacingBox);
+
+                // set position 
+                groupHeight = rangeSelector.group.getBBox().height + 20; // # 20 padding
+                alignTranslateY = rangeSelector.group.alignAttr.translateY;
+
+                // calculate bottom position 
+                if (verticalAlign === 'bottom') {
+                    legendHeight = legendOptions && legendOptions.verticalAlign === 'bottom' && legendOptions.enabled &&
+                        !legendOptions.floating ? legend.legendHeight + pick(legendOptions.margin, 10) : 0;
+
+                    groupHeight = groupHeight + legendHeight - 20;
+                    translateY = alignTranslateY - groupHeight - (floating ? 0 : options.y) - 10; // 10 spacing
+
+                }
+
+                if (verticalAlign === 'top') {
+                    if (floating) {
+                        translateY = 0;
+                    }
+
+                    if (chart.titleOffset) {
+                        translateY = chart.titleOffset + chart.options.title.margin;
+                    }
+
+                    translateY += ((chart.margin[0] - chart.spacing[0]) || 0);
+
+                } else if (verticalAlign === 'middle') {
+                    if (inputPositionY === buttonPositionY) {
+                        if (inputPositionY < 0) {
+                            translateY = alignTranslateY + minPosition;
+                        } else {
+                            translateY = alignTranslateY;
+                        }
+                    } else if (inputPositionY || buttonPositionY) {
+                        if (inputPositionY < 0 || buttonPositionY < 0) {
+                            translateY -= Math.min(inputPositionY, buttonPositionY);
+                        } else {
+                            translateY = alignTranslateY - groupHeight + minPosition;
+                        }
+                    }
+                }
+
+                rangeSelector.group.translate(
+                    options.x,
+                    options.y + Math.floor(translateY)
+                );
+
+                // translate HTML inputs
+                if (inputEnabled !== false) {
+                    rangeSelector.minInput.style.marginTop = rangeSelector.group.translateY + 'px';
+                    rangeSelector.maxInput.style.marginTop = rangeSelector.group.translateY + 'px';
                 }
 
                 rangeSelector.rendered = true;
             },
 
+            /** 
+             * Extracts height of range selector 
+             * @return {Number} Returns rangeSelector height
+             */
+            getHeight: function() {
+                var rangeSelector = this,
+                    options = rangeSelector.options,
+                    rangeSelectorGroup = rangeSelector.group,
+                    inputPosition = options.inputPosition,
+                    buttonPosition = options.buttonPosition,
+                    yPosition = options.y,
+                    buttonPositionY = buttonPosition.y,
+                    inputPositionY = inputPosition.y,
+                    rangeSelectorHeight = 0,
+                    minPosition;
+
+                rangeSelectorHeight = rangeSelectorGroup ? (rangeSelectorGroup.getBBox(true).height) + 13 + yPosition : 0; // 13px to keep back compatibility
+
+                minPosition = Math.min(inputPositionY, buttonPositionY);
+
+                if (
+                    (inputPositionY < 0 && buttonPositionY < 0) ||
+                    (inputPositionY > 0 && buttonPositionY > 0)
+                ) {
+                    rangeSelectorHeight += Math.abs(minPosition);
+                }
+
+                return rangeSelectorHeight;
+            },
+
+            /**
+             * Detect collision with title or subtitle
+             * @param {object} chart
+             * @return {Boolean} Returns collision status
+             */
+            titleCollision: function(chart) {
+                return !(chart.options.title.text || chart.options.subtitle.text);
+            },
+
             /**
              * Update the range selector with new options
+             * @param {object} options
              */
             update: function(options) {
                 var chart = this.chart;
+
                 merge(true, chart.options.rangeSelector, options);
                 this.destroy();
                 this.init(chart);
+                chart.rangeSelector.render();
             },
 
             /**
@@ -33952,7 +39820,7 @@
                     newMax = newMin + fixedRange;
                 }
             }
-            if (!isNumber(newMin)) { // #1195
+            if (!isNumber(newMin) || !isNumber(newMax)) { // #1195, #7411
                 newMin = newMax = undefined;
             }
 
@@ -34025,7 +39893,7 @@
 
         };
 
-        // Initialize scroller for stock charts
+        // Initialize rangeselector for stock charts
         wrap(Chart.prototype, 'init', function(proceed, options, callback) {
 
             addEvent(this, 'init', function() {
@@ -34037,6 +39905,111 @@
             proceed.call(this, options, callback);
 
         });
+
+        wrap(Chart.prototype, 'render', function(proceed, options, callback) {
+
+            var chart = this,
+                axes = chart.axes,
+                rangeSelector = chart.rangeSelector,
+                verticalAlign;
+
+            if (rangeSelector) {
+
+                each(axes, function(axis) {
+                    axis.updateNames();
+                    axis.setScale();
+                });
+
+                chart.getAxisMargins();
+
+                rangeSelector.render();
+                verticalAlign = rangeSelector.options.verticalAlign;
+
+                if (!rangeSelector.options.floating) {
+                    if (verticalAlign === 'bottom') {
+                        this.extraBottomMargin = true;
+                    } else if (verticalAlign !== 'middle') {
+                        this.extraTopMargin = true;
+                    }
+                }
+            }
+
+            proceed.call(this, options, callback);
+
+        });
+
+        wrap(Chart.prototype, 'update', function(proceed, options, redraw, oneToOne) {
+
+            var chart = this,
+                rangeSelector = chart.rangeSelector,
+                verticalAlign;
+
+            this.extraBottomMargin = false;
+            this.extraTopMargin = false;
+
+            if (rangeSelector) {
+
+                rangeSelector.render();
+
+                verticalAlign = (options.rangeSelector && options.rangeSelector.verticalAlign) ||
+                    (rangeSelector.options && rangeSelector.options.verticalAlign);
+
+                if (!rangeSelector.options.floating) {
+                    if (verticalAlign === 'bottom') {
+                        this.extraBottomMargin = true;
+                    } else if (verticalAlign !== 'middle') {
+                        this.extraTopMargin = true;
+                    }
+                }
+            }
+
+            proceed.call(this, H.merge(true, options, {
+                chart: {
+                    marginBottom: pick(options.chart && options.chart.marginBottom, chart.margin.bottom),
+                    spacingBottom: pick(options.chart && options.chart.spacingBottom, chart.spacing.bottom)
+                }
+            }), redraw, oneToOne);
+
+        });
+
+        wrap(Chart.prototype, 'redraw', function(proceed, options, callback) {
+            var chart = this,
+                rangeSelector = chart.rangeSelector,
+                verticalAlign;
+
+            if (rangeSelector && !rangeSelector.options.floating) {
+
+                rangeSelector.render();
+                verticalAlign = rangeSelector.options.verticalAlign;
+
+                if (verticalAlign === 'bottom') {
+                    this.extraBottomMargin = true;
+                } else if (verticalAlign !== 'middle') {
+                    this.extraTopMargin = true;
+                }
+            }
+
+            proceed.call(this, options, callback);
+        });
+
+        Chart.prototype.adjustPlotArea = function() {
+            var chart = this,
+                rangeSelector = chart.rangeSelector,
+                rangeSelectorHeight;
+
+            if (this.rangeSelector) {
+
+                rangeSelectorHeight = rangeSelector.getHeight();
+
+                if (this.extraTopMargin) {
+                    this.plotTop += rangeSelectorHeight;
+                }
+
+                if (this.extraBottomMargin) {
+                    this.marginBottom += rangeSelectorHeight;
+                }
+            }
+        };
 
         Chart.prototype.callbacks.push(function(chart) {
             var extremes,
@@ -34081,7 +40054,7 @@
         H.RangeSelector = RangeSelector;
 
         /* ****************************************************************************
-         * End Range Selector code													*
+         * End Range Selector code													 *
          *****************************************************************************/
 
     }(Highcharts));
@@ -34119,6 +40092,53 @@
             seriesInit = seriesProto.init,
             seriesProcessData = seriesProto.processData,
             pointTooltipFormatter = Point.prototype.tooltipFormatter;
+
+
+        /**
+         * Compare the values of the series against the first non-null, non-
+         * zero value in the visible range. The y axis will show percentage
+         * or absolute change depending on whether `compare` is set to `"percent"`
+         * or `"value"`. When this is applied to multiple series, it allows
+         * comparing the development of the series against each other.
+         * 
+         * @type {String}
+         * @see [compareBase](#plotOptions.series.compareBase), [Axis.setCompare()](#Axis.
+         * setCompare())
+         * @sample {highstock} stock/plotoptions/series-compare-percent/ Percent
+         * @sample {highstock} stock/plotoptions/series-compare-value/ Value
+         * @default undefined
+         * @since 1.0.1
+         * @product highstock
+         * @apioption plotOptions.series.compare
+         */
+
+        /**
+         * Defines if comparisson should start from the first point within the visible
+         * range or should start from the first point <b>before</b> the range.
+         * In other words, this flag determines if first point within the visible range
+         * will have 0% (`compareStart=true`) or should have been already calculated
+         * according to the previous point (`compareStart=false`).
+         *
+         * @type {Boolean}
+         * @sample {highstock} stock/plotoptions/series-comparestart/ Calculate compare within visible range
+         * @default false
+         * @since 6.0.0
+         * @product highstock
+         * @apioption plotOptions.series.compareStart
+         */
+
+        /**
+         * When [compare](#plotOptions.series.compare) is `percent`, this option
+         * dictates whether to use 0 or 100 as the base of comparison.
+         * 
+         * @validvalue [0, 100]
+         * @type {Number}
+         * @sample {highstock} / Compare base is 100
+         * @default 0
+         * @since 5.0.6
+         * @product highstock
+         * @apioption plotOptions.series.compareBase
+         */
 
         /**
          * Factory function for creating new stock charts. Creates a new {@link Chart|
@@ -34190,6 +40210,7 @@
                 return merge({ // defaults
                         minPadding: 0,
                         maxPadding: 0,
+                        overscroll: 0,
                         ordinal: true,
                         title: {
                             text: null
@@ -34217,7 +40238,14 @@
                             y: -2
                         },
                         opposite: opposite,
+
+                        /**
+                         * @default {highcharts} true
+                         * @default {highstock} false
+                         * @apioption yAxis.showLastLabel
+                         */
                         showLastLabel: false,
+
                         title: {
                             text: null
                         }
@@ -34249,7 +40277,7 @@
                         text: null
                     },
                     tooltip: {
-                        shared: true,
+                        split: pick(defaultOptions.tooltip.split, true),
                         crosshairs: true
                     },
                     legend: {
@@ -34334,7 +40362,7 @@
                 x2,
                 y2,
                 result = [],
-                axes = [], //#3416 need a default array
+                axes = [], // #3416 need a default array
                 axes2,
                 uniqueAxes,
                 transVal;
@@ -34387,7 +40415,7 @@
             // Remove duplicates in the axes array. If there are no axes in the axes array,
             // we are adding an axis without data, so we need to populate this with grid
             // lines (#2796).
-            uniqueAxes = axes.length ? [] : [axis.isXAxis ? chart.yAxis[0] : chart.xAxis[0]]; //#3742
+            uniqueAxes = axes.length ? [] : [axis.isXAxis ? chart.yAxis[0] : chart.xAxis[0]]; // #3742
             each(axes, function(axis2) {
                 if (
                     inArray(axis2, uniqueAxes) === -1 &&
@@ -34444,39 +40472,8 @@
             }
             return result.length > 0 ?
                 renderer.crispPolyLine(result, lineWidth || 1) :
-                null; //#3557 getPlotLinePath in regular Highcharts also returns null
+                null; // #3557 getPlotLinePath in regular Highcharts also returns null
         });
-
-        // Override getPlotBandPath to allow for multipane charts
-        Axis.prototype.getPlotBandPath = function(from, to) {
-            var toPath = this.getPlotLinePath(to, null, null, true),
-                path = this.getPlotLinePath(from, null, null, true),
-                result = [],
-                i;
-
-            if (path && toPath) {
-                if (path.toString() === toPath.toString()) {
-                    // #6166
-                    result = path;
-                    result.flat = true;
-                } else {
-                    // Go over each subpath
-                    for (i = 0; i < path.length; i += 6) {
-                        result.push(
-                            'M', path[i + 1], path[i + 2],
-                            'L', path[i + 4], path[i + 5],
-                            toPath[i + 4], toPath[i + 5],
-                            toPath[i + 1], toPath[i + 2],
-                            'z'
-                        );
-                    }
-                }
-            } else { // outside the axis area
-                result = null;
-            }
-
-            return result;
-        };
 
         // Function to crisp a line with multiple segments
         SVGRenderer.prototype.crispPolyLine = function(points, width) {
@@ -34708,6 +40705,7 @@
                 keyIndex = -1,
                 processedXData,
                 processedYData,
+                compareStart = series.options.compareStart === true ? 0 : 1,
                 length,
                 compareValue;
 
@@ -34732,11 +40730,15 @@
                 }
 
                 // find the first value for comparison
-                for (i = 0; i < length - 1; i++) {
+                for (i = 0; i < length - compareStart; i++) {
                     compareValue = processedYData[i] && keyIndex > -1 ?
                         processedYData[i][keyIndex] :
                         processedYData[i];
-                    if (isNumber(compareValue) && processedXData[i + 1] >= series.xAxis.min && compareValue !== 0) {
+                    if (
+                        isNumber(compareValue) &&
+                        processedXData[i + compareStart] >= series.xAxis.min &&
+                        compareValue !== 0
+                    ) {
                         series.compareValue = compareValue;
                         break;
                     }

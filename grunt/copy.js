@@ -123,7 +123,9 @@ module.exports = {
 					
 					'angular-fusioncharts/dist/angular-fusioncharts.min.js',
 					
-					'ngmap/build/scripts/ng-map.min.js'
+					'ngmap/build/scripts/ng-map.min.js',
+					
+					'ng-js-tree/dist/ngJsTree.min.js'
 										
                 ],
                 dest: 'infovinity/libs/angular',
@@ -245,7 +247,9 @@ module.exports = {
 
 					'fusioncharts/**',
 
-					'fusionmaps/**'
+					'fusionmaps/**',
+					
+					'jstree/dist/**'
 								
                 ],
                 dest: 'infovinity/libs/jquery',

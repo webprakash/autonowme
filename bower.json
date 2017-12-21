@@ -122,7 +122,9 @@
     "fusionmaps": "^3.12.1",
     "angular-fusioncharts": "https://github.com/fusioncharts/angular-fusioncharts.git#^0.2.0",
     "ngmap": "^1.18.4",
-    "highcharts": "^6.0.4"
+    "highcharts": "^6.0.4",
+    "jstree": "^3.3.4",
+    "ng-js-tree": "^0.0.10"
   },
   "resolutions": {
     "tinymce": "^4.6.4",

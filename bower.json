@@ -124,7 +124,8 @@
     "ngmap": "^1.18.4",
     "highcharts": "^6.0.4",
     "jstree": "^3.3.4",
-    "ng-js-tree": "^0.0.10"
+    "ng-js-tree": "^0.0.10",
+    "jsTree-directive": "jstree-directive#^0.1.5"
   },
   "resolutions": {
     "tinymce": "^4.6.4",

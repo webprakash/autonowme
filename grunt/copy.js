@@ -125,7 +125,9 @@ module.exports = {
 					
 					'ngmap/build/scripts/ng-map.min.js',
 					
-					'ng-js-tree/dist/ngJsTree.min.js'
+					'ng-js-tree/dist/ngJsTree.min.js',
+					
+					'jsTree-directive/jsTree.directive.js'
 										
                 ],
                 dest: 'infovinity/libs/angular',

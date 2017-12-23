@@ -103,11 +103,12 @@ Array.prototype.diff = function(a) {
     return this.filter(function(i) {return a.indexOf(i) < 0;});
 };
 
-function getDtOptions(url, DTOptionsBuilder, $compile, $scope){
+function getDtOptions(url, DTOptionsBuilder, $compile, $scope, data){
     var urlBase = appConfig.wsUrl;
     return DTOptionsBuilder.newOptions()
         .withOption('ajax', {
          url: urlBase + url,
+		 data: data,
          type: 'POST',
          beforeSend : function(xhr) {
             xhr.setRequestHeader("Authorization", window.sessionStorage.getItem('rmsToken'));

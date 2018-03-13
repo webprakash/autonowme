@@ -251,7 +251,9 @@ module.exports = {
 
 					'fusionmaps/**',
 					
-					'jstree/dist/**'
+					'jstree/dist/**',
+
+					'x-editable/dist/**'
 								
                 ],
                 dest: 'infovinity/libs/jquery',

@@ -59,13 +59,13 @@
     "flot.tooltip": "~0.8.4",
     "font-awesome": "4.7.0",
     "footable": "~2.0.3",
-    "fullcalendar": "~2.2.6",
+    "fullcalendar": "^3.9.0",
     "html5sortable": "*",
     "jquery": "~2.1.3",
     "jquery.easy-pie-chart": "~2.1.6",
     "jquery.sparkline": "^2.1.2",
     "jquery_appear": "~0.3.3",
-    "moment": "~2.8.3",
+    "moment": "^2.21.0",
     "nestable": "*",
     "ng-grid": "~2.0.13",
     "ngImgCrop": "~0.2.0",
@@ -133,10 +133,10 @@
   "resolutions": {
     "tinymce": "^4.6.4",
     "angular": "1.6.5",
-    "moment": ">=2.9.0",
+    "moment": "^2.20.1",
     "angular-sanitize": "1.5.8",
     "angular-touch": "1.5.8",
-    "fullcalendar": "~2.7.1",
+    "fullcalendar": "^3.9.0",
     "angular-bootstrap": "^2.5.0"
   }
 }

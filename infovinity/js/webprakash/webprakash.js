@@ -289,7 +289,7 @@ angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFact
     }
 
 	helper.load = function load(srcs, callback) {
-		console.log(JQ_CONFIG);
+		
 		return {
 			  deps: ['$ocLazyLoad', '$q',
 				function( $ocLazyLoad, $q ){
@@ -301,6 +301,7 @@ angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFact
 				  }
 				  angular.forEach(srcs, function(src) {
 					promise = promise.then( function(){
+					  console.log(JQ_CONFIG[src]);
 					  if(JQ_CONFIG[src]){
 						return $ocLazyLoad.load(JQ_CONFIG[src]);
 					  }

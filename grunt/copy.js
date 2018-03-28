@@ -221,8 +221,7 @@ module.exports = {
                     'footable/dist/*',
                     'footable/css/**',
 
-					'fullcalendar/dist/fullcalendar.js',
-					'fullcalendar/dist/fullcalendar.min.js',
+					'fullcalendar/dist/**',
 
 					'html5sortable/jquery.sortable.js',
 					'html5sortable/jquery.sortable.min.js',

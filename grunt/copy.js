@@ -223,6 +223,8 @@ module.exports = {
 
 					'fullcalendar/dist/**',
 
+					'fullcalendar-scheduler/dist/**',
+
 					'html5sortable/jquery.sortable.js',
 					'html5sortable/jquery.sortable.min.js',
 									

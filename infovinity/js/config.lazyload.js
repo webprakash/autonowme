@@ -44,7 +44,9 @@ angular.module('webprakash')
       fullcalendar:   [   getRemoteURL('libs/jquery/moment/moment.js'),
                           getRemoteURL('libs/jquery/fullcalendar/dist/fullcalendar.min.js'),
                           getRemoteURL('libs/jquery/fullcalendar/dist/fullcalendar.css'),
-                          getRemoteURL('libs/jquery/fullcalendar/dist/fullcalendar.theme.css')
+                          getRemoteURL('libs/jquery/fullcalendar/dist/fullcalendar.theme.css'),
+		  				  getRemoteURL('libs/jquery/fullcalendar-scheduler/dist/scheduler.min.js'),
+						  getRemoteURL('libs/jquery/fullcalendar-scheduler/dist/scheduler.min.css')
 					  ],
       daterangepicker:[   getRemoteURL('libs/jquery/moment/moment.js'),
                           getRemoteURL('libs/jquery/bootstrap-daterangepicker/daterangepicker.js'),

@@ -179,7 +179,7 @@ angular.module('webprakash').factory('dataFactory', ['$http', function($http) {
     return dataFactory;
 }]);
 
-angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFactory', 'JQ_CONFIG', 'MODULE_CONFIG', function($rootScope, $http, dataFactory, JQ_CONFIG, MODULE_CONFIG) {
+angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFactory', '$ocLazyLoad', '$q', 'JQ_CONFIG', 'MODULE_CONFIG', function($rootScope, $http, dataFactory, $ocLazyLoad, $q, JQ_CONFIG, MODULE_CONFIG) {
 
     var helper = {};
 
@@ -289,37 +289,36 @@ angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFact
     }
 
 	helper.load = function load(srcs, callback) {
+
+		  var deferred = $q.defer();
+		  var promise  = false;
+		  srcs = angular.isArray(srcs) ? srcs : srcs.split(/\s+/);
+		  if(!promise){
+			promise = deferred.promise;
+		  }
+		  console.log(srcs);
+		  angular.forEach(srcs, function(src) {
+			console.log(src);
+			promise = promise.then( function(){
+			  // console.log(JQ_CONFIG[src]);
+			  if(JQ_CONFIG[src]){
+				return $ocLazyLoad.load(JQ_CONFIG[src]);
+			  }
+			  angular.forEach(MODULE_CONFIG, function(module) {
+				if( module.name == src){
+				  name = module.name;
+				}else{
+				  name = src;
+				}
+			  });
+			  console.log(name);
+			  return $ocLazyLoad.load(name);
+			} );
+		  });
+		  deferred.resolve();
+		  return callback ? promise.then(function(){ return callback(); }) : promise;
+
 		
-		return {
-			  deps: ['$ocLazyLoad', '$q',
-				function( $ocLazyLoad, $q ){
-				  var deferred = $q.defer();
-				  var promise  = false;
-				  srcs = angular.isArray(srcs) ? srcs : srcs.split(/\s+/);
-				  if(!promise){
-					promise = deferred.promise;
-				  }
-				  angular.forEach(srcs, function(src) {
-					promise = promise.then( function(){
-					  console.log(JQ_CONFIG[src]);
-					  if(JQ_CONFIG[src]){
-						return $ocLazyLoad.load(JQ_CONFIG[src]);
-					  }
-					  angular.forEach(MODULE_CONFIG, function(module) {
-						if( module.name == src){
-						  name = module.name;
-						}else{
-						  name = src;
-						}
-					  });
-					  console.log(name);
-					  return $ocLazyLoad.load(name);
-					} );
-				  });
-				  deferred.resolve();
-				  return callback ? promise.then(function(){ return callback(); }) : promise;
-			  }]
-		}
 	}
 
     return helper;

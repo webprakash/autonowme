@@ -289,7 +289,7 @@ angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFact
     }
 
 	helper.load = function load(srcs, callback) {
-		console.log(srcs);
+		
 		return {
 			  deps: ['$ocLazyLoad', '$q',
 				function( $ocLazyLoad, $q ){
@@ -311,6 +311,7 @@ angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFact
 						  name = src;
 						}
 					  });
+					  console.log(name);
 					  return $ocLazyLoad.load(name);
 					} );
 				  });

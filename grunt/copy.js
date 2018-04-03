@@ -129,7 +129,9 @@ module.exports = {
 					
 					'jsTree-directive/jsTree.directive.js',
 
-					'angular-bootstrap-calendar/dist/**'
+					'angular-bootstrap-calendar/dist/**',
+
+					'angular-wizard/dist/**'
 										
                 ],
                 dest: 'infovinity/libs/angular',
@@ -259,6 +261,8 @@ module.exports = {
 					'x-editable/dist/**',
 
 					'interactjs/dist/**'
+
+					
 								
                 ],
                 dest: 'infovinity/libs/jquery',

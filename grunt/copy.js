@@ -131,7 +131,9 @@ module.exports = {
 
 					'angular-bootstrap-calendar/dist/**',
 
-					'angular-wizard/dist/**'
+					'angular-wizard/dist/**',
+
+					'angular-lock/dist/**'
 										
                 ],
                 dest: 'infovinity/libs/angular',
@@ -260,9 +262,11 @@ module.exports = {
 
 					'x-editable/dist/**',
 
-					'interactjs/dist/**'
+					'interactjs/dist/**',
 
-					
+					'auth0-lock/build/**',
+				
+					'auth0.js/build/**'			
 								
                 ],
                 dest: 'infovinity/libs/jquery',

@@ -84,6 +84,74 @@ app.factory('defaultTranslateFactory', function () {
 	};
 });
 
+
+
+angular.module('webprakash').factory('Auth0Service', function ($http, tokenService, jwtHelper, angularAuth0, authManager) {   
+    
+    var auth0Service = {};
+
+    auth0Service.login = function (credentials) {
+        angularAuth0.authorize();
+    };
+
+    auth0Service.isAuthenticated = function () {
+        var rmsToken = tokenService.getToken();
+
+        if (rmsToken) {
+            if (!jwtHelper.isTokenExpired(rmsToken)) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    auth0Service.isAuthorized = function (authorizedRoles) {
+        if (!angular.isArray(authorizedRoles)) {
+            authorizedRoles = [authorizedRoles];
+        }
+
+        if(tokenService.getToken()) {
+            var tokenPayload = jwtHelper.decodeToken(tokenService.getToken());
+            return (authService.isAuthenticated() && authorizedRoles.indexOf(tokenPayload.userRole) !== -1);
+        }
+
+        return false;
+    };
+
+    auth0Service.getPayload = function(){
+        if(tokenService.getToken()) {
+            var tokenPayload = jwtHelper.decodeToken(tokenService.getToken());
+            return tokenPayload;
+        }
+
+        return false;
+    }
+
+	auth0Service.handleParseHash = function() {
+		angularAuth0.parseHash(
+			{ _idTokenVerification: false },
+			function(err, authResult) {
+				if (err) {
+					console.log(err);
+				}
+				if (authResult && authResult.idToken) {
+					console.log(authResult);
+					// var token = {'access_token': authResult.accessToken, 'id_token': authResult.idToken};
+					tokenService.saveToken(authResult.accessToken);
+					return authResult.accessToken;
+				}
+			}
+		);
+    }
+
+    auth0Service.logout = function(){
+        tokenService.destroyToken();
+    }
+
+    return auth0Service;
+});
+
+
 angular.module('webprakash').factory('AuthService', function ($http, tokenService, jwtHelper) {   
     
     var authService = {};

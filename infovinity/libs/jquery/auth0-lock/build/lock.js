@@ -21577,6 +21577,8 @@ var Base = function (_EventEmitter) {
 
     _classCallCheck(this, Base);
 
+	console.log(clientID);
+
     if (typeof clientID != 'string') {
       throw new Error('A `clientID` string must be provided as first argument.');
     }

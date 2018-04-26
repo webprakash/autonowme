@@ -4913,6 +4913,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	  options.__enableIdPInitiatedLogin =
 	    options.__enableIdPInitiatedLogin || options.__enableImpersonation;
 	  var state = parsedHash.state;
+	  console.log(parsedHash);
 	  var transaction = this.transactionManager.getStoredTransaction(state);
 	  var transactionState = options.state || (transaction && transaction.state) || null;
 	

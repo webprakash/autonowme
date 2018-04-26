@@ -133,7 +133,13 @@ module.exports = {
 
 					'angular-wizard/dist/**',
 
-					'angular-lock/dist/**'
+					'angular-lock/dist/**',
+
+					'auth0.js/build/**',
+
+					'angular-auth0/dist/**',
+
+					
 										
                 ],
                 dest: 'infovinity/libs/angular',
@@ -266,7 +272,9 @@ module.exports = {
 
 					'auth0-lock/build/**',
 				
-					'auth0.js/build/**'			
+					'auth0.js/build/**',
+					
+					'angular-auth0/dist/**'
 								
                 ],
                 dest: 'infovinity/libs/jquery',

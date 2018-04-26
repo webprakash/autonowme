@@ -131,7 +131,8 @@
     "angular-bootstrap-calendar": "^1.0.0",
     "fullcalendar-scheduler": "^1.9.3",
     "angular-wizard": "^1.1.1",
-    "angular-lock": "^3.0.0"
+    "angular-lock": "^3.0.0",
+    "angular-auth0": "^3.0.1"
   },
   "resolutions": {
     "tinymce": "^4.6.4",

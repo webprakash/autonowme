@@ -15,7 +15,7 @@
 						ajaxOptions: {
 							type: 'POST',
 							beforeSend: function (xhr) {
-								xhr.setRequestHeader("Authorization", window.sessionStorage.getItem('rmsToken'));
+								xhr.setRequestHeader("Authorization", window.sessionStorage.getItem('snehToken'));
 							}
 						},
 						success: function(response, newValue) {

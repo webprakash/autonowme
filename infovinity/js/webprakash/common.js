@@ -51,7 +51,7 @@ angular.isUndefinedOrNull = function(val) {
     return angular.isUndefined(val) || val === null
 }
 
-angular.module('app').factory('helper1', function ($http, $compile, DTOptionsBuilder) {
+angular.module('app').factory('helper1', function ($http, $compile, DTOptionsBuilder, AuthService) {
     var factory = {}; 
     
     factory.getDTOptions = function(url, scope){
@@ -62,7 +62,7 @@ angular.module('app').factory('helper1', function ($http, $compile, DTOptionsBui
                 url: urlBase + url,
                 type: 'GET',
                 beforeSend : function(xhr) {
-                    xhr.setRequestHeader("Authorization", window.sessionStorage.getItem('rmsToken'));
+                    xhr.setRequestHeader("Authorization", window.sessionStorage.getItem('snehToken'));
                 }
             })
             // or here
@@ -111,7 +111,7 @@ function getDtOptions(url, DTOptionsBuilder, $compile, $scope, data){
 		 data: data,
          type: 'POST',
          beforeSend : function(xhr) {
-            xhr.setRequestHeader("Authorization", window.sessionStorage.getItem('rmsToken'));
+            xhr.setRequestHeader("Authorization", window.sessionStorage.getItem('snehToken'));
         }
      })
 

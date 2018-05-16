@@ -28,7 +28,7 @@ angular.module('webprakash').constant('USER_ROLES', {
 
 angular.module('webprakash').config(function ($httpProvider, jwtInterceptorProvider) {
     jwtInterceptorProvider.tokenGetter = function() {
-        return window.sessionStorage.getItem('rmsToken');
+        return window.sessionStorage.getItem('snehToken');
     }
     $httpProvider.interceptors.push('jwtInterceptor');
 
@@ -41,27 +41,27 @@ angular.module('webprakash').config(function ($httpProvider, jwtInterceptorProvi
 
 angular.module('webprakash').config(function(){
         $.ajaxSetup({
-            headers: { 'Authorization': window.sessionStorage.getItem('rmsToken') }
+            headers: { 'Authorization': window.sessionStorage.getItem('snehToken') }
         });
     })
 
-angular.module('webprakash').service('tokenService', function ($http) {
-    this.saveToken = function(data){
+angular.module('webprakash').service('tokenService', function ($http, jwtHelper) {
+    this.saveToken = function(data, tokenName){
         if (! angular.isUndefinedOrNull(data)){
             var rmsToken = data;
-            window.sessionStorage.setItem("rmsToken", data);
+            window.sessionStorage.setItem(tokenName, data);
             $.ajaxSetup({
                 headers: { 'Authorization': rmsToken }
             });
             return;
         }
-        window.sessionStorage.removeItem("rmsToken");
+        window.sessionStorage.removeItem(tokenName);
     }
 
-    this.getToken = function(){
+    this.getToken = function(tokenName){
 
-        if (window.sessionStorage.getItem('rmsToken') != null && window.sessionStorage.getItem('rmsToken') != undefined){
-            var rmsToken = window.sessionStorage.getItem('rmsToken');
+        if (window.sessionStorage.getItem(tokenName) != null && window.sessionStorage.getItem(tokenName) != undefined){
+            var rmsToken = window.sessionStorage.getItem(tokenName);
             if (! angular.isUndefinedOrNull(rmsToken)){
                 return rmsToken;
             }
@@ -69,8 +69,17 @@ angular.module('webprakash').service('tokenService', function ($http) {
         return false;
     }
 
-    this.destroyToken = function(){
-        window.sessionStorage.removeItem("rmsToken");
+    this.destroyToken = function(tokenName){
+        window.sessionStorage.removeItem(tokenName);
+    }
+
+	this.getPayload = function(tokenName){
+        if(this.getToken(tokenName)) {
+            var tokenPayload = jwtHelper.decodeToken(this.getToken(tokenName));
+            return tokenPayload;
+        }
+
+        return false;
     }
 });
 
@@ -85,87 +94,32 @@ app.factory('defaultTranslateFactory', function () {
 });
 
 
-
-angular.module('webprakash').factory('Auth0Service', function ($http, tokenService, jwtHelper, angularAuth0, authManager) {   
-    
-    var auth0Service = {};
-
-    auth0Service.login = function (credentials) {
-        angularAuth0.authorize();
-    };
-
-    auth0Service.isAuthenticated = function () {
-        var rmsToken = tokenService.getToken();
-
-        if (rmsToken) {
-            if (!jwtHelper.isTokenExpired(rmsToken)) {
-                return true;
-            }
-        }
-        return false;
-    };
-
-    auth0Service.isAuthorized = function (authorizedRoles) {
-        if (!angular.isArray(authorizedRoles)) {
-            authorizedRoles = [authorizedRoles];
-        }
-
-        if(tokenService.getToken()) {
-            var tokenPayload = jwtHelper.decodeToken(tokenService.getToken());
-            return (authService.isAuthenticated() && authorizedRoles.indexOf(tokenPayload.userRole) !== -1);
-        }
-
-        return false;
-    };
-
-    auth0Service.getPayload = function(){
-        if(tokenService.getToken()) {
-            var tokenPayload = jwtHelper.decodeToken(tokenService.getToken());
-            return tokenPayload;
-        }
-
-        return false;
-    }
-
-	auth0Service.handleParseHash = function() {
-		angularAuth0.parseHash(
-			{ _idTokenVerification: false },
-			function(err, authResult) {
-				if (err) {
-					console.log(err);
-				}
-				if (authResult && authResult.idToken) {
-					console.log(authResult);
-					// var token = {'access_token': authResult.accessToken, 'id_token': authResult.idToken};
-					tokenService.saveToken(authResult.accessToken);
-					return authResult.accessToken;
-				}
-			}
-		);
-    }
-
-    auth0Service.logout = function(){
-        tokenService.destroyToken();
-    }
-
-    return auth0Service;
-});
-
-
 angular.module('webprakash').factory('AuthService', function ($http, tokenService, jwtHelper) {   
     
     var authService = {};
 
+	authService.saveToken = function (data){
+		return tokenService.saveToken(data, "snehToken");
+	}
+
+	authService.getToken = function (){
+		return tokenService.getToken("snehToken");
+	}
+
+	authService.destroyToken = function (){
+		tokenService.destroyToken("snehToken");
+	}
+
     authService.login = function (credentials) {
         return $http.post(appConfig.wsUrl + 'default/jwtlogin', credentials)
             .then(function (res) {
-                tokenService.saveToken(res.data);
+                authService.saveToken(res.data);
                 return res.data;
             });
     };
 
     authService.isAuthenticated = function () {
-        var rmsToken = tokenService.getToken();
+        var rmsToken = tokenService.getToken("snehToken");
 
         if (rmsToken) {
             if (!jwtHelper.isTokenExpired(rmsToken)) {
@@ -180,8 +134,8 @@ angular.module('webprakash').factory('AuthService', function ($http, tokenServic
             authorizedRoles = [authorizedRoles];
         }
 
-        if(tokenService.getToken()) {
-            var tokenPayload = jwtHelper.decodeToken(tokenService.getToken());
+        if(authService.getToken()) {
+            var tokenPayload = jwtHelper.decodeToken(authService.getToken());
             return (authService.isAuthenticated() && authorizedRoles.indexOf(tokenPayload.userRole) !== -1);
         }
 
@@ -189,8 +143,8 @@ angular.module('webprakash').factory('AuthService', function ($http, tokenServic
     };
 
     authService.getPayload = function(){
-        if(tokenService.getToken()) {
-            var tokenPayload = jwtHelper.decodeToken(tokenService.getToken());
+        if(authService.getToken()) {
+            var tokenPayload = jwtHelper.decodeToken(authService.getToken());
             return tokenPayload;
         }
 
@@ -198,7 +152,7 @@ angular.module('webprakash').factory('AuthService', function ($http, tokenServic
     }
 
     authService.logout = function(){
-        tokenService.destroyToken();
+        authService.destroyToken();
     }
 
     return authService;
@@ -218,7 +172,7 @@ angular.module('webprakash').factory('AuthInterceptor', function ($rootScope, $q
         },
         response: function (response) {
             if (! angular.isUndefinedOrNull(response.data.rmsToken)){
-                window.sessionStorage.setItem("rmsToken", response.data.rmsToken);
+                window.sessionStorage.setItem("snehToken", response.data.rmsToken);
             }
             $rootScope.$broadcast({
                 211: APP_EVENTS.appSuccess,
@@ -280,11 +234,14 @@ angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFact
 	}
 		
 	helper.getProfilePic = function(userData){
-		if (userData.profile_image != ''){
-			return helper.getDataUrl(userData.profile_image);
-		}
+		if (typeof userData !== "undefined") {
+			//if (userData != undefined){	
 		
-		return getLetterIcon(userData.first_name);
+			if (userData.profile_image != '' && userData.profile_image != null){
+				return helper.getDataUrl(userData.profile_image);
+			}
+			return getLetterIcon(userData.first_name);
+		}		
 	}
 	
 	helper.getLetterIcon = function (mName) {

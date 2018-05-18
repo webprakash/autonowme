@@ -734,7 +734,7 @@ angular.module('webprakash').directive('wpDatetimepicker', function(helper){
      			
 				
 		template:	'<p class="input-group">' +
-				'<input type="text" class="form-control"  enable-time="enableTime" enable-date="enableDate" datepicker-options = "{dateFormat: \'{{format}}\'}" datetime-picker="{{format}}" ng-model="model" is-open="isOpen"  />' +
+				'<input type="text" class="form-control" ng-required = "{{required}}" enable-time="enableTime" enable-date="enableDate" datepicker-options = "{dateFormat: \'{{format}}\'}" datetime-picker="{{format}}" ng-model="model" is-open="isOpen"  />' +
 				'<span class="input-group-btn">' +
 				'<button type="button" class="btn btn-default" ng-click="isOpen = true"><i class="fa fa-calendar"></i></button>' +
 				'</span>' +

@@ -491,7 +491,7 @@ angular.module('webprakash').directive('wpDatepicker', function(){
     return {
 		restrict: 'EA',
 		template: '<p class="input-group">' + 
-				'<input type="type" class="form-control" ui-date-format = "dd-MMM-yyyy"  uib-datepicker-popup="{{wpUibDatepickerPopup}}" ng-model="val" is-open="wpIsOpen" datepicker-options="wpDatepickerOptions" ng-required="ngRequired" />' +
+				'<input type="type" class="form-control" ui-date-format = "dd-MMM-yyyy"  uib-datepicker-popup="{{wpUibDatepickerPopup}}" ng-model="model" is-open="wpIsOpen" datepicker-options="wpDatepickerOptions" ng-required="ngRequired" />' +
 				
 				// '<input type="text" class="form-control" date-format = "dd-MMM-yyyy HH:mm" datetime-picker="dd-MMM-yyyy HH:mm" ng-model="model" is-open="wpIsOpen" save-as = "a(c)" read-as = "b(c)"/>' +
 				
@@ -500,7 +500,7 @@ angular.module('webprakash').directive('wpDatepicker', function(){
 				'</span>' + 
 				'</p>',
 		scope: {
-			val: '=',
+			model: "=ngModel",
 			wpUibDatepickerPopup: '@?',
 			wpDatepickerOptions: '=?',
 			ngRequired: '=?',

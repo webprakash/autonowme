@@ -24,7 +24,12 @@ function getDataUrl(path){
 };
 
 function getLetterIcon(mName){
-	return getRemoteURL('img/letters/material/' + mName.substring(0,1).toUpperCase() + '.png');
+	var letter = mName.substring(0,1).toUpperCase();
+	if (letter == '')
+	{
+		letter = 'nopic';
+	}
+	return getRemoteURL('img/letters/material/' + letter + '.png');
 };
 
 function getUploadedImgURL(mImg, size){
@@ -124,6 +129,30 @@ function getDtOptions(url, DTOptionsBuilder, $compile, $scope, data){
         $compile(angular.element(row).contents())($scope);
     })
     .withOption('responsive', true)
+    .withBootstrap();    
+}
+
+function getDtOptionsNotResponsive(url, DTOptionsBuilder, $compile, $scope, data){
+    var urlBase = appConfig.wsUrl;
+    return DTOptionsBuilder.newOptions()
+        .withOption('ajax', {
+         url: urlBase + url,
+		 data: data,
+         type: 'POST',
+         beforeSend : function(xhr) {
+            xhr.setRequestHeader("Authorization", window.sessionStorage.getItem('snehToken'));
+        }
+     })
+
+     // or here
+    .withDataProp('data')
+    .withOption('serverSide', true)
+    .withOption('order', [[ 0, "desc" ]])
+    .withPaginationType('full_numbers')
+    .withOption('createdRow', function(row, data, dataIndex) {
+        $compile(angular.element(row).contents())($scope);
+    })
+    .withOption('responsive', false)
     .withBootstrap();    
 }
 

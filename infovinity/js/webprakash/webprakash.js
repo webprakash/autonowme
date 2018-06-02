@@ -256,14 +256,23 @@ angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFact
 		return getUploadedFileURL(mFile);
 	}
 	
-	helper.save = function(actionUrl, obj, goTo){
+	helper.save = function(actionUrl, obj, goTo, isAbsolute){
 		if(angular.isUndefinedOrNull(goTo)){
 			goTo = '.list';
 		}
-		console.log(obj);
+
+		if(angular.isUndefinedOrNull(isAbsolute)){
+			isAbsolute = false;
+		}
+
 		dataFactory.postData(actionUrl, obj).then(
             function (res) {
-                helper.goPeer(goTo);
+				if (isAbsolute){
+					$rootScope.$state.go(goTo);
+				}
+				else {
+					helper.goPeer(goTo);
+				}                
             },
             function (error) {
 				console.log(error);
@@ -280,8 +289,12 @@ angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFact
 		if (v) return 1;
         return 0;
 	}
+
+	helper.go = function(s){		
+		$rootScope.$state.go(s);
+	}
 	
-	helper.goPeer = function(s){
+	helper.goPeer = function(s){		
 		$rootScope.$state.go($rootScope.$state.$current.parent.name + s);
 	}
 	
@@ -727,6 +740,39 @@ angular.module('webprakash').directive('wpFileUploader', function(helper, Upload
     };
   });  
   
+
+angular.module('webprakash').directive('timezonedDate', function () {
+	return {
+		require: 'ngModel',
+		restrict: 'A',
+		link: function (scope, elem, attrs, ngModel) {
+			var toView = function (val) {
+				//var offset = moment(val).utcOffset();
+				//var date = new Date(moment(val).subtract(offset, 'm'));
+				//var newOffset = moment.tz.zone(attrs.timezone).offset(date);
+				//var dt = new Date(moment(date).subtract(newOffset, 'm').unix() * 1000);
+				if (val == '')
+				{
+					return val;
+				}
+				return moment(val).format('DD-MMM-YYYY');
+				
+			};
+
+			var toModel = function (val) {
+				var offset = moment(val).utcOffset();
+				var date = new Date(moment(val).add(offset, 'm'));
+				var newOffset = moment.tz.zone(attrs.timezone).offset(date);
+				var dt = moment(date).add(newOffset, 'm').unix() * 1000;
+				return moment(dt).format('DD-MMM-YYYY');
+			};
+
+			ngModel.$formatters.unshift(toView);
+			ngModel.$parsers.unshift(toModel);
+		}
+	};
+});
+
 	
 angular.module('webprakash').directive('wpDatetimepicker', function(helper){
     return {
@@ -734,7 +780,7 @@ angular.module('webprakash').directive('wpDatetimepicker', function(helper){
      			
 				
 		template:	'<p class="input-group">' +
-				'<input type="text" class="form-control" ng-required = "{{required}}" enable-time="enableTime" enable-date="enableDate" datepicker-options = "{dateFormat: \'{{format}}\'}" datetime-picker="{{format}}" ng-model="model" is-open="isOpen"  />' +
+				'<input type="text" timezoned-date ng-attr-timezone="{{jsTimeZone}}" class="form-control" dateDirective ng-required = "{{required}}" enable-time="enableTime" enable-date="enableDate" datepicker-options = "{dateFormat: \'{{format}}\'}" datetime-picker="{{format}}" ng-model="model" is-open="isOpen"  />' +
 				'<span class="input-group-btn">' +
 				'<button type="button" class="btn btn-default" ng-click="isOpen = true"><i class="fa fa-calendar"></i></button>' +
 				'</span>' +
@@ -746,6 +792,7 @@ angular.module('webprakash').directive('wpDatetimepicker', function(helper){
 			picker: '@picker',
 			enableTime: '=enableTime',
 			enableDate: '=enableDate',	
+			jsTimeZone: '@jsTimeZone',
 			required: "@ngRequired"
 		},
 		link: function($scope, element, attrs){
@@ -795,3 +842,4 @@ angular.module('webprakash').directive('wpTrueValue', [function() {
     }
   };
 }]);
+

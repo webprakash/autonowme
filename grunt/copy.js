@@ -139,7 +139,9 @@ module.exports = {
 
 					'angular-auth0/dist/**',
 
-					
+					'ng-image-gallery/**',
+
+					'hammerjs/hammer.js'
 										
                 ],
                 dest: 'infovinity/libs/angular',
@@ -245,6 +247,7 @@ module.exports = {
 					
 					'moment/moment.js',
 					'moment/min/moment.min.js',
+					'moment-timezone/**',
 					
 					'nestable/jquery.nestable.js',
 					
@@ -284,6 +287,7 @@ module.exports = {
             {
                 src:  [
                     'animate.css/animate.css',
+					'css-progress-wizard/css/progress-wizard.min.css',
                     'font-awesome/css/**',
                     'font-awesome/fonts/**',
                     'simple-line-icons/css/**',

@@ -1,0 +1,33 @@
+{
+  "name": "css-progress-wizard",
+  "description": "A pure CSS step progress indicator",
+  "main": "css/progress-wizard.min.css",
+  "license": "MIT",
+  "keywords": [
+    "css",
+    "step",
+    "progress",
+    "form",
+    "wizard",
+    "flexbox"
+  ],
+  "homepage": "https://github.com/christabor/css-progress-wizard",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "version": "2.0.0",
+  "_release": "2.0.0",
+  "_resolution": {
+    "type": "version",
+    "tag": "2.0.0",
+    "commit": "f8dc89b5332d3198539dc4488d4f04cd717df94e"
+  },
+  "_source": "https://github.com/christabor/css-progress-wizard.git",
+  "_target": "^2.0.0",
+  "_originalSource": "css-progress-wizard",
+  "_direct": true
+}

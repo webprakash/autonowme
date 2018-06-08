@@ -18,6 +18,7 @@
 								xhr.setRequestHeader("Authorization", window.sessionStorage.getItem('snehToken'));
 							}
 						},
+
 						success: function(response, newValue) {
 							$timeout(function() {
 								ngModel.$setViewValue(newValue);
@@ -40,6 +41,17 @@
 					scope.$watch(attrs.ngModel, function(newValue) {
 						$(element).editable('setValue', newValue);
 					});
+
+					attrs.$observe('disabled', function(value){
+						$(element).editable('toggleDisabled');						
+					});
+
+					/*
+					scope.$watch(attrs.disabled, function(newValue) {
+						console.log(attrs.disabled + 'abc');
+						$(element).editable(newValue);
+					});
+					*/
 				}
 				$timeout(function() {
 					loadXeditable();

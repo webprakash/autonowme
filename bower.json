@@ -1,5 +1,5 @@
 {
-  "name": "BootstrapAngularAdminWebApp",
+  "name": "webprakash",
   "authors": [
     "Flatfull"
   ],
@@ -135,7 +135,9 @@
     "angular-auth0": "^3.0.1",
     "ng-image-gallery": "^2.1.2",
     "css-progress-wizard": "^2.0.0",
-    "moment-timezone": "^0.5.17"
+    "moment-timezone": "^0.5.17",
+    "angular-moment-picker": "moment-picker#^0.10.2",
+    "angular-ui-date": "^1.0.1"
   },
   "resolutions": {
     "tinymce": "^4.6.4",

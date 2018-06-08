@@ -141,7 +141,11 @@ module.exports = {
 
 					'ng-image-gallery/**',
 
-					'hammerjs/hammer.js'
+					'angular-moment-picker/dist/**',
+
+					'hammerjs/hammer.js',
+
+					'angular-ui-date/dist/**'
 										
                 ],
                 dest: 'infovinity/libs/angular',
@@ -277,8 +281,9 @@ module.exports = {
 				
 					'auth0.js/build/**',
 					
-					'angular-auth0/dist/**'
-								
+					'angular-auth0/dist/**',
+
+					'jquery-ui/**'								
                 ],
                 dest: 'infovinity/libs/jquery',
                 cwd:  'bower_components',

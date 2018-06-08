@@ -94,9 +94,22 @@ app.factory('defaultTranslateFactory', function () {
 });
 
 
-angular.module('webprakash').factory('AuthService', function ($http, tokenService, jwtHelper) {   
+angular.module('webprakash').factory('AuthService', function ($http, $location, $state, tokenService, jwtHelper) {   
     
     var authService = {};
+
+	authService.saveAttemptedUrl = function(def){
+		var attemptedUrl = $location.url();
+		return tokenService.saveToken(attemptedUrl, "attemptedUrl");		
+	}
+
+	authService.getAttemptedUrl = function(def){
+		var attemptedUrl = tokenService.getToken("attemptedUrl");
+		if (! attemptedUrl){
+			attemptedUrl = def;
+		}
+		return attemptedUrl;
+	}	
 
 	authService.saveToken = function (data){
 		return tokenService.saveToken(data, "snehToken");
@@ -363,8 +376,8 @@ angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFact
 }]);
 
 
-angular.module('webprakash').run(['$rootScope', '$transitions', '$state', '$stateParams', '$translate', '$localStorage', '$window', 'AuthService', '$cookieStore', 'toaster', 'helper', 
-        function ($rootScope, $transitions, $state, $stateParams, $translate, $localStorage, $window, AuthService, $cookieStore, toaster, helper) {
+angular.module('webprakash').run(['$rootScope', '$transitions', '$state', '$stateParams', '$translate', '$localStorage', '$window', '$timeout', 'AuthService', '$cookieStore', 'toaster', 'helper', 
+        function ($rootScope, $transitions, $state, $stateParams, $translate, $localStorage, $window, $timeout, AuthService, $cookieStore, toaster, helper) {
 			
 			$rootScope.$state = $state;
 			$rootScope.$stateParams = $stateParams;
@@ -418,20 +431,30 @@ angular.module('webprakash').run(['$rootScope', '$transitions', '$state', '$stat
 
             $rootScope.$on('app-session-timeout', function(event, mass) {
                 if(! $state.includes('access.signin')){
-                    $state.go('access.signin');
+					AuthService.saveAttemptedUrl();
+					$timeout(function(){
+						$state.go('access.signin');
+					});
                 }
             });
 
             $rootScope.$on('app-not-authenticated', function(event, mass) {
-                if(! $state.includes('access.signin')){
+				
+                if(! $state.includes('access.signin')){					
+					AuthService.saveAttemptedUrl();
                     event.preventDefault();
-                    $state.go('access.signin');
+					$timeout(function(){
+						$state.go('access.signin');
+					});
                 }
             });
 
             $rootScope.$on('app-not-authorized', function(event, mass) {
                 if(! $state.includes('access.signin')){
-                    $state.go('access.signin');
+					AuthService.saveAttemptedUrl();
+					$timeout(function(){
+						$state.go('access.signin');
+					});
                     toaster.pop("error", 'Error', mass.data);
                 }
             });
@@ -747,24 +770,36 @@ angular.module('webprakash').directive('timezonedDate', function () {
 		restrict: 'A',
 		link: function (scope, elem, attrs, ngModel) {
 			var toView = function (val) {
-				//var offset = moment(val).utcOffset();
-				//var date = new Date(moment(val).subtract(offset, 'm'));
-				//var newOffset = moment.tz.zone(attrs.timezone).offset(date);
-				//var dt = new Date(moment(date).subtract(newOffset, 'm').unix() * 1000);
 				if (val == '')
 				{
 					return val;
 				}
-				return moment(val).format('DD-MMM-YYYY');
+
+				var frmt = 'DD-MMM-YYYY';
+				if (attrs.enableTime === true){
+					frmt = 'DD-MMM-YYYY HH:mm';
+				}
+
+				var offset = moment(val).utcOffset();
+				var date = new Date(moment(val).subtract(offset, 'm'));
+				var newOffset = moment.tz.zone(attrs.timezone).offset(date);
+				var dt = new Date(moment(date).subtract(newOffset, 'm').unix() * 1000);
+
+				return moment(dt).format(frmt);
 				
 			};
 
 			var toModel = function (val) {
+				var frmt = 'DD-MMM-YYYY';
+				if (attrs.enableTime === true){
+					frmt = 'DD-MMM-YYYY HH:mm';
+				}
 				var offset = moment(val).utcOffset();
 				var date = new Date(moment(val).add(offset, 'm'));
 				var newOffset = moment.tz.zone(attrs.timezone).offset(date);
 				var dt = moment(date).add(newOffset, 'm').unix() * 1000;
-				return moment(dt).format('DD-MMM-YYYY');
+				console.log(frmt);
+				return moment(dt).format(frmt);
 			};
 
 			ngModel.$formatters.unshift(toView);
@@ -795,12 +830,32 @@ angular.module('webprakash').directive('wpDatetimepicker', function(helper){
 			jsTimeZone: '@jsTimeZone',
 			required: "@ngRequired"
 		},
-		link: function($scope, element, attrs){
-			$scope.model = new Date($scope.model);
+		link: function($scope, element, attrs, ngModel){
+
+			//if (val != ''){
+				console.log(attrs);
+				var val = $scope.model;
+				var offset = moment(val).utcOffset();
+				var date = new Date(moment(val).add(offset, 'm'));
+				var newOffset = moment.tz.zone(attrs.jsTimeZone).offset(date);
+				var dt = moment(date).add(newOffset, 'm').unix() * 1000;
+				// $scope.model = moment(dt).format('DD-MMM-YYYY');
+				$scope.model = new Date(dt);
+				console.log($scope.model);
+			//}
+
+
+			//var offset = moment($scope.model).utcOffset();
+			//var date = new Date(moment($scope.model).add(offset, 'm'));
+			//var newOffset = moment.tz.zone(attrs.timezone).offset(date);
+			//var dt = moment(date).add(newOffset, 'm').unix() * 1000;
+			//$scope.model = moment($scope.model).format('DD-MMM-YYYY');
+
+			// $scope.model = new Date($scope.model);
+			// console.log($scope.model);
 
 			if (angular.isUndefinedOrNull(attrs.required)){
 				$scope.required = "false";				
-				console.log('prakash');
 			}
 			else {
 				$scope.required = "true";

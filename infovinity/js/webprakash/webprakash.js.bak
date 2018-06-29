@@ -264,10 +264,9 @@ angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFact
 			//if (userData != undefined){	
 
 			var ext = fileName.split('.').pop();
-			ext = ext.toUpperCase();
 			
 			
-			if (ext == 'JPG' || ext == 'JPEG' || ext == 'GIF' || ext == 'PNG'){
+			if (fileName != '' && fileName != null){
 				return helper.getDataUrl(fileName);
 			}
 			

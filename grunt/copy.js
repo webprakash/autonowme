@@ -145,7 +145,9 @@ module.exports = {
 
 					'hammerjs/hammer.js',
 
-					'angular-ui-date/dist/**'
+					'angular-ui-date/dist/**',
+
+					'angular-stripe-checkout/angular-stripe-checkout.js'
 										
                 ],
                 dest: 'infovinity/libs/angular',

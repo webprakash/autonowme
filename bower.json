@@ -138,7 +138,8 @@
     "moment-timezone": "^0.5.17",
     "angular-moment-picker": "moment-picker#^0.10.2",
     "angular-ui-date": "^1.0.1",
-    "angular-stripe-checkout": "^5.1.0"
+    "angular-stripe-checkout": "^5.1.0",
+    "angular-paging": "^2.2.2"
   },
   "resolutions": {
     "tinymce": "^4.6.4",

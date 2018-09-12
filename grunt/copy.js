@@ -147,7 +147,9 @@ module.exports = {
 
 					'angular-ui-date/dist/**',
 
-					'angular-stripe-checkout/angular-stripe-checkout.js'
+					'angular-stripe-checkout/angular-stripe-checkout.js',
+
+					'angular-paging/dist/**'
 										
                 ],
                 dest: 'infovinity/libs/angular',

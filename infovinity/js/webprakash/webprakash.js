@@ -128,8 +128,8 @@ angular.module('webprakash').factory('AuthService', function ($http, $location, 
         console.log(appConfig.wsUrl + 'default/jwtlogin');
         return $http.post(appConfig.wsUrl + 'default/jwtlogin', credentials)
             .then(function (res) {
-                authService.saveToken(res.data);
-                return res.data;
+                authService.saveToken(res.data.token);
+                return res.data.token;
             });
     };
 
@@ -158,7 +158,7 @@ angular.module('webprakash').factory('AuthService', function ($http, $location, 
     };
 
     authService.getPayload = function(){
-        if(authService.getToken()) {
+        if(authService.getToken()) {			
             var tokenPayload = jwtHelper.decodeToken(authService.getToken());
             return tokenPayload;
         }
@@ -206,7 +206,18 @@ angular.module('webprakash').factory('dataFactory', ['$http', function($http) {
     var dataFactory = {};
 
     dataFactory.getData = function (url, params) {
-        return $http.get(urlBase + url, params);
+		// console.log(params);
+		var qStr = "";
+		for (var key in params) {
+			// console.log(key);
+			if (!params.hasOwnProperty(key)) continue;
+			var obj = params[key];
+			if (qStr != ""){
+				qStr = qStr + "/";
+			}
+			qStr = qStr + key + "/" + obj;			
+		}
+        return $http.get(urlBase + url + qStr, params);
     };
 
     dataFactory.postData = function (url, params) {

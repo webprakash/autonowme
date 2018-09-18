@@ -128,6 +128,7 @@ angular.module('webprakash').factory('AuthService', function ($http, $location, 
         console.log(appConfig.wsUrl + 'default/jwtlogin');
         return $http.post(appConfig.wsUrl + 'default/jwtlogin', credentials)
             .then(function (res) {
+				console.log(res);
                 authService.saveToken(res.data.token);
                 return res.data.token;
             });

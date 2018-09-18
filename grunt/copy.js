@@ -21,6 +21,8 @@ module.exports = {
 					'angular-cookies/angular-cookies.min.js',
 					
 					'angular-datatables/dist/**',	
+
+					'angular-fullcalendar/dist/**',
 					
 					'angular-file-upload/angular-file-upload.js',
 					'angular-file-upload/angular-file-upload.min.js',

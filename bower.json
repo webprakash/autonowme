@@ -142,7 +142,8 @@
     "angular-paging": "^2.2.2",
     "angular-fullcalendar": "^1.0.0",
     "pick-a-color": "^1.2.3",
-    "angular-pick-a-color": "^0.2.2"
+    "angular-pick-a-color": "^0.2.2",
+    "angular-moment": "^1.3.0"
   },
   "resolutions": {
     "tinymce": "^4.6.4",

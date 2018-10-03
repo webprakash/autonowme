@@ -145,6 +145,8 @@ module.exports = {
 
 					'angular-moment-picker/dist/**',
 
+					'angular-moment/**',
+
 					'hammerjs/hammer.js',
 
 					'angular-ui-date/dist/**',

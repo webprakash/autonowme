@@ -153,7 +153,11 @@ module.exports = {
 
 					'angular-stripe-checkout/angular-stripe-checkout.js',
 
-					'angular-paging/dist/**'
+					'angular-paging/dist/**',
+
+					'angular-slick-carousel/dist/**',
+
+					'angular-recaptcha/release/**',
 										
                 ],
                 dest: 'infovinity/libs/angular',
@@ -291,7 +295,9 @@ module.exports = {
 					
 					'angular-auth0/dist/**',
 
-					'jquery-ui/**'								
+					'jquery-ui/**',
+						
+					'slick-carousel/slick/**',
                 ],
                 dest: 'infovinity/libs/jquery',
                 cwd:  'bower_components',

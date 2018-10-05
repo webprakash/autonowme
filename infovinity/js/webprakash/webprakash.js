@@ -412,7 +412,7 @@ angular.module('webprakash').run(['$rootScope', '$transitions', '$state', '$stat
 			
 			$rootScope.$state = $state;
 			$rootScope.$stateParams = $stateParams;
-			$rootScope.helper = helper;
+			$rootScope.helper = helper;			
 			
                        
             $rootScope.$on('app-error', function(event, mass) {

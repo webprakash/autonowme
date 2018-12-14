@@ -158,6 +158,12 @@ module.exports = {
 					'angular-slick-carousel/dist/**',
 
 					'angular-recaptcha/release/**',
+
+					'tinycolor/**',
+
+					'pick-a-color/build/**',
+
+					'angular-pick-a-color/**',
 										
                 ],
                 dest: 'infovinity/libs/angular',

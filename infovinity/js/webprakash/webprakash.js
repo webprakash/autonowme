@@ -111,6 +111,15 @@ angular.module('webprakash').factory('AuthService', function ($http, $location, 
 		}
 		return attemptedUrl;
 	}	
+	
+	authService.refreshToken = function(){		
+		return $http.post(appConfig.wsUrl + 'default/refreshtoken', {})
+            .then(function (res) {
+				console.log(res);
+				authService.saveToken(res.data.token);
+                return res.data.token;                
+            });
+	}
 
 	authService.saveToken = function (data){
 		return tokenService.saveToken(data, "snehToken");

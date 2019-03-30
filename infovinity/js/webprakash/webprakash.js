@@ -98,8 +98,7 @@ angular.module('webprakash').factory('AuthService', function ($http, $location, 
     
     var authService = {};
 
-	authService.saveAttemptedUrl = function(def){
-        console.log('abc');
+	authService.saveAttemptedUrl = function(def){        
 		var attemptedUrl = $location.url();
 		return tokenService.saveToken(attemptedUrl, "attemptedUrl");		
 	}
@@ -114,8 +113,7 @@ angular.module('webprakash').factory('AuthService', function ($http, $location, 
 	
 	authService.refreshToken = function(){		
 		return $http.post(appConfig.wsUrl + 'default/refreshtoken', {})
-            .then(function (res) {
-				console.log(res);
+            .then(function (res) {				
 				authService.saveToken(res.data.token);
                 return res.data.token;                
             });
@@ -133,11 +131,9 @@ angular.module('webprakash').factory('AuthService', function ($http, $location, 
 		tokenService.destroyToken("snehToken");
 	}
 
-    authService.login = function (credentials) {
-        console.log(appConfig.wsUrl + 'default/jwtlogin');
+    authService.login = function (credentials) {        
         return $http.post(appConfig.wsUrl + 'default/jwtlogin', credentials)
-            .then(function (res) {
-				console.log(res);
+            .then(function (res) {				
                 authService.saveToken(res.data.token);
                 return res.data.token;
             });

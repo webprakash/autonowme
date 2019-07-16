@@ -420,7 +420,7 @@ angular.module('webprakash').run(['$rootScope', '$transitions', '$state', '$stat
 			$rootScope.helper = helper;			
 			
                        
-            $rootScope.$on('app-error', function(event, mass) {
+            $rootScope.$on('app-error', function(event, mass) {				
                 if (! angular.isObject(mass.data)){
                     toaster.pop("error", 'Error', mass.data);
                 }
@@ -429,7 +429,7 @@ angular.module('webprakash').run(['$rootScope', '$transitions', '$state', '$stat
                 }
             });
 
-            $rootScope.$on('app-success', function(event, mass) {
+            $rootScope.$on('app-success', function(event, mass) {				
                 if (! angular.isObject(mass.data)){
                     toaster.pop("success", '', mass.data);
                 }
@@ -557,6 +557,30 @@ angular.module('webprakash').run(['$rootScope', '$transitions', '$state', '$stat
             $rootScope.$stateParams = $stateParams;
         }
     ]);
+	
+angular.module('webprakash').directive('bindUnsafeHtml', ['$compile',
+  function($compile) {
+    return function(scope, element, attrs) {
+      scope.$watch(
+        function(scope) {
+          // watch the 'bindUnsafeHtml' expression for changes
+          return scope.$eval(attrs.bindUnsafeHtml);
+          //return element.children();
+        },
+        function(value) {
+          // when the 'bindUnsafeHtml' expression changes
+          // assign it into the current DOM
+          element.html(value);
+
+          // compile the new DOM and link it to the current scope
+          // NOTE: we only compile .childNodes so that
+          // we don't get into infinite loop compiling ourselves
+          $compile(element.contents())(scope);
+        }
+      );
+    };
+  }
+]);
 	
 
 angular.module('webprakash').directive('wpDatepicker', function(){
@@ -815,10 +839,10 @@ angular.module('webprakash').directive('timezonedDate', function () {
 				if (attrs.enableTime === true){
 					frmt = 'DD-MMM-YYYY HH:mm';
 				}
-
+				val = getDateFromFormat(val, frmt);				
 				var offset = moment(val).utcOffset();
 				var date = new Date(moment(val).subtract(offset, 'm'));
-				var newOffset = moment.tz.zone(attrs.timezone).offset(date);
+				var newOffset = moment.tz.zone(attrs.timezone).utcOffset(date);
 				var dt = new Date(moment(date).subtract(newOffset, 'm').unix() * 1000);
 
 				return moment(dt).format(frmt);
@@ -832,9 +856,8 @@ angular.module('webprakash').directive('timezonedDate', function () {
 				}
 				var offset = moment(val).utcOffset();
 				var date = new Date(moment(val).add(offset, 'm'));
-				var newOffset = moment.tz.zone(attrs.timezone).offset(date);
-				var dt = moment(date).add(newOffset, 'm').unix() * 1000;
-				console.log(frmt);
+				var newOffset = moment.tz.zone(attrs.timezone).utcOffset(date);
+				var dt = moment(date).add(newOffset, 'm').unix() * 1000;				
 				return moment(dt).format(frmt);
 			};
 
@@ -869,15 +892,21 @@ angular.module('webprakash').directive('wpDatetimepicker', function(helper){
 		link: function($scope, element, attrs, ngModel){
 
 			//if (val != ''){
-				console.log(attrs);
-				var val = $scope.model;
-				var offset = moment(val).utcOffset();
-				var date = new Date(moment(val).add(offset, 'm'));
-				var newOffset = moment.tz.zone(attrs.jsTimeZone).offset(date);
-				var dt = moment(date).add(newOffset, 'm').unix() * 1000;
-				// $scope.model = moment(dt).format('DD-MMM-YYYY');
-				$scope.model = new Date(dt);
+				// console.log(attrs);
 				console.log($scope.model);
+				if ($scope.model != undefined){
+					
+					var val = $scope.model;
+					
+					var offset = moment(val).utcOffset();
+					var date = new Date(moment(val).add(offset, 'm'));
+					var newOffset = moment.tz.zone(attrs.jsTimeZone).utcOffset(date);
+					var dt = moment(date).add(newOffset, 'm').unix() * 1000;
+					// $scope.model = moment(dt).format('DD-MMM-YYYY');
+					$scope.model = new Date(dt);
+					
+					
+				}
 			//}
 
 
@@ -919,8 +948,7 @@ angular.module('webprakash').directive('wpTrueValue', [function() {
     restrict: 'A',
     require: 'ngModel',
     link: function(scope, element, attrs, ngModel) {
-		console.log(ngModel);	
-		
+				
 		ngModel.$formatters.push(function(value) {
 			return value == 1 ? true : false;
 		});

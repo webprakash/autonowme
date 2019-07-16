@@ -164,6 +164,8 @@ module.exports = {
 					'pick-a-color/build/**',
 
 					'angular-pick-a-color/**',
+					
+					'angular-stripe-checkout/angular-stripe-checkout.js',
 										
                 ],
                 dest: 'infovinity/libs/angular',

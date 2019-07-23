@@ -407,6 +407,51 @@ angular.module('webprakash').factory('helper', ['$rootScope', '$http', 'dataFact
 
 		
 	}
+	
+	helper.convertDateStringsToDates = function convertDateStringsToDates(input, frmt) {
+				
+		// Ignore things that aren't objects.
+		if (typeof input !== "object") return input;
+
+		for (var key in input) {
+			
+			
+			if (!input.hasOwnProperty(key)) continue;
+
+			var value = input[key];
+			
+			
+			var match;
+			// Check for string properties which look like dates.
+			// if (typeof value === "string" && (match = value.match(regexIso8601))) {
+				
+			var frmt1 = 'dd-MMM-yyyy';
+			var frmt2 = 'dd-MMM-yyyy HH:mm:ss';	
+	
+							
+			if (typeof value === "string" && (isDate(value, frmt1) || isDate(value, frmt2))) {				
+								
+				if (isDate(value, frmt1)){
+					input[key] = new Date(getDateFromFormat(value, frmt1));
+				}
+				else if (isDate(value, frmt2)){
+					input[key] = new Date(getDateFromFormat(value, frmt2));
+				}
+				
+				// var milliseconds = Date.parse(match[0])
+				// if (!isNaN(milliseconds)) {
+				//	input[key] = new Date(milliseconds);
+				// }
+				
+			} else if (typeof value === "object") {
+				// Recurse into object
+				this.convertDateStringsToDates(value);
+			}
+		}
+		
+		return input;
+		
+	}
 
     return helper;
 }]);
@@ -874,7 +919,7 @@ angular.module('webprakash').directive('wpDatetimepicker', function(helper){
      			
 				
 		template:	'<p class="input-group">' +
-				'<input type="text" timezoned-date ng-attr-timezone="{{jsTimeZone}}" class="form-control" dateDirective ng-required = "{{required}}" enable-time="enableTime" enable-date="enableDate" datepicker-options = "{dateFormat: \'{{format}}\'}" datetime-picker="{{format}}" ng-model="model" is-open="isOpen"  />' +
+				'<input type="text" timezoned-date ng-attr-timezone="Europe/London" class="form-control" dateDirective ng-required = "{{required}}" enable-time="enableTime" enable-date="enableDate" datepicker-options = "{dateFormat: \'{{format}}\'}" datetime-picker="{{format}}" ng-model="model" is-open="isOpen"  />' +
 				'<span class="input-group-btn">' +
 				'<button type="button" class="btn btn-default" ng-click="isOpen = true"><i class="fa fa-calendar"></i></button>' +
 				'</span>' +
@@ -894,7 +939,7 @@ angular.module('webprakash').directive('wpDatetimepicker', function(helper){
 			//if (val != ''){
 				// console.log(attrs);
 				console.log($scope.model);
-				if ($scope.model != undefined){
+				if ($scope.model !== undefined){
 					
 					var val = $scope.model;
 					
@@ -902,8 +947,8 @@ angular.module('webprakash').directive('wpDatetimepicker', function(helper){
 					var date = new Date(moment(val).add(offset, 'm'));
 					var newOffset = moment.tz.zone(attrs.jsTimeZone).utcOffset(date);
 					var dt = moment(date).add(newOffset, 'm').unix() * 1000;
-					// $scope.model = moment(dt).format('DD-MMM-YYYY');
-					$scope.model = new Date(dt);
+					$scope.model = moment(dt).format('DD-MMM-YYYY');
+					// $scope.model = new Date(dt);
 					
 					
 				}

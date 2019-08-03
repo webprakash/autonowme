@@ -1,3 +1,5 @@
+var datePattern = "/^(([0-9])|([0-2][0-9])|([3][0-1]))\-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\-\d{4}$/";
+
 angular.module('webprakash', ['angular-jwt', 'pascalprecht.translate'], function ($translateProvider) {
 	// tell angular-translate to use your custom handler
 	$translateProvider.useMissingTranslationHandler('defaultTranslateFactory');

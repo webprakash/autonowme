@@ -156,6 +156,8 @@ module.exports = {
 					'angular-paging/dist/**',
 
 					'angular-slick-carousel/dist/**',
+					
+					'angularjs-datepicker/dist/**',
 
 					'angular-recaptcha/release/**',
 

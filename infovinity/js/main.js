@@ -39,10 +39,14 @@ angular.module('app')
 
 
             // config
-
+			
+			
             $scope.app = {
                 appConfig: appConfig,
                 authData: AuthService.getPayload().rs,
+				globalParam: {
+					dateForamt: /^(([0-9])|([0-2][0-9])|([3][0-1]))\-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\-\d{4}$/
+				},
                 name: appConfig.appTitle,
                 version: '1.3.3',
                 // for chart colors

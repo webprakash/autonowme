@@ -6084,6 +6084,7 @@ Editableform based on Twitter Bootstrap 3
 		formatDate: function(date, format, language){
 			if (typeof format === 'string')
 				format = DPGlobal.parseFormat(format);
+			date = moment(date, 'DD-MMM-YYYY').toDate();
 			var val = {
 				d: date.getUTCDate(),
 				D: dates[language].daysShort[date.getUTCDay()],

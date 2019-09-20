@@ -7,7 +7,7 @@ function getRemoteURL(mFile){
 };
 
 function getAddonPath(addonKey){
-	return MODULES + addonKey.split('.').join('/' + MODULES) + '/';
+	return MODULES + addonKey.split('.').join('/' + MODULES);
 };
 
 function getModuleUrl(path){

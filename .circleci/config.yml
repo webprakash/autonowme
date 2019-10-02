@@ -26,7 +26,7 @@ jobs:
           gcloud --quiet config set project ${GOOGLE_PROJECT_ID}
           gcloud --quiet config set compute/zone ${GOOGLE_COMPUTE_ZONE}
           gsutil defacl ch -u AllUsers:READER gs://$STORAGE_BUCKET
-          gsutil rsync -R /tmp/workspace/dist gs://$STORAGE_BUCKET/autonowme
+          gsutil rsync -R / gs://$STORAGE_BUCKET/autonowme
           gsutil setmeta -h "Cache-Control:private, max-age=0, no-transform" gs://$STORAGE_BUCKET/*.js
           
           

@@ -29,8 +29,9 @@ angular.module('webprakash').constant('USER_ROLES', {
 });
 
 angular.module('webprakash').config(function ($httpProvider, jwtInterceptorProvider) {
-    jwtInterceptorProvider.tokenGetter = function() {
-        return window.sessionStorage.getItem('snehToken');
+    
+    jwtInterceptorProvider.tokenGetter = function() {        
+        return window.sessionStorage.getItem(appConfig.tokenKey);
     }
     $httpProvider.interceptors.push('jwtInterceptor');
 
@@ -43,7 +44,7 @@ angular.module('webprakash').config(function ($httpProvider, jwtInterceptorProvi
 
 angular.module('webprakash').config(function(){
         $.ajaxSetup({
-            headers: { 'Authorization': window.sessionStorage.getItem('snehToken') }
+            headers: { 'Authorization': window.sessionStorage.getItem(appConfig.tokenKey) }
         });
     })
 
@@ -100,49 +101,80 @@ angular.module('webprakash').factory('AuthService', function ($http, $location, 
     
     var authService = {};
 
-	authService.saveAttemptedUrl = function(def){        
-		var attemptedUrl = $location.url();
-		return tokenService.saveToken(attemptedUrl, "attemptedUrl");		
-	}
+    authService.saveAttemptedUrl = function(def){        
+        var attemptedUrl = $location.url();
+        return tokenService.saveToken(attemptedUrl, "attemptedUrl");		
+    }
 
-	authService.getAttemptedUrl = function(def){
-		var attemptedUrl = tokenService.getToken("attemptedUrl");
-		if (! attemptedUrl){
-			attemptedUrl = def;
-		}
-		return attemptedUrl;
-	}	
+    authService.getAttemptedUrl = function(def){
+        var attemptedUrl = tokenService.getToken("attemptedUrl");
+        if (! attemptedUrl){
+                attemptedUrl = def;
+        }
+        return attemptedUrl;
+    }	
 	
-	authService.refreshToken = function(){		
-		return $http.post(appConfig.wsUrl + 'default/refreshtoken', {})
-            .then(function (res) {				
-				authService.saveToken(res.data.token);
-                return res.data.token;                
-            });
-	}
+    authService.refreshToken = function(mToken, isAdmin){
+        //console.log(mToken);
+        if (typeof mToken === 'undefined'){
+            mToken = "snehToken";
+        }
+        
+        if (typeof isAdmin === 'undefined'){
+            isAdmin = false;
+        }
+        
+        return $http.post(appConfig.wsUrl + 'default/refreshtoken', {'isAdmin': isAdmin})
+        .then(function (res) {				
+            authService.saveToken(res.data.token, mToken);
+            return res.data.token;                
+        });
+    }
 
-	authService.saveToken = function (data){
-		return tokenService.saveToken(data, "snehToken");
-	}
+    authService.saveToken = function (data, mToken){
+        //console.log(mToken);
+        if (typeof mToken === 'undefined'){
+            mToken = "snehToken";
+        }
+        return tokenService.saveToken(data, mToken);
+    }
 
-	authService.getToken = function (){
-		return tokenService.getToken("snehToken");
-	}
+    authService.getToken = function (mToken){
+        //console.log(mToken);
+        if (typeof mToken === 'undefined'){
+            mToken = "snehToken";
+        }
+        return tokenService.getToken(mToken);
+    }
 
-	authService.destroyToken = function (){
-		tokenService.destroyToken("snehToken");
-	}
+    authService.destroyToken = function (mToken){
+        if (typeof mToken === 'undefined'){
+            mToken = "snehToken";
+        }
+        
+        tokenService.destroyToken(mToken);
+    }
 
-    authService.login = function (credentials) {        
+    authService.login = function (credentials, mToken) {
+        //console.log(mToken);
+        if (typeof mToken === 'undefined'){
+            mToken = "snehToken";
+        }
+        
         return $http.post(appConfig.wsUrl + 'default/jwtlogin', credentials)
             .then(function (res) {				
-                authService.saveToken(res.data.token);
+                authService.saveToken(res.data.token, mToken);
                 return res.data.token;
             });
     };
 
-    authService.isAuthenticated = function () {
-        var rmsToken = tokenService.getToken("snehToken");
+    authService.isAuthenticated = function (mToken) {
+        //console.log(mToken);
+        if (typeof mToken === 'undefined'){
+            mToken = "snehToken";
+        }
+        
+        var rmsToken = tokenService.getToken(mToken);
 
         if (rmsToken) {
             if (!jwtHelper.isTokenExpired(rmsToken)) {
@@ -152,22 +184,28 @@ angular.module('webprakash').factory('AuthService', function ($http, $location, 
         return false;
     };
 
-    authService.isAuthorized = function (authorizedRoles) {
+    authService.isAuthorized = function (authorizedRoles, mToken) {
+        //console.log(mToken);
+        if (typeof mToken === 'undefined'){
+            mToken = "snehToken";
+        }
+        
         if (!angular.isArray(authorizedRoles)) {
             authorizedRoles = [authorizedRoles];
         }
 
-        if(authService.getToken()) {
-            var tokenPayload = jwtHelper.decodeToken(authService.getToken());
-            return (authService.isAuthenticated() && authorizedRoles.indexOf(tokenPayload.userRole) !== -1);
+        if(authService.getToken(mToken)) {
+            var tokenPayload = jwtHelper.decodeToken(authService.getToken(mToken));
+            return (authService.isAuthenticated(mToken) && authorizedRoles.indexOf(tokenPayload.userRole) !== -1);
         }
 
         return false;
     };
 
-    authService.getPayload = function(){
-        if(authService.getToken()) {			
-            var tokenPayload = jwtHelper.decodeToken(authService.getToken());
+    authService.getPayload = function(mToken){
+        //console.log(mToken);
+        if(authService.getToken(mToken)) {			
+            var tokenPayload = jwtHelper.decodeToken(authService.getToken(mToken));
             return tokenPayload;
         }
 
@@ -195,7 +233,7 @@ angular.module('webprakash').factory('AuthInterceptor', function ($rootScope, $q
         },
         response: function (response) {
             if (! angular.isUndefinedOrNull(response.data.rmsToken)){
-                window.sessionStorage.setItem("snehToken", response.data.rmsToken);
+                window.sessionStorage.setItem(appConfig.tokenKey, response.data.rmsToken);
             }
             $rootScope.$broadcast({
                 211: APP_EVENTS.appSuccess,
@@ -996,15 +1034,15 @@ angular.module('webprakash').directive('wpTrueValue', [function() {
     require: 'ngModel',
     link: function(scope, element, attrs, ngModel) {
 				
-		ngModel.$formatters.push(function(value) {
-			return value == 1 ? true : false;
-		});
-  
-	
-		ngModel.$parsers.push(function(v){		
-			console.log(v);
-			return v ? scope.$eval(attrs.wpTrueValue) : scope.$eval(attrs.wpFalseValue);
-		});
+        ngModel.$formatters.push(function(value) {
+                return value == 1 ? true : false;
+        });
+
+
+        ngModel.$parsers.push(function(v){		
+                console.log(v);
+                return v ? scope.$eval(attrs.wpTrueValue) : scope.$eval(attrs.wpFalseValue);
+        });
     }
   };
 }]);

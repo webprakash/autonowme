@@ -10,8 +10,7 @@ function getAddonPath(addonKey){
 	return MODULES + addonKey.split('.').join('/' + MODULES) + '/';
 };
 
-function getModuleUrl(path){
-	console.log(appConfig.appUrl + appConfig.module.name  + '/' + path);
+function getModuleUrl(path){	
 	return appConfig.appUrl + appConfig.module.name  + '/' + path;
 }
 
@@ -67,7 +66,7 @@ angular.module('app').factory('helper1', function ($http, $compile, DTOptionsBui
                 url: urlBase + url,
                 type: 'GET',
                 beforeSend : function(xhr) {
-                    xhr.setRequestHeader("Authorization", window.sessionStorage.getItem('snehToken'));
+                    xhr.setRequestHeader("Authorization", window.sessionStorage.getItem(appConfig.tokenKey));
                 }
             })
             // or here
@@ -116,7 +115,7 @@ function getDtOptions(url, DTOptionsBuilder, $compile, $scope, data){
 		 data: data,
          type: 'POST',
          beforeSend : function(xhr) {
-            xhr.setRequestHeader("Authorization", window.sessionStorage.getItem('snehToken'));
+            xhr.setRequestHeader("Authorization", window.sessionStorage.getItem(appConfig.tokenKey));
         }
      })
 
@@ -140,7 +139,7 @@ function getDtOptionsNotResponsive(url, DTOptionsBuilder, $compile, $scope, data
 		 data: data,
          type: 'POST',
          beforeSend : function(xhr) {
-            xhr.setRequestHeader("Authorization", window.sessionStorage.getItem('snehToken'));
+            xhr.setRequestHeader("Authorization", window.sessionStorage.getItem(appConfig.tokenKey));
         }
      })
 

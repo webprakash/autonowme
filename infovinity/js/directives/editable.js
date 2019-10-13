@@ -15,7 +15,7 @@
 						ajaxOptions: {
 							type: 'POST',
 							beforeSend: function (xhr) {
-								xhr.setRequestHeader("Authorization", window.sessionStorage.getItem('snehToken'));
+								xhr.setRequestHeader("Authorization", window.sessionStorage.getItem(appConfig.tokenKey));
 							}
 						},
 

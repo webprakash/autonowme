@@ -12,13 +12,13 @@
   "dependencies": {
     "angular-paging": "^2.2.2",
     "grunt-contrib-cssmin": "^0.14.0",
-    "grunt-contrib-watch": "^0.6.1",
+    "grunt-contrib-watch": "^1.1.0",
     "grunt-usemin": "^3.1.1",
     "natives": "^1.1.6"
   },
   "devDependencies": {
     "grunt": "^0.4.5",
-    "grunt-bower-install-simple": "^0.9.3",
+    "grunt-bower-install-simple": "^1.2.8",
     "grunt-bump": "^0.8.0",
     "grunt-changelog": "^0.3.2",
     "grunt-contrib-clean": "^0.6.0",
@@ -29,7 +29,7 @@
     "grunt-recess": "^1.0.0",
     "grunt-swig": "^0.2.1",
     "gruntfile-gtx": "^0.3.0",
-    "http-server": "^0.11.1",
+    "http-server": "^0.11.2",
     "require-directory": "^2.0.0"
   }
 }

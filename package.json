@@ -12,7 +12,7 @@
   "dependencies": {
     "angular-paging": "^2.2.2",
     "grunt-contrib-cssmin": "^0.14.0",
-    "grunt-contrib-watch": "^0.6.1",
+    "grunt-contrib-watch": "^1.1.0",
     "grunt-usemin": "^3.1.1",
     "natives": "^1.1.6"
   },
